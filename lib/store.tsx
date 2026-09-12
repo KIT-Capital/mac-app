@@ -71,7 +71,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           timepieces: prev.timepieces.length ? prev.timepieces : DEMO_TIMEPIECES,
           agreements: prev.agreements.length ? prev.agreements : DEMO_AGREEMENTS,
         })),
-      signOut: () => setState({ hydrated: true, user: null, timepieces: [], agreements: [] }),
+      signOut: () =>
+        setState((prev) => ({
+          ...prev,
+          user: null,
+        })),
       updateProfile: (patch) =>
         setState((prev) =>
           prev.user ? { ...prev, user: { ...prev.user, ...patch } } : prev

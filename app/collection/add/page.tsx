@@ -30,9 +30,9 @@ const IMAGE_OPTIONS = [
 export default function AddTimepiecePage() {
   const router = useRouter();
   const { addTimepiece, updateTimepiece } = useStore();
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>(["", "", "", ""]);
   const [brand, setBrand] = useState("Audemars Piguet");
-  const [model, setModel] = useState("");
+  const [model, setModel] = useState("Royal Oak Selfwinding");
   const [reference, setReference] = useState("");
   const [condition, setCondition] = useState("Excellent");
   const [boxPapers, setBoxPapers] = useState("Box and papers");
@@ -53,7 +53,7 @@ export default function AddTimepiecePage() {
         brand,
         model: model || "Untitled model",
         reference,
-        images: images.length ? images : ["/watches/royal-oak.png"],
+        images: images.filter(Boolean).length ? images.filter(Boolean) : ["/watches/royal-oak.png"],
         status: "not_evaluated" as const,
         financeable: TIER_ONE_BRANDS.includes(brand as (typeof TIER_ONE_BRANDS)[number]),
         condition,
@@ -85,9 +85,15 @@ export default function AddTimepiecePage() {
     ]
   );
 
-  function addImage() {
-    const next = IMAGE_OPTIONS[images.length % IMAGE_OPTIONS.length];
-    setImages((prev) => [...prev, next]);
+  function setSlotImage(index: number) {
+    const next = IMAGE_OPTIONS[index % IMAGE_OPTIONS.length];
+    setImages((prev) => {
+      const copy = [...prev];
+      while (copy.length <= index) copy.push("");
+      copy[index] = next;
+      return copy;
+    });
+    if (error) setError("");
   }
 
   function persist(watch: Timepiece) {
@@ -95,18 +101,27 @@ export default function AddTimepiecePage() {
     router.push(`/collection/${watch.id}`);
   }
 
+  function missingFields() {
+    const missing: string[] = [];
+    if (!images.some(Boolean)) missing.push("at least one image");
+    if (!model.trim()) missing.push("a model name");
+    return missing;
+  }
+
   function onSave(e: FormEvent) {
     e.preventDefault();
-    if (images.length < 1 || !model) {
-      setError("Add at least one image and a model name.");
+    const missing = missingFields();
+    if (missing.length) {
+      setError(`Add ${missing.join(" and ")}.`);
       return;
     }
     persist(draft);
   }
 
   function onAppraise() {
-    if (images.length < 1 || !model) {
-      setError("Add at least one image and a model name.");
+    const missing = missingFields();
+    if (missing.length) {
+      setError(`Add ${missing.join(" and ")}.`);
       return;
     }
     const watch: Timepiece = {
@@ -134,7 +149,7 @@ export default function AddTimepiecePage() {
             <button
               key={label}
               type="button"
-              onClick={addImage}
+              onClick={() => setSlotImage(i)}
               className="aspect-square overflow-hidden rounded-sm bg-[#161616] text-[10px] text-white/40"
             >
               {images[i] ? (
