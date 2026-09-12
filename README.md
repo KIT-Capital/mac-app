@@ -25,7 +25,7 @@ npm run dev -- --port 43173
 
 Open [http://localhost:43173](http://localhost:43173). On desktop the app sits in a phone frame; on a phone it is full width.
 
-Use **Sign in** with the prefilled collector account, or **Get started** to create a new one. **Restore demo collection** on the Account screen reloads the sample watches.
+Use **Sign in** with the prefilled collector account, or **Get started** to create a new one. Collection and agreements stay in the browser after logout. **Restore demo collection** on the Account screen reloads the sample watches.
 
 ## Product notes
 
