@@ -27,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geist.variable} ${display.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full bg-black font-sans text-white">
+      <body className="min-h-full bg-[#F3EEE6] font-sans text-white">
         <StoreProvider>
           <AppFrame>{children}</AppFrame>
         </StoreProvider>
