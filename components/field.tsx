@@ -26,6 +26,37 @@ export function Field({
   );
 }
 
+export function LineField({
+  label,
+  children,
+  onClear,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  onClear?: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("border-b border-mac-line py-2.5", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[12px] text-mac-faint">{label}</span>
+        {onClear ? (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[16px] leading-none text-mac-faint"
+            aria-label={`Clear ${label}`}
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
 export function NativeSelect({
   className,
   children,
@@ -42,7 +73,7 @@ export function NativeSelect({
       >
         {children}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-0 h-4 w-4 text-[#FCB040]" />
+      <ChevronDown className="pointer-events-none absolute right-0 h-4 w-4 text-mac-faint" />
     </div>
   );
 }
