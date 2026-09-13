@@ -56,3 +56,19 @@ export function MacDarkLogo({ className }: { className?: string }) {
 export function MacMark({ className }: { className?: string }) {
   return <MacLogoMark className={className} />;
 }
+
+/** Compact top lockup — occupies the same slot as the old MB&F wordmark. */
+export function MacLockup({ onDark = false, className }: { onDark?: boolean; className?: string }) {
+  return (
+    <div className={cn("flex flex-col items-center", className)}>
+      <span
+        className={cn(
+          "flex h-16 w-16 items-center justify-center",
+          onDark && "rounded-full bg-white p-1.5",
+        )}
+      >
+        <MacLogoMark />
+      </span>
+    </div>
+  );
+}

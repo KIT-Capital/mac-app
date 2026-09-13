@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { MacWordmark } from "@/components/mac-logo";
+import { MacLockup } from "@/components/mac-logo";
 import { SocialLogin } from "@/components/social-login";
 import { roleFromEmail } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
