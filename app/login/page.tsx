@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { MacWordmark } from "@/components/mac-logo";
 import { PillButton } from "@/components/field";
+import { roleFromEmail } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function LoginPage() {
@@ -14,30 +15,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState("••••••••");
   const [error, setError] = useState("");
 
+  function go(nextEmail: string) {
+    signIn({ email: nextEmail });
+    router.push(roleFromEmail(nextEmail) === "collector" ? "/collection" : "/admin");
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!email.includes("@")) {
       setError("Enter a valid email or phone number.");
       return;
     }
-    signIn({ email });
-    router.push("/collection");
+    go(email);
   }
 
   return (
-    <main className="flex flex-1 flex-col">
-      <div className="relative h-44 overflow-hidden">
+    <main className="flex flex-1 flex-col bg-black">
+      <div className="relative h-48 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/splash.jpg" alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black" />
-        <div className="absolute bottom-5 left-6">
-          <MacWordmark />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0E2A44]/20 to-black" />
+        <div className="absolute inset-x-0 bottom-6 flex justify-center">
+          <MacWordmark className="w-[220px]" />
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-1 flex-col px-6 pb-8 pt-6">
+      <form onSubmit={onSubmit} className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 pb-8 pt-6">
         <label className="space-y-1 border-b border-white/15 pb-3">
-          <span className="text-[11px] text-white/45">Email address or phone number</span>
+          <span className="text-[11px] text-white/40">Email address or phone number</span>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -46,7 +51,7 @@ export default function LoginPage() {
           />
         </label>
         <label className="mt-6 space-y-1 border-b border-white/15 pb-3">
-          <span className="text-[11px] text-white/45">Password</span>
+          <span className="text-[11px] text-white/40">Password</span>
           <input
             type="password"
             value={password}
@@ -54,7 +59,7 @@ export default function LoginPage() {
             className="w-full bg-transparent py-1 text-[16px] outline-none"
           />
         </label>
-        <button type="button" className="mt-3 self-end text-[12px] text-white/50">
+        <button type="button" className="mac-tap mt-2 self-end text-[12px] text-white/45">
           Forgot password
         </button>
 
@@ -66,11 +71,8 @@ export default function LoginPage() {
             <button
               key={mark}
               type="button"
-              onClick={() => {
-                signIn();
-                router.push("/collection");
-              }}
-              className="flex h-12 items-center justify-center rounded-full bg-[#1c1c1c] text-lg"
+              onClick={() => go(email)}
+              className="mac-tap flex h-12 items-center justify-center rounded-full bg-[#1c1c1c] text-lg"
             >
               {mark}
             </button>
@@ -81,9 +83,12 @@ export default function LoginPage() {
           <PillButton type="submit">Log in</PillButton>
           <p className="text-center text-[13px] text-white/50">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-white underline underline-offset-4">
+            <Link href="/signup" className="text-[#FCB040] underline underline-offset-4">
               Sign up
             </Link>
+          </p>
+          <p className="text-center text-[11px] text-white/35">
+            Desk: admin@mechartcap.com · Collector: jonathan.hale@mechartcap.com
           </p>
         </div>
       </form>

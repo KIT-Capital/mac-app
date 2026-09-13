@@ -10,7 +10,7 @@ import { useStore } from "@/lib/store";
 export default function WatchDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { timepieces, updateTimepiece } = useStore();
+  const { timepieces, updateTimepiece, removeTimepiece, settings } = useStore();
   const watch = timepieces.find((w) => w.id === params.id);
 
   if (!watch) {
@@ -24,13 +24,14 @@ export default function WatchDetailPage() {
     );
   }
 
-  const advance = estimateAdvance(watch.valueLow, watch.valueHigh);
+  const advance = estimateAdvance(watch.valueLow, watch.valueHigh, settings.maxLtv);
+  const locked = watch.status !== "not_evaluated";
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title={watch.brand} backHref="/collection" />
-      <div className="flex-1 overflow-y-auto pb-8">
-        <div className="grid grid-cols-2 gap-px bg-white/5">
+      <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto pb-8">
+        <div className="grid grid-cols-2 gap-px bg-white/5 md:grid-cols-3">
           {watch.images.map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img key={src} src={src} alt="" className="aspect-square w-full object-cover" />
@@ -39,13 +40,14 @@ export default function WatchDetailPage() {
         <div className="space-y-4 px-5 py-6">
           <div>
             <p className="text-[11px] tracking-[0.2em] text-[#FCB040] uppercase">{watch.status.replace("_", " ")}</p>
-            <h2 className="mt-1 font-[family-name:var(--font-display)] text-3xl">{watch.model}</h2>
+            <h2 className="mt-1 text-3xl font-medium tracking-tight">{watch.model}</h2>
             {watch.reference ? <p className="text-white/50">{watch.reference}</p> : null}
           </div>
           <p className="text-lg">{moneyRange(watch.valueLow, watch.valueHigh)}</p>
           {watch.financeable && watch.status === "appraised" ? (
             <p className="text-sm text-white/60">
-              Financing available up to {money(advance)} against this piece (65% of liquidation value).
+              Financing available up to {money(advance)} against this piece ({Math.round(settings.maxLtv * 100)}% of
+              liquidation value).
             </p>
           ) : null}
 
@@ -86,8 +88,9 @@ export default function WatchDetailPage() {
           ) : null}
 
           {watch.status === "reviewing" ? (
-            <p className="rounded-md border border-[#FCB040]/30 px-4 py-3 text-sm text-[#FCB040]">
-              MAC specialists are reviewing this timepiece. Typical turnaround is two business days.
+            <p className="border border-[#FCB040]/30 px-4 py-3 text-sm text-[#FCB040]">
+              MAC specialists are reviewing this timepiece. Typical turnaround is {settings.closeBusinessDays} business
+              days.
             </p>
           ) : null}
 
@@ -96,6 +99,25 @@ export default function WatchDetailPage() {
               Estimate financing
             </PillButton>
           ) : null}
+
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <PillButton
+              variant="ghost"
+              disabled={locked}
+              onClick={() => router.push("/collection/add")}
+            >
+              {locked ? "Locked" : "Edit later"}
+            </PillButton>
+            <PillButton
+              variant="ghost"
+              onClick={() => {
+                removeTimepiece(watch.id);
+                router.push("/collection");
+              }}
+            >
+              Remove
+            </PillButton>
+          </div>
         </div>
       </div>
     </main>

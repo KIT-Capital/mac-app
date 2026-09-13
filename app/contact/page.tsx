@@ -3,9 +3,10 @@
 import { FormEvent, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
-import { COMPANY } from "@/lib/catalog";
+import { useStore } from "@/lib/store";
 
 export default function ContactPage() {
+  const { settings } = useStore();
   const [sent, setSent] = useState(false);
 
   function onSubmit(e: FormEvent) {
@@ -14,19 +15,19 @@ export default function ContactPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title="Contact us" />
-      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+      <div className="mx-auto w-full max-w-md flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <p className="text-sm leading-6 text-white/65">
           Mechanical Art Capital provides confidential, overnight financing to the high-end watch
           community through sale-and-repurchase agreements. The desk is in New York. Closings
-          typically take two business days.
+          typically take {settings.closeBusinessDays} business days.
         </p>
         <div className="space-y-2 text-sm">
-          <p>{COMPANY.phone}</p>
-          <p>{COMPANY.email}</p>
-          <p>{COMPANY.financingEmail}</p>
-          <p>{COMPANY.handle}</p>
+          <p>{settings.phone}</p>
+          <p>{settings.email}</p>
+          <p>{settings.financingEmail}</p>
+          <p>{settings.handle}</p>
         </div>
         {sent ? (
           <p className="rounded-md border border-[#FCB040]/30 px-4 py-3 text-sm text-[#FCB040]">

@@ -4,13 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useMemo, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, NativeSelect, PillButton } from "@/components/field";
-import { COMPANY, DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
+import { DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 function EstimatorForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const { timepieces, user, createAgreement } = useStore();
+  const { timepieces, user, createAgreement, settings } = useStore();
   const appraised = timepieces.filter((w) => w.status === "appraised" && w.financeable);
   const initialId = params.get("watch") || appraised[0]?.id || "";
   const [watchId, setWatchId] = useState(initialId);
@@ -24,7 +24,7 @@ function EstimatorForm() {
 
   const watch = timepieces.find((w) => w.id === watchId);
   const maxAdvance = useMemo(
-    () => estimateAdvance(watch?.valueLow, watch?.valueHigh),
+    () => estimateAdvance(watch?.valueLow, watch?.valueHigh, settings.maxLtv),
     [watch]
   );
 
@@ -39,8 +39,8 @@ function EstimatorForm() {
       setError("Confirm you are at least 18 years old.");
       return;
     }
-    if (n < COMPANY.minAdvance) {
-      setError(`Minimum amount for a financial agreement is ${money(COMPANY.minAdvance)}.`);
+    if (n < settings.minAdvance) {
+      setError(`Minimum amount for a financial agreement is ${money(settings.minAdvance)}.`);
       return;
     }
     if (n > maxAdvance) {
@@ -59,7 +59,7 @@ function EstimatorForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title="Financing estimator" backHref="/financing" />
       {watch ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -98,7 +98,7 @@ function EstimatorForm() {
           />
         </Field>
         <p className="text-[12px] text-white/45">
-          Minimum amount for a financial agreement is {money(COMPANY.minAdvance)}.
+          Minimum amount for a financial agreement is {money(settings.minAdvance)}.
         </p>
         <Field label="Delivery method">
           <NativeSelect value={delivery} onChange={(e) => setDelivery(e.target.value)}>
@@ -125,7 +125,7 @@ function EstimatorForm() {
         </Field>
         <label className="flex items-start gap-3 text-sm text-white/75">
           <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1" />
-          I confirm that I am at least 18 years old
+          I confirm that I am at least {settings.ageMinimum} years old
         </label>
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
         <PillButton type="submit">Get estimate</PillButton>

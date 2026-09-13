@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
 import { COMPANY, money } from "@/lib/catalog";
-import { MacWordmark } from "@/components/mac-logo";
+import { MacLogoMark } from "@/components/mac-logo";
 import { useStore } from "@/lib/store";
 
 export default function AppraisalPage() {
@@ -18,8 +18,8 @@ export default function AppraisalPage() {
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-6">
         <div className="flex items-start justify-between">
-          <div className="scale-90 origin-left">
-            <MacWordmark />
+          <div className="w-24">
+            <MacLogoMark className="p-1" />
           </div>
           <p className="text-right text-[11px] leading-4 text-black/50">
             Evaluated by Mechanical Art Capital

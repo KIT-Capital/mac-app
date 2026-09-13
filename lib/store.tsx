@@ -8,26 +8,68 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES } from "@/lib/seed";
-import type { Agreement, AppState, Profile, Timepiece } from "@/lib/types";
+import {
+  DEMO_CATALOG,
+  DEMO_SETTINGS,
+  DEMO_SHELLS,
+  DEMO_USERS,
+  photosFromWatches,
+} from "@/lib/admin-seed";
+import { roleFromEmail } from "@/lib/catalog";
+import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
+import type {
+  Agreement,
+  AgreementShell,
+  AppSettings,
+  AppState,
+  CatalogEntry,
+  ManagedUser,
+  PhotoRecord,
+  Profile,
+  Timepiece,
+} from "@/lib/types";
 
-const STORAGE_KEY = "mac-app-state-v1";
+const STORAGE_KEY = "mac-app-state-v2";
 
 type Store = AppState & {
   signIn: (profile?: Partial<Profile>) => void;
+  signUp: (profile: Pick<Profile, "name" | "email"> & Partial<Profile>) => void;
   signOut: () => void;
   updateProfile: (patch: Partial<Profile>) => void;
+  completeOnboarding: () => void;
   addTimepiece: (watch: Timepiece) => void;
   updateTimepiece: (id: string, patch: Partial<Timepiece>) => void;
+  removeTimepiece: (id: string) => void;
   createAgreement: (input: Omit<Agreement, "id" | "createdAt" | "status">) => Agreement;
+  updateAgreement: (id: string, patch: Partial<Agreement>) => void;
+  removeAgreement: (id: string) => void;
   signAgreement: (id: string) => void;
+  updateSettings: (patch: Partial<AppSettings>) => void;
+  upsertUser: (user: ManagedUser) => void;
+  removeUser: (id: string) => void;
+  upsertCatalog: (entry: CatalogEntry) => void;
+  removeCatalog: (id: string) => void;
+  upsertShell: (shell: AgreementShell) => void;
+  removeShell: (id: string) => void;
+  upsertPhoto: (photo: PhotoRecord) => void;
+  removePhoto: (id: string) => void;
   resetDemo: () => void;
 };
 
 const StoreContext = createContext<Store | null>(null);
 
 function emptyState(): AppState {
-  return { hydrated: false, user: null, timepieces: [], agreements: [] };
+  return {
+    hydrated: false,
+    user: null,
+    timepieces: [],
+    agreements: [],
+    users: DEMO_USERS,
+    catalog: DEMO_CATALOG,
+    shells: DEMO_SHELLS,
+    photos: [],
+    settings: DEMO_SETTINGS,
+  };
 }
 
 function demoState(): AppState {
@@ -36,6 +78,54 @@ function demoState(): AppState {
     user: DEMO_PROFILE,
     timepieces: DEMO_TIMEPIECES,
     agreements: DEMO_AGREEMENTS,
+    users: DEMO_USERS,
+    catalog: DEMO_CATALOG,
+    shells: DEMO_SHELLS,
+    photos: photosFromWatches(DEMO_TIMEPIECES),
+    settings: DEMO_SETTINGS,
+  };
+}
+
+function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
+  const role = patch?.role ?? roleFromEmail(email);
+  if (role === "admin") {
+    return { ...ADMIN_PROFILE, ...patch, email, role };
+  }
+  if (role === "staff") {
+    return { ...STAFF_PROFILE, ...patch, email, role };
+  }
+  return {
+    name: patch?.name || "Collector",
+    email,
+    phone: patch?.phone || "",
+    member: patch?.member ?? false,
+    avatar: patch?.avatar || "/watches/patek-wrist.jpg",
+    role: "collector",
+    onboardingComplete: patch?.onboardingComplete ?? false,
+  };
+}
+
+function normalizeUser(user: Profile | null, timepieceCount: number): Profile | null {
+  if (!user) return null;
+  return {
+    ...user,
+    role: user.role ?? roleFromEmail(user.email),
+    onboardingComplete:
+      user.onboardingComplete ?? (timepieceCount > 0 || user.role === "admin" || user.role === "staff"),
+  };
+}
+
+function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): AppState {
+  return {
+    hydrated: true,
+    user: state.user ?? null,
+    timepieces,
+    agreements: state.agreements ?? [],
+    users: state.users?.length ? state.users : DEMO_USERS,
+    catalog: state.catalog?.length ? state.catalog : DEMO_CATALOG,
+    shells: state.shells?.length ? state.shells : DEMO_SHELLS,
+    photos: state.photos?.length ? state.photos : photosFromWatches(timepieces),
+    settings: { ...DEMO_SETTINGS, ...state.settings },
   };
 }
 
@@ -44,16 +134,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("mac-app-state-v1");
       if (raw) {
         const parsed = JSON.parse(raw) as AppState;
-        setState({ ...parsed, hydrated: true });
+        const timepieces = parsed.timepieces ?? [];
+        setState({
+          ...withDeskDefaults(parsed, timepieces),
+          user: normalizeUser(parsed.user, timepieces.length),
+        });
         return;
       }
     } catch {
-      /* use demo */
+      /* start empty */
     }
-    setState({ hydrated: true, user: null, timepieces: [], agreements: [] });
+    setState({ ...emptyState(), hydrated: true, user: null });
   }, []);
 
   useEffect(() => {
@@ -65,11 +159,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       signIn: (profile) =>
+        setState((prev) => {
+          const email = (profile?.email ?? prev.user?.email ?? DEMO_PROFILE.email).trim();
+          const lower = email.toLowerCase();
+          const switching = Boolean(prev.user?.email && prev.user.email.toLowerCase() !== lower);
+
+          if (lower === DEMO_PROFILE.email.toLowerCase() && (switching || !prev.timepieces.length)) {
+            return { ...demoState(), user: { ...DEMO_PROFILE, ...profile, email: DEMO_PROFILE.email } };
+          }
+
+          if (switching || !prev.user) {
+            const user = profileForEmail(email, profile);
+            const keepDesk =
+              prev.users.length || prev.catalog.length
+                ? prev
+                : withDeskDefaults({}, []);
+            return {
+              ...keepDesk,
+              hydrated: true,
+              user,
+              timepieces: user.role === "collector" ? [] : prev.timepieces,
+              agreements: user.role === "collector" ? [] : prev.agreements,
+            };
+          }
+
+          return {
+            ...prev,
+            user: normalizeUser(
+              { ...prev.user, ...profile, email, role: profile?.role ?? prev.user.role ?? roleFromEmail(email) },
+              prev.timepieces.length
+            ),
+          };
+        }),
+      signUp: (profile) =>
         setState((prev) => ({
           ...prev,
-          user: { ...DEMO_PROFILE, ...profile },
-          timepieces: prev.timepieces.length ? prev.timepieces : DEMO_TIMEPIECES,
-          agreements: prev.agreements.length ? prev.agreements : DEMO_AGREEMENTS,
+          hydrated: true,
+          user: profileForEmail(profile.email, { ...profile, role: "collector", onboardingComplete: false }),
+          timepieces: [],
+          agreements: [],
         })),
       signOut: () =>
         setState((prev) => ({
@@ -80,23 +208,62 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((prev) =>
           prev.user ? { ...prev, user: { ...prev.user, ...patch } } : prev
         ),
+      completeOnboarding: () =>
+        setState((prev) =>
+          prev.user ? { ...prev, user: { ...prev.user, onboardingComplete: true } } : prev
+        ),
       addTimepiece: (watch) =>
-        setState((prev) => ({ ...prev, timepieces: [watch, ...prev.timepieces] })),
+        setState((prev) => ({
+          ...prev,
+          timepieces: [watch, ...prev.timepieces],
+          photos: [
+            ...watch.images.map((url, index) => ({
+              id: `ph-${watch.id}-${index}-${Date.now()}`,
+              url,
+              kind: (["front", "back", "left", "buckle"] as const)[index] ?? "other",
+              assetId: watch.id,
+              caption: `${watch.brand} ${watch.model}`,
+              uploadedAt: new Date().toISOString().slice(0, 10),
+              ownerEmail: watch.ownerEmail || prev.user?.email || "",
+            })),
+            ...prev.photos,
+          ],
+        })),
       updateTimepiece: (id, patch) =>
         setState((prev) => ({
           ...prev,
           timepieces: prev.timepieces.map((w) => (w.id === id ? { ...w, ...patch } : w)),
         })),
+      removeTimepiece: (id) =>
+        setState((prev) => ({
+          ...prev,
+          timepieces: prev.timepieces.filter((w) => w.id !== id),
+          photos: prev.photos.filter((p) => p.assetId !== id),
+          agreements: prev.agreements
+            .map((a) => ({ ...a, watchIds: a.watchIds.filter((wid) => wid !== id) }))
+            .filter((a) => a.watchIds.length > 0),
+        })),
       createAgreement: (input) => {
         const agreement: Agreement = {
           ...input,
           id: `agr-${Date.now().toString().slice(-6)}`,
+          agreementCode: `MAC-${Date.now().toString().slice(-5)}`,
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
         };
         setState((prev) => ({ ...prev, agreements: [agreement, ...prev.agreements] }));
         return agreement;
       },
+      updateAgreement: (id, patch) =>
+        setState((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+        })),
+      removeAgreement: (id) =>
+        setState((prev) => ({
+          ...prev,
+          agreements: prev.agreements.filter((a) => a.id !== id),
+        })),
       signAgreement: (id) =>
         setState((prev) => ({
           ...prev,
@@ -106,8 +273,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : a
           ),
         })),
+      updateSettings: (patch) =>
+        setState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
+      upsertUser: (user) =>
+        setState((prev) => {
+          const exists = prev.users.some((u) => u.id === user.id);
+          return {
+            ...prev,
+            users: exists ? prev.users.map((u) => (u.id === user.id ? user : u)) : [user, ...prev.users],
+          };
+        }),
+      removeUser: (id) =>
+        setState((prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) })),
+      upsertCatalog: (entry) =>
+        setState((prev) => {
+          const exists = prev.catalog.some((c) => c.id === entry.id);
+          return {
+            ...prev,
+            catalog: exists ? prev.catalog.map((c) => (c.id === entry.id ? entry : c)) : [entry, ...prev.catalog],
+          };
+        }),
+      removeCatalog: (id) =>
+        setState((prev) => ({ ...prev, catalog: prev.catalog.filter((c) => c.id !== id) })),
+      upsertShell: (shell) =>
+        setState((prev) => {
+          const exists = prev.shells.some((s) => s.id === shell.id);
+          return {
+            ...prev,
+            shells: exists ? prev.shells.map((s) => (s.id === shell.id ? shell : s)) : [shell, ...prev.shells],
+          };
+        }),
+      removeShell: (id) =>
+        setState((prev) => ({ ...prev, shells: prev.shells.filter((s) => s.id !== id) })),
+      upsertPhoto: (photo) =>
+        setState((prev) => {
+          const exists = prev.photos.some((p) => p.id === photo.id);
+          return {
+            ...prev,
+            photos: exists ? prev.photos.map((p) => (p.id === photo.id ? photo : p)) : [photo, ...prev.photos],
+          };
+        }),
+      removePhoto: (id) =>
+        setState((prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) })),
       resetDemo: () => {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem("mac-app-state-v1");
         setState(demoState());
       },
     }),
@@ -121,4 +331,8 @@ export function useStore() {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error("useStore must be used within StoreProvider");
   return ctx;
+}
+
+export function isDesk(user: Profile | null) {
+  return user?.role === "admin" || user?.role === "staff";
 }

@@ -1,7 +1,11 @@
 export type WatchStatus = "not_evaluated" | "reviewing" | "appraised";
+export type Role = "collector" | "staff" | "admin";
+export type UserStatus = "active" | "invited" | "suspended";
+export type PhotoKind = "front" | "back" | "left" | "buckle" | "papers" | "other";
 
 export type Timepiece = {
   id: string;
+  ownerEmail?: string;
   brand: string;
   model: string;
   reference?: string;
@@ -21,6 +25,7 @@ export type Timepiece = {
   bandMaterial: string;
   complication: string;
   evaluatedAt?: string;
+  assetCode?: string;
 };
 
 export type AgreementStatus = "draft" | "pending_signature" | "signed";
@@ -36,6 +41,7 @@ export type Agreement = {
   status: AgreementStatus;
   createdAt: string;
   signedAt?: string;
+  agreementCode?: string;
 };
 
 export type Profile = {
@@ -44,6 +50,72 @@ export type Profile = {
   phone: string;
   member: boolean;
   avatar: string;
+  role: Role;
+  onboardingComplete: boolean;
+};
+
+export type ManagedUser = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: Role;
+  status: UserStatus;
+  member: boolean;
+  lastActive: string;
+};
+
+export type CatalogEntry = {
+  id: string;
+  brand: string;
+  model: string;
+  reference: string;
+  caseMetal: string;
+  caseDiameter: string;
+  typicalLow: number;
+  typicalHigh: number;
+  financeable: boolean;
+  notes: string;
+};
+
+export type AgreementShell = {
+  id: string;
+  code: string;
+  title: string;
+  termMonths: number;
+  rate: number;
+  ltv: number;
+  status: "open" | "assigned" | "closed";
+  createdAt: string;
+};
+
+export type PhotoRecord = {
+  id: string;
+  url: string;
+  kind: PhotoKind;
+  assetId?: string;
+  caption: string;
+  uploadedAt: string;
+  ownerEmail: string;
+};
+
+export type AppSettings = {
+  companyName: string;
+  phone: string;
+  email: string;
+  financingEmail: string;
+  handle: string;
+  startingRate: number;
+  minAdvance: number;
+  maxLtv: number;
+  typicalTerm: number;
+  membershipMonthly: number;
+  minPieceValue: number;
+  closeBusinessDays: number;
+  vaultLocation: string;
+  requireFourPhotos: boolean;
+  ageMinimum: number;
+  allowVideo: boolean;
 };
 
 export type AppState = {
@@ -51,4 +123,9 @@ export type AppState = {
   user: Profile | null;
   timepieces: Timepiece[];
   agreements: Agreement[];
+  users: ManagedUser[];
+  catalog: CatalogEntry[];
+  shells: AgreementShell[];
+  photos: PhotoRecord[];
+  settings: AppSettings;
 };

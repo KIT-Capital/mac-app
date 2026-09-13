@@ -1,3 +1,5 @@
+import { DEFAULT_SETTINGS } from "@/lib/theme";
+
 export const TIER_ONE_BRANDS = [
   "A. Lange & Söhne",
   "Audemars Piguet",
@@ -70,17 +72,27 @@ export const DELIVERY_METHODS = [
   "NYC vault drop-off",
 ];
 
+export const MODELS_BY_BRAND: Record<string, string[]> = {
+  "Audemars Piguet": ["Royal Oak Selfwinding", "Royal Oak Offshore", "Royal Oak Perpetual Calendar"],
+  "Patek Philippe": ["Nautilus", "Calatrava Pilot Travel Time", "Aquanaut", "Grand Complications"],
+  "Richard Mille": ["RM 011", "RM 027", "RM 035"],
+  "Romain Gauthier": ["Logical One", "Insight Micro-Rotor"],
+  "MB&F": ["HMX", "Legacy Machine", "Horological Machine"],
+  Rolex: ["Daytona", "GMT-Master II", "Day-Date"],
+  "Vacheron Constantin": ["Overseas", "Patrimony", "Traditionnelle"],
+};
+
 export const COMPANY = {
-  name: "Mechanical Art Capital",
+  name: DEFAULT_SETTINGS.companyName,
   short: "MAC",
-  phone: "+1 (833) 209-0972",
-  email: "info@mechartcap.com",
-  financingEmail: "financing@mechartcap.com",
-  handle: "@mechartcap",
-  rate: 0.18,
-  minAdvance: 10_000,
-  ltv: 0.65,
-  membershipMonthly: 4.99,
+  phone: DEFAULT_SETTINGS.phone,
+  email: DEFAULT_SETTINGS.email,
+  financingEmail: DEFAULT_SETTINGS.financingEmail,
+  handle: DEFAULT_SETTINGS.handle,
+  rate: DEFAULT_SETTINGS.startingRate,
+  minAdvance: DEFAULT_SETTINGS.minAdvance,
+  ltv: DEFAULT_SETTINGS.maxLtv,
+  membershipMonthly: DEFAULT_SETTINGS.membershipMonthly,
 };
 
 export function money(n: number) {
@@ -97,7 +109,16 @@ export function moneyRange(low?: number, high?: number) {
   return money(low || high || 0);
 }
 
-export function estimateAdvance(valueLow?: number, valueHigh?: number) {
+export function estimateAdvance(valueLow?: number, valueHigh?: number, ltv = COMPANY.ltv) {
   const base = valueLow ?? (valueHigh ? valueHigh * 0.75 : 0);
-  return Math.round((base * COMPANY.ltv) / 500) * 500;
+  return Math.round((base * ltv) / 500) * 500;
+}
+
+export function roleFromEmail(email: string) {
+  const lower = email.trim().toLowerCase();
+  if (lower === "admin@mechartcap.com" || lower.startsWith("admin@")) return "admin" as const;
+  if (lower === "desk@mechartcap.com" || lower.startsWith("desk@") || lower.startsWith("financing@")) {
+    return "staff" as const;
+  }
+  return "collector" as const;
 }

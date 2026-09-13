@@ -21,7 +21,7 @@ export default function AgreementDetailPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title="Repurchase agreement" backHref="/agreements" />
       <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-6 text-white/80">
         <div className="mb-4 flex items-center justify-between">

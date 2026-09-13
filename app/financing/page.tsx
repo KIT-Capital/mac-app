@@ -7,26 +7,27 @@ import { money } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function FinancingPage() {
-  const { agreements, timepieces } = useStore();
+  const { agreements, timepieces, settings } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader
         title="Financing"
         right={
-          <Link href="/financing/new" aria-label="New estimate">
-            <Plus className="h-5 w-5" />
+          <Link href="/financing/new" aria-label="New estimate" className="mac-tap flex items-center justify-center">
+            <Plus className="h-5 w-5" strokeWidth={1.5} />
           </Link>
         }
       />
-      <div className="flex-1 space-y-4 px-5 py-5">
+      <div className="mx-auto w-full max-w-xl flex-1 space-y-4 px-5 py-5">
         <p className="text-sm leading-6 text-white/60">
-          Confidential sale-and-repurchase agreements against selected models. Typical close is two
-          business days, including manufacturer verification. Advances start at $10,000 and run at
-          18% plus fees, never above 65% of liquidation value.
+          Confidential sale-and-repurchase agreements against selected models. Typical close is{" "}
+          {settings.closeBusinessDays} business days, including manufacturer verification. Advances start at $
+          {settings.minAdvance.toLocaleString()} and run at {Math.round(settings.startingRate * 100)}% plus fees, never
+          above {Math.round(settings.maxLtv * 100)}% of liquidation value.
         </p>
         {agreements.length === 0 ? (
-          <div className="rounded-lg border border-white/10 px-4 py-10 text-center text-sm text-white/50">
+          <div className="border border-white/10 px-4 py-10 text-center text-sm text-white/50">
             No financing requests yet.
             <Link href="/financing/new" className="mt-3 block text-[#FCB040]">
               Open the estimator
@@ -39,10 +40,10 @@ export default function FinancingPage() {
               <Link
                 key={a.id}
                 href={`/agreements/${a.id}`}
-                className="block rounded-lg border border-white/10 bg-[#111] p-4"
+                className="block border-b border-white/10 py-4"
               >
                 <div className="flex items-center justify-between text-[11px] tracking-[0.16em] uppercase text-white/45">
-                  <span>{a.id.toUpperCase()}</span>
+                  <span>{a.agreementCode || a.id}</span>
                   <span>{a.status.replace("_", " ")}</span>
                 </div>
                 <p className="mt-2 text-xl">{money(a.amount)}</p>

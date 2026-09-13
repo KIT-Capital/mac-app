@@ -6,11 +6,35 @@ export const DEMO_PROFILE: Profile = {
   phone: "+1 (212) 555-0148",
   member: false,
   avatar: "/watches/patek-wrist.jpg",
+  role: "collector",
+  onboardingComplete: true,
+};
+
+export const ADMIN_PROFILE: Profile = {
+  name: "Ricardo Cidale",
+  email: "admin@mechartcap.com",
+  phone: "+1 (833) 209-0972",
+  member: true,
+  avatar: "/brand/mac-logo.png",
+  role: "admin",
+  onboardingComplete: true,
+};
+
+export const STAFF_PROFILE: Profile = {
+  name: "Desk Partner",
+  email: "desk@mechartcap.com",
+  phone: "+1 (833) 209-0972",
+  member: true,
+  avatar: "/brand/mac-logo.png",
+  role: "staff",
+  onboardingComplete: true,
 };
 
 export const DEMO_TIMEPIECES: Timepiece[] = [
   {
     id: "rm-011",
+    ownerEmail: "jonathan.hale@mechartcap.com",
+    assetCode: "20210321-RM011",
     brand: "Richard Mille",
     model: "RM 011",
     reference: "RM 011",
@@ -33,6 +57,8 @@ export const DEMO_TIMEPIECES: Timepiece[] = [
   },
   {
     id: "pp-nautilus",
+    ownerEmail: "jonathan.hale@mechartcap.com",
+    assetCode: "20210321-PP5711",
     brand: "Patek Philippe",
     model: "Nautilus",
     reference: "5711/1A",
@@ -55,6 +81,8 @@ export const DEMO_TIMEPIECES: Timepiece[] = [
   },
   {
     id: "ap-royal-oak",
+    ownerEmail: "jonathan.hale@mechartcap.com",
+    assetCode: "20210321-AP15400",
     brand: "Audemars Piguet",
     model: "Royal Oak Selfwinding",
     reference: "15400ST",
@@ -76,6 +104,8 @@ export const DEMO_TIMEPIECES: Timepiece[] = [
   },
   {
     id: "rg-logical-one",
+    ownerEmail: "jonathan.hale@mechartcap.com",
+    assetCode: "20210321-RGLO",
     brand: "Romain Gauthier",
     model: "Logical One",
     images: ["/watches/romain-gauthier.jpg"],
@@ -97,6 +127,7 @@ export const DEMO_TIMEPIECES: Timepiece[] = [
 export const DEMO_AGREEMENTS: Agreement[] = [
   {
     id: "agr-31419",
+    agreementCode: "MAC-31419",
     watchIds: ["rm-011", "pp-nautilus"],
     amount: 200000,
     termMonths: 12,

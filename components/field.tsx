@@ -11,8 +11,8 @@ export function Field({
   className?: string;
 }) {
   return (
-    <label className={cn("block space-y-1.5 border-b border-white/12 pb-3", className)}>
-      <span className="text-[11px] tracking-[0.14em] text-white/45">{label}</span>
+    <label className={cn("block space-y-1 border-b border-white/12 pb-3", className)}>
+      <span className="text-[11px] tracking-[0.04em] text-white/40">{label}</span>
       {children}
     </label>
   );
@@ -26,7 +26,7 @@ export function NativeSelect({
     <select
       className={cn(
         "w-full appearance-none bg-transparent py-1 text-[16px] text-white outline-none",
-        className
+        className,
       )}
       {...props}
     />
@@ -35,25 +35,26 @@ export function NativeSelect({
 
 export function PillButton({
   children,
-  variant = "champagne",
+  variant = "navy",
   className,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "champagne" | "white" | "navy" | "ghost";
+  variant?: "champagne" | "white" | "navy" | "ghost" | "gold";
 }) {
   const styles = {
     champagne: "bg-[#E8D5C0] text-black",
     white: "bg-white text-black",
     navy: "bg-[#0E2A44] text-white",
     ghost: "bg-transparent text-white ring-1 ring-white/25",
+    gold: "bg-[#FCB040] text-black",
   }[variant];
 
   return (
     <button
       className={cn(
-        "h-12 w-full rounded-full text-[13px] font-semibold tracking-[0.18em] uppercase disabled:opacity-40",
+        "mac-tap h-12 w-full rounded-none text-[12px] font-semibold tracking-[0.2em] uppercase disabled:opacity-40",
         styles,
-        className
+        className,
       )}
       {...props}
     >

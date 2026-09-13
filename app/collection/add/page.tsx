@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, NativeSelect, PillButton } from "@/components/field";
 import {
@@ -13,24 +13,22 @@ import {
   COMPLICATIONS,
   CONDITIONS,
   DIAL_COLORS,
+  MODELS_BY_BRAND,
   STRAP_MATERIALS,
   TIER_ONE_BRANDS,
 } from "@/lib/catalog";
+import { readImageFile } from "@/lib/image";
 import { useStore } from "@/lib/store";
 import type { Timepiece } from "@/lib/types";
 
-const IMAGE_OPTIONS = [
-  "/watches/richard-mille.jpg",
-  "/watches/patek-nautilus.jpg",
-  "/watches/royal-oak.png",
-  "/watches/romain-gauthier.jpg",
-  "/watches/patek-5524g.png",
-];
+const SLOTS = ["Front", "Back", "Left"] as const;
 
-export default function AddTimepiecePage() {
+function AddForm() {
   const router = useRouter();
-  const { addTimepiece, updateTimepiece } = useStore();
-  const [images, setImages] = useState<string[]>(["", "", "", ""]);
+  const params = useSearchParams();
+  const onboarding = params.get("onboarding") === "1";
+  const { addTimepiece, updateTimepiece, catalog, user, settings } = useStore();
+  const [images, setImages] = useState<string[]>(["", "", ""]);
   const [brand, setBrand] = useState("Audemars Piguet");
   const [model, setModel] = useState("Royal Oak Selfwinding");
   const [reference, setReference] = useState("");
@@ -45,15 +43,20 @@ export default function AddTimepiecePage() {
   const [bandMaterial, setBandMaterial] = useState("Steel");
   const [complication, setComplication] = useState("Date");
   const [error, setError] = useState("");
+  const [missingBrand, setMissingBrand] = useState(false);
+
+  const models = MODELS_BY_BRAND[brand] ?? catalog.filter((c) => c.brand === brand).map((c) => c.model);
 
   const draft = useMemo(
     () =>
       ({
         id: `tp-${Date.now()}`,
+        ownerEmail: user?.email,
+        assetCode: new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
         brand,
         model: model || "Untitled model",
         reference,
-        images: images.filter(Boolean).length ? images.filter(Boolean) : ["/watches/royal-oak.png"],
+        images: images.filter(Boolean),
         status: "not_evaluated" as const,
         financeable: TIER_ONE_BRANDS.includes(brand as (typeof TIER_ONE_BRANDS)[number]),
         condition,
@@ -82,28 +85,34 @@ export default function AddTimepiecePage() {
       images,
       model,
       reference,
+      user?.email,
     ]
   );
 
-  function setSlotImage(index: number) {
-    const next = IMAGE_OPTIONS[index % IMAGE_OPTIONS.length];
-    setImages((prev) => {
-      const copy = [...prev];
-      while (copy.length <= index) copy.push("");
-      copy[index] = next;
-      return copy;
-    });
-    if (error) setError("");
+  async function onPick(index: number, file?: File) {
+    if (!file) return;
+    try {
+      const data = await readImageFile(file);
+      setImages((prev) => {
+        const copy = [...prev];
+        copy[index] = data;
+        return copy;
+      });
+      setError("");
+    } catch {
+      setError("That photo could not be read.");
+    }
   }
 
   function persist(watch: Timepiece) {
     addTimepiece(watch);
-    router.push(`/collection/${watch.id}`);
+    router.push(onboarding ? "/collection/continue" : `/collection/${watch.id}`);
   }
 
   function missingFields() {
     const missing: string[] = [];
-    if (!images.some(Boolean)) missing.push("at least one image");
+    const needed = settings.requireFourPhotos ? 3 : 1;
+    if (images.filter(Boolean).length < needed) missing.push("front, back, and left photos");
     if (!model.trim()) missing.push("a model name");
     return missing;
   }
@@ -124,10 +133,7 @@ export default function AddTimepiecePage() {
       setError(`Add ${missing.join(" and ")}.`);
       return;
     }
-    const watch: Timepiece = {
-      ...draft,
-      status: "reviewing",
-    };
+    const watch: Timepiece = { ...draft, status: "reviewing" };
     persist(watch);
     window.setTimeout(() => {
       updateTimepiece(watch.id, {
@@ -140,35 +146,46 @@ export default function AddTimepiecePage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col">
-      <ScreenHeader title="Add a timepiece" backHref="/collection" />
-      <form onSubmit={onSave} className="flex-1 space-y-6 overflow-y-auto px-5 py-5 pb-10">
-        <p className="text-[12px] text-white/50">Please upload at least 4 images of the timepiece</p>
-        <div className="grid grid-cols-4 gap-2">
-          {["Front", "Back", "Left", "Buckle"].map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setSlotImage(i)}
-              className="aspect-square overflow-hidden rounded-sm bg-[#161616] text-[10px] text-white/40"
-            >
-              {images[i] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={images[i]} alt={label} className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full flex-col items-center justify-center gap-1">
-                  +<span>{label}</span>
-                </span>
-              )}
-            </button>
+    <main className="flex flex-1 flex-col bg-black">
+      <ScreenHeader title="Add a timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
+      <form onSubmit={onSave} className="mx-auto w-full max-w-xl flex-1 space-y-6 overflow-y-auto px-5 py-5 pb-10">
+        <p className="text-[13px] text-white/55">Please upload at least 4 images of the timepiece</p>
+        <div className="grid grid-cols-3 gap-4">
+          {SLOTS.map((label, i) => (
+            <label key={label} className="block text-center">
+              <span className="flex aspect-square items-center justify-center overflow-hidden bg-[#1a1a1a] text-white/35">
+                {images[i] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={images[i]} alt={label} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-2xl">+</span>
+                )}
+              </span>
+              <span className="mt-2 block text-[11px] tracking-[0.12em] text-white/45 uppercase">{label}</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => onPick(i, e.target.files?.[0])}
+              />
+            </label>
           ))}
         </div>
-        <button type="button" className="text-[13px] text-[#E8D5C0]">
-          + Upload video
-        </button>
+        {settings.allowVideo ? (
+          <button type="button" className="mac-tap w-full text-left text-[13px] text-white/80">
+            + Upload video
+          </button>
+        ) : null}
 
         <Field label="Manufacturer / Brand">
-          <NativeSelect value={brand} onChange={(e) => setBrand(e.target.value)}>
+          <NativeSelect
+            value={brand}
+            onChange={(e) => {
+              setBrand(e.target.value);
+              const next = MODELS_BY_BRAND[e.target.value]?.[0];
+              if (next) setModel(next);
+            }}
+          >
             {TIER_ONE_BRANDS.map((b) => (
               <option key={b} value={b} className="bg-black">
                 {b}
@@ -176,13 +193,34 @@ export default function AddTimepiecePage() {
             ))}
           </NativeSelect>
         </Field>
+        <button
+          type="button"
+          onClick={() => setMissingBrand((v) => !v)}
+          className="text-[12px] text-white underline underline-offset-4"
+        >
+          Missing a brand?
+        </button>
+        {missingBrand ? (
+          <p className="text-[12px] text-white/50">
+            Email {settings.financingEmail} and the desk will add the manufacturer to the catalog.
+          </p>
+        ) : null}
         <Field label="Your model (name or number)">
-          <input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full bg-transparent py-1 text-[16px] outline-none"
-            placeholder="Royal Oak Selfwinding"
-          />
+          {models.length ? (
+            <NativeSelect value={model} onChange={(e) => setModel(e.target.value)}>
+              {models.map((m) => (
+                <option key={m} value={m} className="bg-black">
+                  {m}
+                </option>
+              ))}
+            </NativeSelect>
+          ) : (
+            <input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full bg-transparent py-1 text-[16px] outline-none"
+            />
+          )}
         </Field>
         <Field label="Reference number (if different)">
           <input
@@ -255,22 +293,14 @@ export default function AddTimepiecePage() {
           </NativeSelect>
         </Field>
         <div className="space-y-3 border-b border-white/12 pb-3">
-          <p className="text-[11px] tracking-[0.14em] text-white/45">Band</p>
-          <div className="flex gap-8 text-[15px]">
+          <p className="text-[11px] text-white/40">Band</p>
+          <div className="flex gap-10 text-[15px]">
             <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={band === "strap"}
-                onChange={() => setBand("strap")}
-              />
+              <input type="radio" checked={band === "strap"} onChange={() => setBand("strap")} />
               Strap
             </label>
             <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                checked={band === "bracelet"}
-                onChange={() => setBand("bracelet")}
-              />
+              <input type="radio" checked={band === "bracelet"} onChange={() => setBand("bracelet")} />
               Metal bracelet
             </label>
           </div>
@@ -308,5 +338,13 @@ export default function AddTimepiecePage() {
         </div>
       </form>
     </main>
+  );
+}
+
+export default function AddTimepiecePage() {
+  return (
+    <Suspense fallback={<div className="flex flex-1 items-center justify-center text-white/40">Loading</div>}>
+      <AddForm />
+    </Suspense>
   );
 }

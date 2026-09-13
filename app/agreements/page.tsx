@@ -9,7 +9,7 @@ export default function AgreementsPage() {
   const { agreements } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title="Agreements" backHref="/financing" />
       <div className="flex-1 space-y-3 px-5 py-5">
         {agreements.length === 0 ? (

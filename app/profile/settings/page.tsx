@@ -21,7 +21,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title="Settings" backHref="/profile" />
       <form onSubmit={onSave} className="flex-1 space-y-6 px-6 py-8">
         <Field label="Name">

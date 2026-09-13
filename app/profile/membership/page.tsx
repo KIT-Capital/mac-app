@@ -2,19 +2,18 @@
 
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
-import { COMPANY } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function MembershipPage() {
-  const { user, updateProfile } = useStore();
+  const { user, updateProfile, settings } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex flex-1 flex-col bg-black">
       <ScreenHeader title="Membership" backHref="/profile" />
       <div className="flex-1 space-y-6 px-6 py-8">
         <p className="text-[11px] tracking-[0.22em] text-[#FCB040] uppercase">Premium collection service</p>
-        <h2 className="font-[family-name:var(--font-display)] text-4xl leading-tight">
-          Monthly appraisals for ${COMPANY.membershipMonthly.toFixed(2)}
+        <h2 className="text-4xl leading-tight font-medium tracking-tight">
+          Monthly appraisals for ${settings.membershipMonthly.toFixed(2)}
           <span className="text-2xl text-white/50">/month</span>
         </h2>
         <p className="text-sm leading-6 text-white/65">
