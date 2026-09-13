@@ -26,6 +26,17 @@ Admin desk (`admin@mechartcap.com`):
 
 Collection state lives in the browser. Outbound mail goes through the Next.js `/api/mail` route and Resend.
 
+## Hosting
+
+Railway runs the production app. Cloudware Hosting holds `mechartcap.com` and DNS. See `docs/hosting.md`.
+
+```bash
+railway up -y -m "MAC collector app"
+railway domain mechartcap.com
+```
+
+Then add the CNAME / TXT records Railway prints in the Cloudware portal.
+
 ## Run locally
 
 ```bash

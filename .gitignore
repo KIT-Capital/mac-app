@@ -34,8 +34,12 @@ yarn-error.log*
 .env*
 !.env.example
 
-# vercel
+# vercel / railway
 .vercel
+.railway
+
+# misnamed TIFF export — do not ship
+/public/brand/mac-logo-full.png
 
 # typescript
 *.tsbuildinfo
