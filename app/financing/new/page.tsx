@@ -25,7 +25,7 @@ function EstimatorForm() {
   const watch = timepieces.find((w) => w.id === watchId);
   const maxAdvance = useMemo(
     () => estimateAdvance(watch?.valueLow, watch?.valueHigh, settings.maxLtv),
-    [watch]
+    [watch, settings.maxLtv]
   );
 
   function onSubmit(e: FormEvent) {
@@ -59,76 +59,85 @@ function EstimatorForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
-      <ScreenHeader title="Financing estimator" backHref="/financing" />
+    <main className="flex flex-1 flex-col bg-[#10141D]">
+      <ScreenHeader title="Financing Estimator" backHref="/financing" />
       {watch ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={watch.images[0]} alt="" className="h-44 w-full object-cover" />
+        <div className="relative h-44 w-full bg-[#090C12] overflow-hidden border-b border-white/10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={watch.images[0]} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#10141D] via-transparent to-transparent" />
+          <div className="absolute bottom-3 left-4">
+            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Selected Collateral</span>
+            <p className="text-[15px] font-semibold text-white">{watch.brand} {watch.model}</p>
+          </div>
+        </div>
       ) : null}
-      <form onSubmit={onSubmit} className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-        <Field label="Timepiece">
+      <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        <Field label="Selected Timepiece">
           <NativeSelect value={watchId} onChange={(e) => setWatchId(e.target.value)}>
             {appraised.length === 0 ? (
-              <option className="bg-black">No appraised pieces yet</option>
+              <option className="bg-[#161B24]">No appraised pieces yet</option>
             ) : (
               appraised.map((w) => (
-                <option key={w.id} value={w.id} className="bg-black">
+                <option key={w.id} value={w.id} className="bg-[#161B24]">
                   {w.brand} {w.model}
                 </option>
               ))
             )}
           </NativeSelect>
         </Field>
-        <Field label="Term (months)">
+        <Field label="Repurchase Term (Months)">
           <NativeSelect value={term} onChange={(e) => setTerm(Number(e.target.value))}>
             {TERMS.map((t) => (
-              <option key={t} value={t} className="bg-black">
-                {t} months
+              <option key={t} value={t} className="bg-[#161B24]">
+                {t} Months (Typical liquidity term)
               </option>
             ))}
           </NativeSelect>
         </Field>
-        <Field label={`Enter amount up to ${maxAdvance ? money(maxAdvance) : "—"}`}>
+        <Field label={`Requested Advance (Max ${maxAdvance ? money(maxAdvance) : "—"})`}>
           <input
             inputMode="numeric"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder={maxAdvance ? String(Math.min(maxAdvance, 200000)) : "20000"}
-            className="w-full bg-transparent py-1 text-[16px] outline-none"
+            className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/30"
           />
         </Field>
-        <p className="text-[12px] text-white/45">
-          Minimum amount for a financial agreement is {money(settings.minAdvance)}.
+        <p className="text-[11px] text-white/50">
+          Minimum advance is {money(settings.minAdvance)}. Interest begins at {Math.round(settings.startingRate * 100)}% plus custody fees.
         </p>
-        <Field label="Delivery method">
+        <Field label="Custody & Delivery Method">
           <NativeSelect value={delivery} onChange={(e) => setDelivery(e.target.value)}>
             {DELIVERY_METHODS.map((d) => (
-              <option key={d} className="bg-black">
+              <option key={d} className="bg-[#161B24]">
                 {d}
               </option>
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Email address">
+        <Field label="Direct Email Address">
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-transparent py-1 text-[16px] outline-none"
+            className="w-full bg-transparent text-[15px] text-white outline-none"
           />
         </Field>
-        <Field label="Watch owner's name">
+        <Field label="Beneficial Watch Owner Name">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-transparent py-1 text-[16px] outline-none"
+            className="w-full bg-transparent text-[15px] text-white outline-none"
           />
         </Field>
-        <label className="flex items-start gap-3 text-sm text-white/75">
-          <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-1" />
-          I confirm that I am at least {settings.ageMinimum} years old
+        <label className="flex items-start gap-3 text-[13px] text-white/75 cursor-pointer pt-1">
+          <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-0.5 h-4 w-4 rounded accent-[#FCB040]" />
+          <span>I confirm that I am at least {settings.ageMinimum} years old and authorized to pledge this asset.</span>
         </label>
-        {error ? <p className="text-sm text-red-300">{error}</p> : null}
-        <PillButton type="submit">Get estimate</PillButton>
+        {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
+        <PillButton type="submit" variant="gold" className="mt-2">
+          Generate Agreement Draft
+        </PillButton>
       </form>
     </main>
   );

@@ -17,34 +17,27 @@ export function ScreenHeader({
   return (
     <header
       className={cn(
-        "relative isolate flex h-[56px] shrink-0 items-center justify-between px-3 pt-[env(safe-area-inset-top)]",
+        "relative flex h-[54px] shrink-0 items-center justify-between border-b border-white/10 bg-[#0E2A44] px-3 shadow-sm",
         className,
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/brand/splash.jpg"
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover object-[86%_72%] opacity-30"
-      />
-      <div className="absolute inset-0 bg-[#0E2A44]/88" />
-      <div className="relative z-10 flex w-12 justify-start">
+      <div className="flex w-12 justify-start">
         {backHref ? (
           <Link
             href={backHref}
             aria-label="Back"
-            className="mac-tap flex items-center justify-center text-white"
+            className="mac-tap -ml-1 flex items-center justify-center text-white/80 transition hover:text-white"
           >
-            <ArrowLeft className="h-5 w-5" strokeWidth={1.75} />
+            <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </Link>
         ) : (
-          <span className="w-11" />
+          <span className="w-8" />
         )}
       </div>
-      <h1 className="relative z-10 flex-1 text-center text-[13px] font-medium tracking-[0.22em] text-white uppercase">
+      <h1 className="flex-1 text-center text-[12px] font-semibold tracking-[0.22em] text-white uppercase">
         {title}
       </h1>
-      <div className="relative z-10 flex w-12 justify-end text-white">{right}</div>
+      <div className="flex w-12 justify-end text-white/90">{right}</div>
     </header>
   );
 }

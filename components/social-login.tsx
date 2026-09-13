@@ -2,7 +2,7 @@
 
 export function GoogleMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
       <path
         fill="#4285F4"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -25,7 +25,7 @@ export function GoogleMark() {
 
 export function FacebookMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
       <circle cx="12" cy="12" r="12" fill="#1877F2" />
       <path
         fill="#FFFFFF"
@@ -37,7 +37,7 @@ export function FacebookMark() {
 
 export function AppleMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className ?? "h-5 w-5"} fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className ?? "h-4 w-4"} fill="currentColor" aria-hidden>
       <path d="M16.37 12.23c-.03-3.04 2.48-4.5 2.59-4.57-1.41-2.06-3.61-2.34-4.39-2.37-1.87-.19-3.65 1.1-4.6 1.1-.95 0-2.42-1.07-3.98-1.04-2.05.03-3.94 1.19-5 3.02-2.13 3.69-.54 9.15 1.53 12.14 1.01 1.46 2.22 3.1 3.8 3.04 1.54-.06 2.12-.99 3.98-.99 1.86 0 2.38.99 4 .96 1.65-.03 2.7-1.49 3.71-2.96 1.17-1.7 1.65-3.35 1.68-3.44-.04-.01-3.22-1.24-3.25-4.89zM13.76 3.99c.85-1.03 1.42-2.46 1.26-3.89-1.22.05-2.7.81-3.57 1.84-.79.91-1.48 2.37-1.3 3.77 1.37.11 2.77-.7 3.61-1.72z" />
     </svg>
   );
@@ -45,16 +45,22 @@ export function AppleMark({ className }: { className?: string }) {
 
 export function SocialLogin({ onContinue }: { onContinue: () => void }) {
   return (
-    <div className="space-y-3 text-center">
-      <p className="text-[12px] tracking-[0.06em] text-white/60 uppercase">
-        Or log in with
-      </p>
-      <div className="flex items-center justify-center gap-4">
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-white/20" />
+        <span className="text-[10px] font-medium tracking-[0.16em] text-white/50 uppercase">
+          Or continue with
+        </span>
+        <div className="h-px flex-1 bg-white/20" />
+      </div>
+
+      <div className="flex items-center justify-center gap-4 pt-1">
         <button
           type="button"
           onClick={onContinue}
           aria-label="Sign in with Google"
-          className="mac-tap flex h-12 w-12 items-center justify-center rounded-full bg-[#242424] ring-1 ring-white/25 transition hover:bg-[#2e2e2e] active:scale-95"
+          title="Sign in with Google"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#1D222E] shadow-sm transition hover:border-[#FCB040] hover:bg-[#252C3A] active:scale-95"
         >
           <GoogleMark />
         </button>
@@ -62,7 +68,8 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           type="button"
           onClick={onContinue}
           aria-label="Continue with Facebook"
-          className="mac-tap flex h-12 w-12 items-center justify-center rounded-full bg-[#242424] ring-1 ring-white/25 transition hover:bg-[#2e2e2e] active:scale-95"
+          title="Continue with Facebook"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#1D222E] shadow-sm transition hover:border-[#FCB040] hover:bg-[#252C3A] active:scale-95"
         >
           <FacebookMark />
         </button>
@@ -70,9 +77,10 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           type="button"
           onClick={onContinue}
           aria-label="Sign in with Apple"
-          className="mac-tap flex h-12 w-12 items-center justify-center rounded-full bg-[#242424] text-white ring-1 ring-white/25 transition hover:bg-[#2e2e2e] active:scale-95"
+          title="Sign in with Apple"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#1D222E] text-white shadow-sm transition hover:border-[#FCB040] hover:bg-[#252C3A] active:scale-95"
         >
-          <AppleMark className="h-5 w-5" />
+          <AppleMark />
         </button>
       </div>
     </div>

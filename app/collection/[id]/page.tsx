@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { Check, Clock, Edit3, HelpCircle, Shield, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { estimateAdvance, money, moneyRange } from "@/lib/catalog";
@@ -15,10 +16,14 @@ export default function WatchDetailPage() {
 
   if (!watch) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <p className="text-white/60">This timepiece is no longer in the collection.</p>
-        <Link href="/collection" className="mt-4 text-[#FCB040]">
-          Back to collection
+      <main className="flex flex-1 flex-col items-center justify-center p-6 text-center bg-[#10141D]">
+        <HelpCircle className="h-10 w-10 text-white/30" />
+        <p className="mt-3 text-[14px] font-medium text-white/70">Timepiece Not Found</p>
+        <Link
+          href="/collection"
+          className="mt-4 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-[#FCB040]"
+        >
+          Return to Collection
         </Link>
       </main>
     );
@@ -28,95 +33,164 @@ export default function WatchDetailPage() {
   const locked = watch.status !== "not_evaluated";
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
+    <main className="flex flex-1 flex-col bg-[#10141D]">
       <ScreenHeader title={watch.brand} backHref="/collection" />
-      <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto pb-8">
-        <div className="grid grid-cols-2 gap-px bg-white/5 md:grid-cols-3">
-          {watch.images.map((src) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={src} src={src} alt="" className="aspect-square w-full object-cover" />
-          ))}
-        </div>
-        <div className="space-y-4 px-5 py-6">
-          <div>
-            <p className="text-[11px] tracking-[0.2em] text-[#FCB040] uppercase">{watch.status.replace("_", " ")}</p>
-            <h2 className="mt-1 text-3xl font-medium tracking-tight">{watch.model}</h2>
-            {watch.reference ? <p className="text-white/50">{watch.reference}</p> : null}
-          </div>
-          <p className="text-lg">{moneyRange(watch.valueLow, watch.valueHigh)}</p>
-          {watch.financeable && watch.status === "appraised" ? (
-            <p className="text-sm text-white/60">
-              Financing available up to {money(advance)} against this piece ({Math.round(settings.maxLtv * 100)}% of
-              liquidation value).
-            </p>
+
+      <div className="flex-1 overflow-y-auto pb-8">
+        {/* Gallery Hero */}
+        <div className="relative aspect-square w-full bg-[#090C12]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={watch.images[0]} alt={watch.model} className="h-full w-full object-cover" />
+
+          {/* Thumbnails if multi-angle */}
+          {watch.images.length > 1 ? (
+            <div className="absolute bottom-3 left-3 flex gap-2">
+              {watch.images.map((src, i) => (
+                <div
+                  key={src + i}
+                  className="h-12 w-12 overflow-hidden rounded-lg border-2 border-white/50 bg-[#161B24] shadow-md"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="h-full w-full object-cover" />
+                </div>
+              ))}
+            </div>
           ) : null}
 
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            {[
-              ["Condition", watch.condition],
-              ["Case metal", watch.caseMetal],
-              ["Case", `${watch.caseType} · ${watch.caseDiameter}`],
-              ["Dial", watch.dialColor],
-              ["Band", `${watch.band} · ${watch.bandMaterial}`],
-              ["Box & papers", watch.boxPapers],
-              ["Complication", watch.complication],
-              ["Evaluated", watch.evaluatedAt || "—"],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-[11px] tracking-[0.12em] text-white/40 uppercase">{k}</dt>
-                <dd className="mt-1">{v}</dd>
-              </div>
-            ))}
-          </dl>
+          {/* Status Badge */}
+          <div className="absolute top-3 right-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase backdrop-blur-md">
+              {watch.status === "appraised" ? <Check className="h-3 w-3" strokeWidth={3} /> : <Clock className="h-3 w-3" />}
+              {watch.status.replace("_", " ")}
+            </span>
+          </div>
+        </div>
 
+        {/* Content Body */}
+        <div className="p-5 space-y-5">
+          {/* Title & Reference */}
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.16em] text-[#FCB040] uppercase">
+              {watch.brand}
+            </p>
+            <h1 className="mt-0.5 text-[24px] font-semibold text-white tracking-tight">
+              {watch.model}
+            </h1>
+            {watch.reference ? (
+              <p className="text-[13px] text-white/55 font-mono">Ref. {watch.reference}</p>
+            ) : null}
+          </div>
+
+          {/* Valuation Card */}
+          <div className="rounded-2xl border border-white/15 bg-[#161B24] p-4">
+            <p className="text-[10px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
+              Certified Valuation
+            </p>
+            <p className="mt-1 text-[22px] font-bold text-white">
+              {moneyRange(watch.valueLow, watch.valueHigh)}
+            </p>
+
+            {watch.status === "appraised" && watch.financeable ? (
+              <div className="mt-3 border-t border-white/10 pt-3 flex items-center justify-between text-[12px]">
+                <span className="text-white/65">Est. Max Advance ({Math.round(settings.maxLtv * 100)}% LTV):</span>
+                <span className="font-bold text-[#FCB040]">{money(advance)}</span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Specifications Table */}
+          <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
+            <h3 className="text-[11px] font-bold tracking-[0.16em] text-white/50 uppercase pb-2 border-b border-white/10">
+              Technical Specifications
+            </h3>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+              <div>
+                <dt className="text-[10px] font-semibold uppercase text-white/45">Condition</dt>
+                <dd className="font-medium text-white">{watch.condition}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase text-white/45">Case Metal</dt>
+                <dd className="font-medium text-white">{watch.caseMetal}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase text-white/45">Case Diameter</dt>
+                <dd className="font-medium text-white">{watch.caseDiameter}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase text-white/45">Dial Color</dt>
+                <dd className="font-medium text-white">{watch.dialColor}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase text-white/45">Box & Papers</dt>
+                <dd className="font-medium text-white">{watch.boxPapers}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase text-white/45">Complication</dt>
+                <dd className="font-medium text-white">{watch.complication}</dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* Actions depending on state */}
           {watch.status === "not_evaluated" ? (
-            <PillButton
+            <button
+              type="button"
               onClick={() => {
                 updateTimepiece(watch.id, { status: "reviewing" });
                 window.setTimeout(() => {
                   updateTimepiece(watch.id, {
                     status: "appraised",
                     evaluatedAt: new Date().toISOString().slice(0, 10),
-                    valueLow: watch.valueLow ?? 40000,
-                    valueHigh: watch.valueHigh ?? 55000,
+                    valueLow: watch.valueLow ?? 42000,
+                    valueHigh: watch.valueHigh ?? 58000,
                   });
                 }, 900);
               }}
+              className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
             >
-              Request appraisal
-            </PillButton>
+              Request Certified Appraisal
+            </button>
           ) : null}
 
           {watch.status === "reviewing" ? (
-            <p className="border border-[#FCB040]/30 px-4 py-3 text-sm text-[#FCB040]">
-              MAC specialists are reviewing this timepiece. Typical turnaround is {settings.closeBusinessDays} business
-              days.
-            </p>
+            <div className="rounded-xl border border-[#FCB040]/30 bg-[#FCB040]/10 p-4 text-center">
+              <p className="text-[12px] font-medium text-[#FCB040]">
+                ★ Desk specialists are reviewing title & market comparables. Turnaround is {settings.closeBusinessDays} business days.
+              </p>
+            </div>
           ) : null}
 
           {watch.status === "appraised" && watch.financeable ? (
-            <PillButton onClick={() => router.push(`/financing/new?watch=${watch.id}`)}>
-              Estimate financing
-            </PillButton>
+            <button
+              type="button"
+              onClick={() => router.push(`/financing/new?watch=${watch.id}`)}
+              className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
+            >
+              Estimate Sale-and-Repurchase Advance
+            </button>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <PillButton
-              variant="ghost"
+          {/* Secondary Controls */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
               disabled={locked}
               onClick={() => router.push("/collection/add")}
+              className="flex-1 rounded-xl border border-white/20 bg-white/5 py-3 text-[11px] font-semibold tracking-wider text-white uppercase disabled:opacity-30"
             >
-              {locked ? "Locked" : "Edit later"}
-            </PillButton>
-            <PillButton
-              variant="ghost"
+              {locked ? "Locked for Review" : "Edit Details"}
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 removeTimepiece(watch.id);
                 router.push("/collection");
               }}
+              className="flex items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-red-300 transition hover:bg-red-500/20"
+              aria-label="Remove watch"
             >
-              Remove
-            </PillButton>
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>

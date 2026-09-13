@@ -12,31 +12,36 @@ export default function CollectionContinuePage() {
   const last = timepieces[0];
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
-      <ScreenHeader title="My timepieces" />
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-10">
-        <p className="text-[13px] tracking-[0.18em] text-[#FCB040] uppercase">Saved</p>
-        <h2 className="mt-3 text-[28px] leading-tight font-medium">
-          {last ? `${last.brand} ${last.model}` : "Timepiece saved"}
-        </h2>
-        <p className="mt-4 text-sm leading-6 text-white/65">
-          Add another piece or open the collection. You can edit or remove any saved timepiece until
-          it is sent for appraisal.
-        </p>
-        <div className="mt-auto space-y-3">
+    <main className="flex flex-1 flex-col bg-[#10141D]">
+      <ScreenHeader title="Timepiece Saved" />
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-between p-6">
+        <div className="space-y-4 pt-4">
+          <span className="inline-block rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-emerald-300 uppercase">
+            ✓ Successfully Added
+          </span>
+          <h2 className="text-[24px] font-semibold text-white">
+            {last ? `${last.brand} ${last.model}` : "Timepiece registered"}
+          </h2>
+          <p className="text-[13px] leading-relaxed text-white/70">
+            Your piece is now recorded in your private portfolio. You can add more watches to request a consolidated advance, or enter your collection dashboard directly.
+          </p>
+        </div>
+
+        <div className="space-y-3 pt-6">
           <Link href="/collection/add?onboarding=1">
             <PillButton type="button" variant="white">
-              Add another
+              + Add Another Piece
             </PillButton>
           </Link>
           <PillButton
             type="button"
+            variant="gold"
             onClick={() => {
               completeOnboarding();
               router.push("/collection");
             }}
           >
-            Done
+            Enter Collection
           </PillButton>
         </div>
       </div>

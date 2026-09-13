@@ -12,20 +12,20 @@ export default function AppraisalPage() {
   const appraised = timepieces.filter((w) => w.status === "appraised");
 
   return (
-    <main className="flex flex-1 flex-col bg-white text-black">
-      <div className="bg-black text-white">
-        <ScreenHeader title="Collection appraisal" backHref="/collection" />
+    <main className="flex flex-1 flex-col bg-white text-[#10141D]">
+      <div className="bg-[#0E2A44] text-white">
+        <ScreenHeader title="Certified Valuation" backHref="/collection" />
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-6">
-        <div className="flex items-start justify-between">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex items-start justify-between border-b border-black/10 pb-4">
           <div className="w-24">
             <MacLogoMark className="p-1" />
           </div>
-          <p className="text-right text-[11px] leading-4 text-black/50">
-            Evaluated by Mechanical Art Capital
-            <br />
-            Created {new Date().toLocaleDateString()}
-          </p>
+          <div className="text-right text-[11px] leading-4 text-black/60">
+            <p className="font-bold text-[#0E2A44] uppercase">Mechanical Art Capital LLC</p>
+            <p>Certified Valuation Schedule</p>
+            <p>Issued: {new Date().toLocaleDateString()}</p>
+          </div>
         </div>
 
         {appraised.length === 0 ? (
@@ -74,13 +74,13 @@ export default function AppraisalPage() {
         </p>
         <p className="mt-4 text-center text-[11px] text-black/35">Prepared for {user?.name}</p>
       </div>
-      <div className="flex justify-end p-4">
+      <div className="flex justify-end p-4 border-t border-black/10 bg-slate-50">
         <Link
           href="/collection"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0E2A44] text-white"
-          aria-label="Return to collection"
+          className="mac-tap flex h-11 items-center gap-2 rounded-xl bg-[#0E2A44] px-5 text-xs font-bold uppercase tracking-wider text-white shadow-sm"
         >
-          <Pencil className="h-5 w-5" />
+          <Pencil className="h-4 w-4" />
+          Edit Collection
         </Link>
       </div>
     </main>

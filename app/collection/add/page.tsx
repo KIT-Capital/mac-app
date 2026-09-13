@@ -146,30 +146,39 @@ function AddForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
-      <ScreenHeader title="Add a timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
-      <form onSubmit={onSave} className="mx-auto w-full max-w-xl flex-1 space-y-6 overflow-y-auto px-5 py-5 pb-10">
-        <p className="text-[13px] text-white/75">Please upload at least 4 images of the timepiece</p>
-        <div className="grid grid-cols-3 gap-4">
-          {SLOTS.map((label, i) => (
-            <label key={label} className="block text-center">
-              <span className="flex aspect-square items-center justify-center overflow-hidden bg-[#2A2A2A] text-white/70 ring-1 ring-white/35">
-                {images[i] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={images[i]} alt={label} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-2xl">+</span>
-                )}
-              </span>
-              <span className="mt-2 block text-[11px] tracking-[0.12em] text-white/70 uppercase">{label}</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={(e) => onPick(i, e.target.files?.[0])}
-              />
-            </label>
-          ))}
+    <main className="flex flex-1 flex-col bg-[#10141D]">
+      <ScreenHeader title="Add Timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
+      <form onSubmit={onSave} className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-10">
+        <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
+          <p className="text-[11px] font-bold tracking-[0.14em] text-[#E8D5C0] uppercase">
+            Intake Photographs (Min. 3 Angles)
+          </p>
+          <p className="mt-1 text-[12px] text-white/60">
+            Please provide clear shots for manufacturer authenticity verification.
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {SLOTS.map((label, i) => (
+              <label key={label} className="group block text-center cursor-pointer">
+                <span className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/30 bg-[#0F131A] text-white/50 transition group-hover:border-[#FCB040] group-hover:text-white">
+                  {images[i] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={images[i]} alt={label} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xl">+</span>
+                  )}
+                </span>
+                <span className="mt-1.5 block text-[10px] font-semibold tracking-wider text-white/60 uppercase">
+                  {label}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => onPick(i, e.target.files?.[0])}
+                />
+              </label>
+            ))}
+          </div>
         </div>
         {settings.allowVideo ? (
           <button type="button" className="mac-tap w-full text-left text-[13px] text-white/80">
@@ -292,16 +301,16 @@ function AddForm() {
             ))}
           </NativeSelect>
         </Field>
-        <div className="space-y-3 border-b-2 border-white/45 pb-3">
-          <p className="text-[11px] text-white/70">Band</p>
-          <div className="flex gap-10 text-[15px]">
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={band === "strap"} onChange={() => setBand("strap")} />
-              Strap
+        <div className="rounded-xl border border-white/20 bg-[#161B24] p-3">
+          <p className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">Band Configuration</p>
+          <div className="mt-2 flex gap-8 text-[14px]">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" checked={band === "strap"} onChange={() => setBand("strap")} className="accent-[#FCB040]" />
+              <span>Leather / Rubber Strap</span>
             </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={band === "bracelet"} onChange={() => setBand("bracelet")} />
-              Metal bracelet
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" checked={band === "bracelet"} onChange={() => setBand("bracelet")} className="accent-[#FCB040]" />
+              <span>Integrated Bracelet</span>
             </label>
           </div>
         </div>
@@ -328,12 +337,12 @@ function AddForm() {
           *Once you click appraise, the timepiece profile can only be modified by contacting us.
         </p>
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
-        <div className="grid grid-cols-2 gap-3 pt-2">
+        <div className="grid grid-cols-2 gap-3 pt-3">
           <PillButton type="submit" variant="white">
-            Save
+            Save as Draft
           </PillButton>
-          <PillButton type="button" variant="navy" onClick={onAppraise}>
-            Appraise
+          <PillButton type="button" variant="gold" onClick={onAppraise}>
+            Appraise Now
           </PillButton>
         </div>
       </form>

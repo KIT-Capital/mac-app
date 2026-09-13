@@ -8,44 +8,61 @@ export default function MembershipPage() {
   const { user, updateProfile, settings } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
+    <main className="flex flex-1 flex-col bg-[#10141D]">
       <ScreenHeader title="Membership" backHref="/profile" />
-      <div className="flex-1 space-y-6 px-6 py-8">
-        <p className="text-[11px] tracking-[0.22em] text-[#FCB040] uppercase">Premium collection service</p>
-        <h2 className="text-4xl leading-tight font-medium tracking-tight">
-          Monthly appraisals for ${settings.membershipMonthly.toFixed(2)}
-          <span className="text-2xl text-white/50">/month</span>
-        </h2>
-        <p className="text-sm leading-6 text-white/65">
-          Active financing clients receive appraisals at no charge. Other collectors can subscribe
-          for monthly revaluations, insurance-ready documentation, and priority desk access when a
-          repo is requested.
-        </p>
-        <ul className="space-y-3 text-sm text-white/80">
-          {[
-            "Monthly mark-to-market on registered timepieces",
-            "PDF certificates for insurers and family offices",
-            "Priority two-day close on qualifying repos",
-            "White-glove coordination with the Manhattan vault",
-          ].map((item) => (
-            <li key={item} className="border-b border-white/25 pb-3">
-              {item}
-            </li>
-          ))}
-        </ul>
+      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+        <div className="rounded-2xl border border-[#FCB040]/30 bg-gradient-to-br from-[#161B24] to-[#0E2A44]/40 p-5 shadow-sm">
+          <p className="text-[10px] font-bold tracking-[0.22em] text-[#FCB040] uppercase">
+            Certified Horology Revaluations
+          </p>
+          <h2 className="mt-2 text-[26px] font-bold leading-tight text-white">
+            ${settings.membershipMonthly.toFixed(2)}
+            <span className="text-[14px] font-normal text-white/60"> / month</span>
+          </h2>
+          <p className="mt-2 text-[12px] leading-relaxed text-white/70">
+            Active sale-and-repurchase clients receive complimentary monthly certified valuations.
+            Independent collectors may subscribe to keep insurance schedules and title logs updated.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
+          <h3 className="text-[11px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase pb-2 border-b border-white/10">
+            Member Privileges
+          </h3>
+          <ul className="mt-3 space-y-3 text-[13px] text-white/80">
+            {[
+              "Monthly mark-to-market valuations on registered timepieces",
+              "Insurance-grade PDF certificates for family offices and insurers",
+              "Priority 48-hour liquidity execution on qualifying models",
+              "Direct white-glove intake at the Manhattan vault",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2.5">
+                <span className="text-[#FCB040] text-sm">✦</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
         {user?.member ? (
-          <div className="space-y-3">
-            <p className="rounded-md border border-[#FCB040]/40 px-4 py-3 text-sm text-[#FCB040]">
-              You are a premium member. Monthly appraisals are on.
-            </p>
+          <div className="space-y-3 pt-2">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+              <p className="text-[13px] font-semibold text-emerald-300">
+                You are currently an active Premium Member.
+              </p>
+              <p className="mt-1 text-[11px] text-white/60">
+                Next automatic mark-to-market certificate generates in 18 days.
+              </p>
+            </div>
             <PillButton variant="ghost" onClick={() => updateProfile({ member: false })}>
-              Cancel membership
+              Pause Membership
             </PillButton>
           </div>
         ) : (
-          <PillButton onClick={() => updateProfile({ member: true })}>
-            Become a member
-          </PillButton>
+          <div className="pt-2">
+            <PillButton variant="gold" onClick={() => updateProfile({ member: true })}>
+              Subscribe to Monthly Appraisals
+            </PillButton>
+          </div>
         )}
       </div>
     </main>

@@ -21,22 +21,25 @@ export default function AgreementDetailPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
-      <ScreenHeader title="Repurchase agreement" backHref="/agreements" />
-      <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-6 text-white/80">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
-            Select start to begin
-          </p>
-          <button
-            onClick={() => setStarted(true)}
-            className="rounded-full bg-[#FCB040] px-4 py-1.5 text-[11px] font-semibold tracking-[0.16em] text-black uppercase"
-          >
-            Start
-          </button>
+    <main className="flex flex-1 flex-col bg-[#10141D]">
+      <ScreenHeader title="Repurchase Agreement" backHref="/agreements" />
+      <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-relaxed text-white/80">
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-[#161B24] p-3">
+          <div>
+            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Status: {agreement.status.replace("_", " ")}</span>
+            <p className="text-[12px] text-white/70">Contract #{agreement.agreementCode || agreement.id}</p>
+          </div>
+          {agreement.status !== "signed" ? (
+            <button
+              onClick={() => setStarted(true)}
+              className="rounded-lg bg-[#FCB040] px-4 py-2 text-[11px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm"
+            >
+              {started ? "Ready to Sign" : "Review Terms"}
+            </button>
+          ) : null}
         </div>
 
-        <article className="space-y-4 rounded-md bg-white px-4 py-5 text-[#1a1a1a]">
+        <article className="space-y-4 rounded-2xl bg-white p-5 text-[#1a1a1a] shadow-md font-sans">
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
             Repurchase agreement
           </h2>
@@ -76,15 +79,16 @@ export default function AgreementDetailPage() {
           ) : null}
         </article>
       </div>
-      <div className="border-t border-white/25 p-4">
+      <div className="border-t border-white/10 bg-[#161B24] p-4">
         <PillButton
+          variant="gold"
           disabled={!started || agreement.status === "signed"}
           onClick={() => signAgreement(agreement.id)}
         >
-          {agreement.status === "signed" ? "Finished" : "Finish"}
+          {agreement.status === "signed" ? "Executed & Verified" : "Sign Repurchase Agreement"}
         </PillButton>
-        <p className="mt-2 text-center text-[11px] text-white/35">
-          Questions: {COMPANY.phone} · {COMPANY.financingEmail}
+        <p className="mt-2 text-center text-[11px] text-white/50">
+          Custody Questions: {COMPANY.phone} · {COMPANY.financingEmail}
         </p>
       </div>
     </main>

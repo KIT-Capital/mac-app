@@ -11,54 +11,74 @@ export default function CollectionPage() {
   const empty = timepieces.length === 0;
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
+    <main className="flex flex-1 flex-col bg-[#10141D]">
       <ScreenHeader
-        title="My timepieces"
+        title="My Timepieces"
         right={
-          <Link href="/appraisal" aria-label="Export appraisal PDF" className="mac-tap flex flex-col items-center justify-center text-white">
-            <FileDown className="h-5 w-5" strokeWidth={1.5} />
+          <Link
+            href="/appraisal"
+            aria-label="Export appraisal certificate"
+            title="Export Appraisal Certificate"
+            className="mac-tap -mr-1 flex items-center justify-center text-white/80 transition hover:text-white"
+          >
+            <FileDown className="h-5 w-5" strokeWidth={1.8} />
           </Link>
         }
       />
 
-      {!user?.member ? (
-        <p className="px-5 py-4 text-[13px] leading-5 text-white/80">
-          If you want to have the timepieces appraised on a monthly basis,{" "}
-          <Link href="/profile/membership" className="text-white underline underline-offset-2">
-            become a premium member
-          </Link>
-          .
-        </p>
-      ) : (
-        <p className="px-5 py-4 text-[13px] text-[#FCB040]">
-          Premium member — monthly reappraisal is included.
-        </p>
-      )}
+      {/* Membership banner */}
+      <div className="border-b border-white/10 bg-[#161B24] px-5 py-3">
+        {!user?.member ? (
+          <p className="text-[12px] leading-relaxed text-white/70">
+            Monthly market reappraisals are included with premium membership.{" "}
+            <Link href="/profile/membership" className="font-semibold text-[#FCB040] hover:underline">
+              Upgrade membership ($4.99/mo)
+            </Link>
+          </p>
+        ) : (
+          <p className="text-[12px] font-medium text-[#FCB040]">
+            ★ Premium Member — Monthly certified revaluations active.
+          </p>
+        )}
+      </div>
 
-      <div className="relative flex-1 px-5 pb-24">
+      {/* Collection Grid */}
+      <div className="relative flex-1 p-4 pb-24">
         {empty ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/watches/patek-wrist.jpg" alt="" className="mb-8 h-28 w-full object-cover opacity-70" />
-            <p className="text-[15px] text-white/70">
-              Press <span className="text-[#E8D5C0]">+</span> to upload your first timepiece
+          <div className="flex h-full min-h-[360px] flex-col items-center justify-center px-4 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-[#161B24]">
+              <Plus className="h-8 w-8 text-[#FCB040]" />
+            </div>
+            <h3 className="mt-4 text-[17px] font-medium text-white">Your collection is empty</h3>
+            <p className="mt-1 max-w-[260px] text-[13px] text-white/60">
+              Upload photographs of your luxury timepiece to request a certified confidential appraisal.
             </p>
+            <Link
+              href="/collection/add"
+              className="mt-6 flex h-11 items-center justify-center rounded-xl bg-[#FCB040] px-6 text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
+            >
+              Add First Timepiece
+            </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8">
+          <div className="grid grid-cols-2 gap-3.5">
             {timepieces.map((watch) => (
               <WatchCard key={watch.id} watch={watch} />
             ))}
           </div>
         )}
 
-        <Link
-          href="/collection/add"
-          className="absolute bottom-6 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-[#E8D5C0] text-black shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
-          aria-label="Add a timepiece"
-        >
-          <Plus className="h-7 w-7" strokeWidth={1.75} />
-        </Link>
+        {/* Floating Add Action Button */}
+        {!empty ? (
+          <Link
+            href="/collection/add"
+            className="mac-tap absolute bottom-6 right-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#FCB040] text-[#0A0D14] shadow-[0_8px_25px_rgba(252,176,64,0.4)] transition hover:scale-105 active:scale-95"
+            aria-label="Add a timepiece"
+            title="Add a timepiece"
+          >
+            <Plus className="h-7 w-7" strokeWidth={2.5} />
+          </Link>
+        ) : null}
       </div>
     </main>
   );

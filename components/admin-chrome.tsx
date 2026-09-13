@@ -3,17 +3,27 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import {
+  BookOpen,
+  Camera,
+  ChevronLeft,
+  FileSpreadsheet,
+  FileText,
+  LayoutDashboard,
+  Sliders,
+  Users2,
+} from "lucide-react";
 import { MacWordmark } from "@/components/mac-logo";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/config", label: "Configure" },
-  { href: "/admin/access", label: "Access" },
-  { href: "/admin/catalog", label: "Catalog" },
-  { href: "/admin/assets", label: "Assets" },
-  { href: "/admin/agreements", label: "Agreements" },
-  { href: "/admin/photos", label: "Photos" },
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/config", label: "Configure", icon: Sliders },
+  { href: "/admin/access", label: "Access & Roles", icon: Users2 },
+  { href: "/admin/catalog", label: "Timepiece Catalog", icon: BookOpen },
+  { href: "/admin/assets", label: "Client Assets", icon: FileSpreadsheet },
+  { href: "/admin/agreements", label: "Repo Agreements", icon: FileText },
+  { href: "/admin/photos", label: "Photo Vault", icon: Camera },
 ];
 
 export function AdminChrome({
@@ -26,39 +36,47 @@ export function AdminChrome({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#161616] md:flex-row">
-      <aside className="shrink-0 border-b border-white/10 bg-[#0E2A44] md:w-56 md:border-r md:border-b-0">
-        <div className="px-4 py-4">
-          <MacWordmark className="w-[150px]" />
-          <p className="mt-2 text-[10px] tracking-[0.2em] text-[#FCB040] uppercase">Admin desk</p>
-        </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:overflow-visible md:px-3 md:pb-6">
-          {LINKS.map((link) => {
-            const active = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "mac-tap whitespace-nowrap px-3 text-[11px] tracking-[0.14em] text-white/55 uppercase",
-                  active && "bg-black/25 text-white",
-                )}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-          <Link href="/collection" className="mac-tap px-3 text-[11px] tracking-[0.14em] text-[#E8D5C0] uppercase">
-            Collector app
-          </Link>
-        </nav>
-      </aside>
-      <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center border-b border-white/25 px-5">
-          <h1 className="text-[13px] font-medium tracking-[0.22em] uppercase">{title}</h1>
-        </header>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
-      </section>
+    <div className="flex flex-1 flex-col bg-[#10141D]">
+      {/* Admin Top Navigation */}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0E2A44] px-4">
+        <Link
+          href="/collection"
+          className="mac-tap flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-white/80 uppercase hover:text-white"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Collector App
+        </Link>
+        <span className="text-[12px] font-bold tracking-[0.2em] text-[#FCB040] uppercase">
+          Desk · {title}
+        </span>
+        <div className="w-16" />
+      </header>
+
+      {/* Horizontal Tab Subnavigation */}
+      <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-[#161B24] px-2 py-1.5 no-scrollbar">
+        {LINKS.map((link) => {
+          const active = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
+          const Icon = link.icon;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase transition",
+                active
+                  ? "bg-[#FCB040] text-[#0A0D14] shadow-sm"
+                  : "text-white/60 hover:bg-white/5 hover:text-white",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {link.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto p-4">{children}</div>
     </div>
   );
 }
@@ -73,10 +91,10 @@ export function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="border border-white/25 bg-[#222] px-4 py-4">
-      <p className="text-[10px] tracking-[0.16em] text-white/40 uppercase">{label}</p>
-      <p className="mt-2 text-2xl text-[#FCB040]">{value}</p>
-      {hint ? <p className="mt-1 text-[12px] text-white/45">{hint}</p> : null}
+    <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4 shadow-sm">
+      <p className="text-[10px] font-semibold tracking-[0.16em] text-white/50 uppercase">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-[#FCB040]">{value}</p>
+      {hint ? <p className="mt-1 text-[11px] text-white/60">{hint}</p> : null}
     </div>
   );
 }
@@ -89,22 +107,22 @@ export function AdminTable({
   rows: ReactNode[][];
 }) {
   return (
-    <div className="overflow-x-auto border border-white/25">
-      <table className="w-full min-w-[640px] text-left text-[13px]">
-        <thead className="bg-[#0E2A44] text-[10px] tracking-[0.16em] text-white/70 uppercase">
+    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#161B24]">
+      <table className="w-full min-w-[540px] text-left text-[13px]">
+        <thead className="border-b border-white/10 bg-[#0E2A44] text-[10px] font-bold tracking-[0.16em] text-white/70 uppercase">
           <tr>
             {headers.map((h) => (
-              <th key={h} className="px-3 py-3 font-medium">
+              <th key={h} className="px-3.5 py-3">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-white/5">
           {rows.map((row, i) => (
-            <tr key={i} className="border-t border-white/8">
+            <tr key={i} className="transition hover:bg-white/[0.02]">
               {row.map((cell, j) => (
-                <td key={j} className="px-3 py-3 align-top text-white/80">
+                <td key={j} className="px-3.5 py-3 align-middle text-white/80">
                   {cell}
                 </td>
               ))}

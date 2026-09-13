@@ -9,20 +9,26 @@ export default function AgreementsPage() {
   const { agreements } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
-      <ScreenHeader title="Agreements" backHref="/financing" />
-      <div className="flex-1 space-y-3 px-5 py-5">
+    <main className="flex flex-1 flex-col bg-[#10141D]">
+      <ScreenHeader title="Repurchase Vault" backHref="/financing" />
+      <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5">
         {agreements.length === 0 ? (
-          <p className="py-16 text-center text-sm text-white/50">No repo agreements yet.</p>
+          <div className="rounded-2xl border border-white/10 bg-[#161B24] p-8 text-center text-sm text-white/50">
+            No sale-and-repurchase agreements on file yet.
+          </div>
         ) : (
           agreements.map((a) => (
-            <Link key={a.id} href={`/agreements/${a.id}`} className="block border-b border-white/25 py-4">
-              <div className="flex justify-between text-[11px] tracking-[0.14em] text-white/40 uppercase">
-                <span>Agreement {a.id}</span>
-                <span>{a.status.replace("_", " ")}</span>
+            <Link
+              key={a.id}
+              href={`/agreements/${a.id}`}
+              className="block rounded-2xl border border-white/10 bg-[#161B24] p-4 transition hover:border-[#FCB040]/50"
+            >
+              <div className="flex justify-between text-[11px] tracking-[0.14em] text-[#E8D5C0] uppercase">
+                <span className="font-bold">{a.agreementCode || a.id}</span>
+                <span className="text-[#FCB040]">{a.status.replace("_", " ")}</span>
               </div>
-              <p className="mt-1 text-lg">{money(a.amount)}</p>
-              <p className="text-sm text-white/50">{a.createdAt}</p>
+              <p className="mt-2 text-2xl font-bold text-white">{money(a.amount)}</p>
+              <p className="mt-1 text-xs text-white/50">Originated on {a.createdAt} · {a.termMonths} Months</p>
             </Link>
           ))
         )}

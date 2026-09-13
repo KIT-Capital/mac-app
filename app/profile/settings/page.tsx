@@ -21,42 +21,54 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#161616]">
-      <ScreenHeader title="Settings" backHref="/profile" />
-      <form onSubmit={onSave} className="flex-1 space-y-6 px-6 py-8">
-        <Field label="Name">
-          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-transparent py-1 text-[16px] outline-none" />
+    <main className="flex flex-1 flex-col bg-[#10141D]">
+      <ScreenHeader title="Account Settings" backHref="/profile" />
+      <form onSubmit={onSave} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+        <Field label="Full Legal Name">
+          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-transparent text-[15px] text-white outline-none" />
         </Field>
-        <Field label="Email">
-          <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent py-1 text-[16px] outline-none" />
+        <Field label="Direct Email">
+          <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent text-[15px] text-white outline-none" />
         </Field>
-        <Field label="Phone">
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent py-1 text-[16px] outline-none" />
+        <Field label="Verified Phone">
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-white outline-none" />
         </Field>
-        <Field label="Promo code">
+        <Field label="Partner / Desk Promo Code">
           <input
             value={promo}
             onChange={(e) => setPromo(e.target.value)}
-            placeholder="HOUSE65"
-            className="w-full bg-transparent py-1 text-[16px] outline-none"
+            placeholder="e.g. HOUSE65"
+            className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/30 uppercase"
           />
         </Field>
-        <button
-          type="button"
-          onClick={() =>
-            setPromoMsg(
-              promo.trim().toUpperCase() === "HOUSE65"
-                ? "Code applied. Next repo desk fee is waived."
-                : "That code is not recognized."
-            )
-          }
-          className="text-[12px] text-[#FCB040]"
-        >
-          Apply code
-        </button>
-        {promoMsg ? <p className="text-sm text-white/70">{promoMsg}</p> : null}
-        {saved ? <p className="text-sm text-[#FCB040]">Profile saved.</p> : null}
-        <PillButton type="submit">Save profile</PillButton>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() =>
+              setPromoMsg(
+                promo.trim().toUpperCase() === "HOUSE65"
+                  ? "✓ Code verified: Next repo origination fee is 100% waived."
+                  : "Code not recognized by New York desk."
+              )
+            }
+            className="text-[12px] font-semibold text-[#FCB040] hover:underline"
+          >
+            Verify Promo Code
+          </button>
+        </div>
+        {promoMsg ? (
+          <p className="rounded-xl border border-white/10 bg-[#161B24] p-3 text-xs text-white/80">
+            {promoMsg}
+          </p>
+        ) : null}
+        {saved ? (
+          <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-xs text-emerald-300">
+            Profile successfully updated.
+          </p>
+        ) : null}
+        <div className="pt-2">
+          <PillButton type="submit" variant="gold">Save Changes</PillButton>
+        </div>
       </form>
     </main>
   );
