@@ -20,7 +20,7 @@ export default function ProfilePage() {
     <main className="flex flex-1 flex-col bg-black">
       <div className="relative isolate h-36">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/splash.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
+        <img src="/brand/splash.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-[86%_72%] opacity-35" />
         <div className="absolute inset-0 bg-[#0E2A44]/86" />
         <div className="relative z-10 flex items-start justify-between px-4 pt-[max(12px,env(safe-area-inset-top))]">
           <Link href="/profile/settings" className="mac-tap flex flex-col items-center text-[9px] tracking-[0.16em] text-white/80 uppercase">

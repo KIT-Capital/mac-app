@@ -17,7 +17,7 @@ export function BottomNav() {
   const { user } = useStore();
 
   return (
-    <nav className="sticky bottom-0 z-20 border-t border-white/10 bg-black pb-[env(safe-area-inset-bottom)] xl:hidden">
+    <nav className="sticky bottom-0 z-20 border-t border-white/10 bg-black pb-[env(safe-area-inset-bottom)]">
       <ul className="grid grid-cols-4">
         {ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);

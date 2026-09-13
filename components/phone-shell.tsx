@@ -1,24 +1,18 @@
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
 
-export function PhoneShell({
-  children,
-  wide = false,
-}: {
-  children: ReactNode;
-  wide?: boolean;
-}) {
+/** Stage behind the phone — mid slate so it contrasts with both black screens and the white appraisal. */
+export const STAGE = "#5C6570";
+
+export function PhoneShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh bg-[#F3EEE6] md:flex md:items-stretch md:justify-center md:py-6 xl:py-8">
-      <div
-        className={cn(
-          "relative mx-auto flex min-h-dvh w-full flex-col overflow-hidden bg-black text-white",
-          wide
-            ? "max-w-[1280px] md:min-h-[calc(100dvh-4rem)] md:rounded-[1.6rem] md:border md:border-black/10 md:shadow-[0_24px_60px_rgba(40,28,16,0.16)]"
-            : "max-w-[430px] md:max-w-[834px] xl:max-w-[1280px] md:min-h-[calc(100dvh-4rem)] md:rounded-[1.8rem] md:border md:border-black/10 md:shadow-[0_24px_60px_rgba(40,28,16,0.16)]",
-        )}
-      >
-        {children}
+    <div
+      className="flex min-h-dvh items-center justify-center px-3 py-4 md:px-6 md:py-8"
+      style={{ background: STAGE }}
+    >
+      <div className="relative mx-auto w-full max-w-[430px] rounded-[2.15rem] bg-[#1a1c1e] p-[10px] shadow-[0_22px_50px_rgba(12,16,20,0.38)] ring-1 ring-black/25">
+        <div className="relative flex min-h-[min(100dvh-2rem,844px)] flex-col overflow-hidden rounded-[1.65rem] bg-black text-white md:min-h-[844px]">
+          {children}
+        </div>
       </div>
     </div>
   );

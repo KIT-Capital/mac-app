@@ -25,7 +25,7 @@ export function ScreenHeader({
       <img
         src="/brand/splash.jpg"
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-30"
+        className="absolute inset-0 h-full w-full object-cover object-[86%_72%] opacity-30"
       />
       <div className="absolute inset-0 bg-[#0E2A44]/88" />
       <div className="relative z-10 flex w-12 justify-start">

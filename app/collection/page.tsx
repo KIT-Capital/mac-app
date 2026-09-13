@@ -39,13 +39,13 @@ export default function CollectionPage() {
         {empty ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/splash.jpg" alt="" className="mb-8 h-28 w-full object-cover opacity-70" />
+            <img src="/watches/patek-wrist.jpg" alt="" className="mb-8 h-28 w-full object-cover opacity-70" />
             <p className="text-[15px] text-white/70">
               Press <span className="text-[#E8D5C0]">+</span> to upload your first timepiece
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8">
             {timepieces.map((watch) => (
               <WatchCard key={watch.id} watch={watch} />
             ))}

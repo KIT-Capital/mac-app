@@ -31,18 +31,22 @@ export default function LoginPage() {
 
   return (
     <main className="flex flex-1 flex-col bg-black">
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative h-40 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/splash.jpg" alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0E2A44]/20 to-black" />
-        <div className="absolute inset-x-0 bottom-6 flex justify-center">
-          <MacWordmark className="w-[220px]" />
+        <img
+          src="/watches/richard-mille-side.jpg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0E2A44]/30 to-black" />
+        <div className="absolute bottom-5 left-6">
+          <MacWordmark className="w-[200px]" />
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 pb-8 pt-6">
+      <form onSubmit={onSubmit} className="flex flex-1 flex-col px-6 pb-8 pt-6">
         <label className="space-y-1 border-b border-white/15 pb-3">
-          <span className="text-[11px] text-white/40">Email address or phone number</span>
+          <span className="text-[11px] text-white/45">Email address or phone number</span>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -51,7 +55,7 @@ export default function LoginPage() {
           />
         </label>
         <label className="mt-6 space-y-1 border-b border-white/15 pb-3">
-          <span className="text-[11px] text-white/40">Password</span>
+          <span className="text-[11px] text-white/45">Password</span>
           <input
             type="password"
             value={password}
@@ -87,8 +91,10 @@ export default function LoginPage() {
               Sign up
             </Link>
           </p>
-          <p className="text-center text-[11px] text-white/35">
-            Desk: admin@mechartcap.com · Collector: jonathan.hale@mechartcap.com
+          <p className="text-center text-[11px] leading-4 text-white/35">
+            Collector: jonathan.hale@mechartcap.com
+            <br />
+            Desk: admin@mechartcap.com
           </p>
         </div>
       </form>

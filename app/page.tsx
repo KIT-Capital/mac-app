@@ -8,16 +8,19 @@ export default function WelcomePage() {
     <main className="relative flex flex-1 flex-col overflow-hidden bg-black">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/splash.jpg"
+        src="/watches/richard-mille.jpg"
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-55"
+        className="absolute inset-0 h-full w-full object-cover opacity-70"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/70 to-black" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/65 to-black" />
 
-      <div className="relative z-10 flex flex-1 flex-col items-center px-8 pb-10 pt-[max(3rem,env(safe-area-inset-top))]">
-        <MacWordmark className="mt-6 w-[220px] md:w-[260px]" />
-        <div className="mt-auto w-full max-w-md space-y-7 pb-4 text-center">
-          <h1 className="text-[34px] leading-[1.05] font-semibold tracking-[0.02em] text-white uppercase md:text-[42px]">
+      <div className="relative z-10 flex flex-1 flex-col px-7 pb-10 pt-16">
+        <MacWordmark className="w-[210px]" />
+        <div className="mt-auto space-y-6">
+          <p className="text-[11px] tracking-[0.28em] text-[#FCB040] uppercase">
+            Appraising premium timepieces
+          </p>
+          <h1 className="text-[34px] leading-[1.05] font-semibold tracking-tight text-white uppercase">
             Unbiased
             <br />
             appraisals
@@ -26,11 +29,11 @@ export default function WelcomePage() {
             <br />
             timepieces
           </h1>
-          <p className="mx-auto max-w-[20rem] text-[11px] leading-5 tracking-[0.16em] text-white/75 uppercase">
-            Appraise your timepieces and access financing from MAC, the horology experts who
-            appreciate mechanical art as much as you do.
+          <p className="max-w-[18rem] text-[13px] leading-5 text-white/70">
+            Appraise your watches and access confidential financing from horology experts who
+            love timepieces as much as you do.
           </p>
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3 pt-4">
             <Link
               href="/signup"
               className="mac-tap flex h-12 items-center justify-center bg-white text-[12px] font-semibold tracking-[0.22em] text-black uppercase"

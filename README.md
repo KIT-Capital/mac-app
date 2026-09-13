@@ -1,6 +1,6 @@
 # Mechanical Art Capital
 
-Prototype of the Mechanical Art Capital collector app for iPhone, iPad, and notebooks, rebuilt from Vladimir’s November 2022 screens and the official MAC palette.
+Prototype of the Mechanical Art Capital collector app. The iPhone frame is the source of truth, rebuilt from Vladimir’s November 2022 screens and the official MAC palette.
 
 The original mobile source was lost. This web app follows Vladimir’s information architecture — Timepieces, Financing, Contact us, Account — with navy headers, black screens, white/navy actions, and the official gold wordmark.
 
@@ -34,9 +34,7 @@ npm run dev -- --port 43173
 
 Open [http://localhost:43173](http://localhost:43173).
 
-- Phone: full-bleed black app
-- iPad: wider 2–3 column collection in the same navy/black chrome
-- Notebook: left navigation plus the collector screens; admin uses a desk sidebar
+On a phone the app is full-bleed. On a notebook it stays a 430px iPhone on a slate stage (`#5C6570`) so the page behind the device always contrasts with both the black screens and the white appraisal certificate.
 
 ### Demo accounts
 

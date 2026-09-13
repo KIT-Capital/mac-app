@@ -4,7 +4,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { BottomNav } from "@/components/bottom-nav";
 import { PhoneShell } from "@/components/phone-shell";
-import { SideNav } from "@/components/side-nav";
 import { isDesk } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
@@ -46,19 +45,16 @@ export function AppFrame({ children }: { children: ReactNode }) {
   }, [desk, hydrated, isAdmin, isPublic, pathname, router, user]);
 
   return (
-    <PhoneShell wide={isAdmin || Boolean(user)}>
-      <div className="flex min-h-dvh flex-1 md:min-h-[calc(100dvh-4rem)]">
-        {showCollectorNav ? <SideNav /> : null}
-        <div className="flex min-w-0 flex-1 flex-col bg-black">
-          {!hydrated ? (
-            <div className="flex flex-1 items-center justify-center text-[12px] tracking-[0.2em] text-white/40 uppercase">
-              Loading collection
-            </div>
-          ) : (
-            children
-          )}
-          {showCollectorNav ? <BottomNav /> : null}
-        </div>
+    <PhoneShell>
+      <div className="flex min-h-[min(100dvh-2rem,844px)] flex-1 flex-col md:min-h-[844px]">
+        {!hydrated ? (
+          <div className="flex flex-1 items-center justify-center text-[12px] tracking-[0.2em] text-white/40 uppercase">
+            Loading collection
+          </div>
+        ) : (
+          children
+        )}
+        {showCollectorNav ? <BottomNav /> : null}
       </div>
     </PhoneShell>
   );
