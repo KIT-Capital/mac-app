@@ -131,7 +131,11 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
     catalog: state.catalog?.length ? state.catalog : DEMO_CATALOG,
     shells: state.shells?.length ? state.shells : DEMO_SHELLS,
     photos: state.photos?.length ? state.photos : photosFromWatches(timepieces),
-    settings: { ...DEMO_SETTINGS, ...state.settings },
+    settings: {
+      ...DEMO_SETTINGS,
+      ...state.settings,
+      appearance: state.settings?.appearance ?? DEMO_SETTINGS.appearance,
+    },
   };
 }
 
@@ -227,7 +231,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...watch.images.map((url, index) => ({
               id: `ph-${watch.id}-${index}-${Date.now()}`,
               url,
-              kind: (["front", "back", "left", "buckle"] as const)[index] ?? "other",
+              kind: (["front", "back", "left", "more"] as const)[index] ?? "other",
               assetId: watch.id,
               caption: `${watch.brand} ${watch.model}`,
               uploadedAt: new Date().toISOString().slice(0, 10),

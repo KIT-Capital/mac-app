@@ -25,4 +25,5 @@ export const DEFAULT_SETTINGS = {
   requireFourPhotos: true,
   ageMinimum: 18,
   allowVideo: true,
+  appearance: "dark" as const,
 };

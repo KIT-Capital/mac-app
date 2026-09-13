@@ -1,7 +1,8 @@
 export type WatchStatus = "not_evaluated" | "reviewing" | "appraised";
 export type Role = "collector" | "staff" | "admin";
 export type UserStatus = "active" | "invited" | "suspended";
-export type PhotoKind = "front" | "back" | "left" | "buckle" | "papers" | "other";
+export type PhotoKind = "front" | "back" | "left" | "more" | "buckle" | "papers" | "other";
+export type Appearance = "dark" | "light";
 
 export type Timepiece = {
   id: string;
@@ -117,6 +118,7 @@ export type AppSettings = {
   requireFourPhotos: boolean;
   ageMinimum: number;
   allowVideo: boolean;
+  appearance: Appearance;
 };
 
 export type AppState = {

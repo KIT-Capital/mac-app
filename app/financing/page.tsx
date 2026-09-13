@@ -11,7 +11,7 @@ export default function FinancingPage() {
   const applied = hasApplication(user, agreements.length);
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader
         title="Sale & Repurchase"
         right={
@@ -36,15 +36,15 @@ export default function FinancingPage() {
               Repo desk — not a loan
             </span>
           </div>
-          <h2 className="mt-2 text-[18px] font-semibold text-white">MAC buys. You buy back.</h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-white/70">
+          <h2 className="mt-2 text-[18px] font-semibold text-mac-fg">MAC buys. You buy back.</h2>
+          <p className="mt-1 text-[12px] leading-relaxed text-mac-muted">
             Mechanical Art Capital purchases qualifying timepieces. You may repurchase them later at
             the price on our preset scale for the term you choose. There is no interest rate and
             this is not a loan.
           </p>
 
           {applied ? (
-            <div className="mt-4 space-y-2 border-t border-white/10 pt-3 text-[12px] text-white/75">
+            <div className="mt-4 space-y-2 border-t border-mac-line pt-3 text-[12px] text-mac-muted">
               <p>
                 Custody after purchase is arranged by the desk
                 {settings.vaultLocation ? ` (${settings.vaultLocation})` : ""}.
@@ -52,7 +52,7 @@ export default function FinancingPage() {
               <p>Your repurchase price is confirmed on the scale attached to each application.</p>
             </div>
           ) : (
-            <p className="mt-4 border-t border-white/10 pt-3 text-[12px] text-white/60">
+            <p className="mt-4 border-t border-mac-line pt-3 text-[12px] text-mac-faint">
               Custody location and the pricing scale are shared after you send an application.
             </p>
           )}
@@ -67,7 +67,7 @@ export default function FinancingPage() {
 
         <div>
           <div className="flex items-center justify-between pb-2">
-            <h3 className="text-[11px] font-bold tracking-[0.16em] text-white/60 uppercase">
+            <h3 className="text-[11px] font-bold tracking-[0.16em] text-mac-faint uppercase">
               Your repurchase agreements
             </h3>
             <Link href="/agreements" className="text-[11px] font-medium text-[#FCB040] hover:underline">
@@ -76,10 +76,10 @@ export default function FinancingPage() {
           </div>
 
           {agreements.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-[#161B24] p-6 text-center">
+            <div className="rounded-2xl border border-mac-line bg-mac-card p-6 text-center">
               <Clock className="mx-auto h-8 w-8 text-white/30" />
-              <p className="mt-2 text-[14px] font-medium text-white">No applications yet</p>
-              <p className="mt-1 text-[12px] text-white/55">
+              <p className="mt-2 text-[14px] font-medium text-mac-fg">No applications yet</p>
+              <p className="mt-1 text-[12px] text-mac-faint">
                 Appraise a timepiece, then send a sale-and-repurchase application. The desk confirms
                 the buyback scale after it arrives.
               </p>
@@ -93,7 +93,7 @@ export default function FinancingPage() {
                   <Link
                     key={a.id}
                     href={`/agreements/${a.id}`}
-                    className="group block rounded-2xl border border-white/15 bg-[#161B24] p-4 transition hover:border-[#FCB040]/50"
+                    className="group block rounded-2xl border border-mac-line bg-mac-card p-4 transition hover:border-[#FCB040]/50"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
@@ -112,15 +112,15 @@ export default function FinancingPage() {
                     </div>
 
                     <div className="mt-2 flex items-baseline justify-between">
-                      <p className="text-[20px] font-bold text-white">{money(a.amount)}</p>
-                      <span className="text-[12px] text-white/60">{a.termMonths} Months</span>
+                      <p className="text-[20px] font-bold text-mac-fg">{money(a.amount)}</p>
+                      <span className="text-[12px] text-mac-muted">{a.termMonths} Months</span>
                     </div>
 
-                    <p className="mt-1 text-[12px] text-white/70 line-clamp-1">
+                    <p className="mt-1 text-[12px] text-mac-muted line-clamp-1">
                       Timepiece: {watches.map((w) => `${w.brand} ${w.model}`).join(" · ") || "Selected watch"}
                     </p>
 
-                    <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] text-white/50">
+                    <div className="mt-3 flex items-center justify-between border-t border-mac-line pt-2 text-[11px] text-mac-faint">
                       <span>{applied ? a.delivery : "Custody confirmed after review"}</span>
                       <span className="flex items-center gap-1 text-[#FCB040] group-hover:translate-x-0.5 transition">
                         Agreement <ArrowRight className="h-3 w-3" />

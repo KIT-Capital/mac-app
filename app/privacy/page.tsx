@@ -5,13 +5,13 @@ import { ScreenHeader } from "@/components/screen-header";
 
 export default function PrivacyPage() {
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Privacy Policy" backHref="/signup" />
-      <article className="mx-auto w-full max-w-xl flex-1 space-y-4 overflow-y-auto px-6 py-6 text-[13px] leading-relaxed text-white/75">
+      <article className="mx-auto w-full max-w-xl flex-1 space-y-4 overflow-y-auto px-6 py-6 text-[13px] leading-relaxed text-mac-muted">
         <span className="inline-block rounded-full border border-[#FCB040]/30 bg-[#FCB040]/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">
           Client Data & Title Verification Standard
         </span>
-        <p className="font-medium text-white">
+        <p className="font-medium text-mac-fg">
           Effective November 20, 2020 · Updated for Mobile Client Desk
         </p>
         <p>
@@ -23,10 +23,10 @@ export default function PrivacyPage() {
         </p>
         <p>
           You may request access, certified export, or deletion of your collection profile at any time by contacting{" "}
-          <span className="text-white font-medium">info@mechartcap.com</span> or calling{" "}
-          <span className="text-white font-medium">+1 (833) 209-0972</span>.
+          <span className="text-mac-fg font-medium">info@mechartcap.com</span> or calling{" "}
+          <span className="text-mac-fg font-medium">+1 (833) 209-0972</span>.
         </p>
-        <p className="text-white/50 text-[12px]">
+        <p className="text-mac-faint text-[12px]">
           By creating an account, you confirm you are 18 or older and consent to manufacturer authentication checks.
         </p>
         <div className="pt-4">

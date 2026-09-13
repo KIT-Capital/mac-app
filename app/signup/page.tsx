@@ -45,22 +45,22 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Create Account" backHref="/" />
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mb-6 space-y-1">
           <span className="text-[10px] font-semibold tracking-[0.2em] text-[#FCB040] uppercase">
             New Client Registration
           </span>
-          <h2 className="text-[20px] font-medium text-white">Open Your Collection</h2>
-          <p className="text-[13px] leading-relaxed text-white/65">
+          <h2 className="text-[20px] font-medium text-mac-fg">Open Your Collection</h2>
+          <p className="text-[13px] leading-relaxed text-mac-muted">
             Register timepieces for unbiased valuations. After you apply, MAC may purchase
             qualifying pieces and you may buy them back on a preset scale. This is not a loan.
           </p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="rounded-xl border border-white/20 bg-[#161B24] p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+          <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
             <label htmlFor="reg-name" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase block">
               Full Legal Name
             </label>
@@ -68,13 +68,13 @@ export default function SignupPage() {
               id="reg-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/35"
+              className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
               placeholder="e.g. Jonathan Hale"
               required
             />
           </div>
 
-          <div className="rounded-xl border border-white/20 bg-[#161B24] p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+          <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
             <label htmlFor="reg-email" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase block">
               Email Address
             </label>
@@ -83,13 +83,13 @@ export default function SignupPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/35"
+              className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
               placeholder="jonathan.hale@example.com"
               required
             />
           </div>
 
-          <div className="rounded-xl border border-white/20 bg-[#161B24] p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+          <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
             <label htmlFor="reg-phone" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase block">
               Direct Phone Number
             </label>
@@ -98,18 +98,18 @@ export default function SignupPage() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/35"
+              className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
               placeholder="+1 (212) 555-0100"
             />
           </div>
 
-          <div className="space-y-3 pt-2 text-[13px] text-white/75">
+          <div className="space-y-3 pt-2 text-[13px] text-mac-muted">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={adult}
                 onChange={(e) => setAdult(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-white/30 bg-[#161B24] accent-[#FCB040]"
+                className="mt-1 h-4 w-4 rounded border-white/30 bg-mac-card accent-[#FCB040]"
               />
               <span>I confirm that I am at least 18 years old.</span>
             </label>
@@ -119,7 +119,7 @@ export default function SignupPage() {
                 type="checkbox"
                 checked={privacy}
                 onChange={(e) => setPrivacy(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-white/30 bg-[#161B24] accent-[#FCB040]"
+                className="mt-1 h-4 w-4 rounded border-white/30 bg-mac-card accent-[#FCB040]"
               />
               <span>
                 I agree to the{" "}
@@ -141,7 +141,7 @@ export default function SignupPage() {
             >
               {busy ? "Creating account…" : "Create Account"}
             </button>
-            <p className="text-center text-[12px] text-white/55">
+            <p className="text-center text-[12px] text-mac-faint">
               Already registered?{" "}
               <Link href="/login" className="font-medium text-[#FCB040] underline underline-offset-4">
                 Sign in

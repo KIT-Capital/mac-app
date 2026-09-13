@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, NativeSelect, PillButton } from "@/components/field";
-import { DELIVERY_METHODS, TERMS } from "@/lib/catalog";
+import { DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
@@ -25,6 +25,7 @@ function ApplicationForm() {
   const [busy, setBusy] = useState(false);
 
   const watch = timepieces.find((w) => w.id === watchId);
+  const maxPurchase = watch ? estimateAdvance(watch.valueLow, watch.valueHigh, settings.maxLtv) : 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -39,6 +40,10 @@ function ApplicationForm() {
     }
     if (!n) {
       setError("Enter the sale amount you are proposing.");
+      return;
+    }
+    if (maxPurchase && n > maxPurchase) {
+      setError(`The desk can purchase up to ${money(maxPurchase)} on this appraisal.`);
       return;
     }
     setBusy(true);
@@ -65,8 +70,8 @@ function ApplicationForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
-      <ScreenHeader title="Repurchase application" backHref="/financing" />
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
+      <ScreenHeader title="Sale & Repurchase" backHref="/financing" />
       {watch ? (
         <div className="relative h-44 w-full bg-[#090C12] overflow-hidden border-b border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -79,7 +84,7 @@ function ApplicationForm() {
         </div>
       ) : null}
       <form onSubmit={onSubmit} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-        <p className="text-[12px] leading-relaxed text-white/65">
+        <p className="text-[12px] leading-relaxed text-mac-muted">
           MAC would purchase this timepiece. You may buy it back later on our preset scale. This
           application is not a loan request. The desk confirms the buyback price and custody after
           it arrives.
@@ -87,58 +92,58 @@ function ApplicationForm() {
         <Field label="Selected Timepiece">
           <NativeSelect value={watchId} onChange={(e) => setWatchId(e.target.value)}>
             {eligible.length === 0 ? (
-              <option className="bg-[#161B24]">No appraised pieces yet</option>
+              <option className="bg-mac-card">No appraised pieces yet</option>
             ) : (
               eligible.map((w) => (
-                <option key={w.id} value={w.id} className="bg-[#161B24]">
+                <option key={w.id} value={w.id} className="bg-mac-card">
                   {w.brand} {w.model}
                 </option>
               ))
             )}
           </NativeSelect>
         </Field>
-        <Field label="Proposed repurchase term">
+        <Field label="Term (months)">
           <NativeSelect value={term} onChange={(e) => setTerm(Number(e.target.value))}>
             {TERMS.map((t) => (
-              <option key={t} value={t} className="bg-[#161B24]">
-                {t} Months
+              <option key={t} value={t} className="bg-mac-card">
+                {t} months
               </option>
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Proposed sale amount (what MAC would pay)">
+        <Field label={maxPurchase ? `Enter amount up to ${money(maxPurchase)}` : "Proposed sale amount"}>
           <input
             inputMode="numeric"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="Amount in USD"
-            className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/30"
+            placeholder={maxPurchase ? money(maxPurchase) : "Amount in USD"}
+            className="w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
           />
         </Field>
-        <Field label="How you will deliver the piece">
+        <Field label="Delivery method">
           <NativeSelect value={delivery} onChange={(e) => setDelivery(e.target.value)}>
             {DELIVERY_METHODS.map((d) => (
-              <option key={d} className="bg-[#161B24]">
+              <option key={d} className="bg-mac-card">
                 {d}
               </option>
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Direct Email Address">
+        <Field label="Email address">
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-transparent text-[15px] text-white outline-none"
+            className="w-full bg-transparent text-[15px] text-mac-fg outline-none"
           />
         </Field>
-        <Field label="Legal seller name">
+        <Field label="Watch owner's name">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-transparent text-[15px] text-white outline-none"
+            className="w-full bg-transparent text-[15px] text-mac-fg outline-none"
           />
         </Field>
-        <label className="flex items-start gap-3 text-[13px] text-white/75 cursor-pointer pt-1">
+        <label className="flex items-start gap-3 text-[13px] text-mac-muted cursor-pointer pt-1">
           <input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} className="mt-0.5 h-4 w-4 rounded accent-[#FCB040]" />
           <span>
             I confirm that I am at least {settings.ageMinimum} years old and authorized to sell this
@@ -146,7 +151,7 @@ function ApplicationForm() {
           </span>
         </label>
         {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
-        <PillButton type="submit" variant="gold" className="mt-2" disabled={busy}>
+        <PillButton type="submit" variant="navy" className="mt-2" disabled={busy}>
           {busy ? "Sending application…" : "Send Application"}
         </PillButton>
       </form>

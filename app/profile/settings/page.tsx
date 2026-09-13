@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { AppearanceToggle } from "@/components/appearance-toggle";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
 import { useStore } from "@/lib/store";
@@ -21,24 +22,33 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Account Settings" backHref="/profile" />
       <form onSubmit={onSave} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+        <div>
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+            Appearance
+          </p>
+          <AppearanceToggle />
+          <p className="mt-2 text-[11px] text-mac-faint">
+            Dark and light match the November 2022 collector screens.
+          </p>
+        </div>
         <Field label="Full Legal Name">
-          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-transparent text-[15px] text-white outline-none" />
+          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
         <Field label="Direct Email">
-          <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent text-[15px] text-white outline-none" />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
         <Field label="Verified Phone">
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-white outline-none" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
         <Field label="Partner / Desk Promo Code">
           <input
             value={promo}
             onChange={(e) => setPromo(e.target.value)}
             placeholder="e.g. HOUSE65"
-            className="w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/30 uppercase"
+            className="w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint uppercase"
           />
         </Field>
         <div className="flex justify-end">
@@ -47,8 +57,8 @@ export default function SettingsPage() {
             onClick={() =>
               setPromoMsg(
                 promo.trim().toUpperCase() === "HOUSE65"
-                  ? "✓ Code verified: Next repo origination fee is 100% waived."
-                  : "Code not recognized by New York desk."
+                  ? "✓ Code verified: next membership month is complimentary."
+                  : "Code not recognized by the desk."
               )
             }
             className="text-[12px] font-semibold text-[#FCB040] hover:underline"
@@ -57,7 +67,7 @@ export default function SettingsPage() {
           </button>
         </div>
         {promoMsg ? (
-          <p className="rounded-xl border border-white/10 bg-[#161B24] p-3 text-xs text-white/80">
+          <p className="rounded-xl border border-mac-line bg-mac-card p-3 text-xs text-mac-muted">
             {promoMsg}
           </p>
         ) : null}

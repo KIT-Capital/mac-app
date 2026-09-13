@@ -47,11 +47,11 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-white/20" />
-        <span className="text-[10px] font-medium tracking-[0.16em] text-white/50 uppercase">
+        <div className="h-px flex-1 bg-mac-line" />
+        <span className="text-[10px] font-medium tracking-[0.16em] text-mac-faint uppercase">
           Or continue with
         </span>
-        <div className="h-px flex-1 bg-white/20" />
+        <div className="h-px flex-1 bg-mac-line" />
       </div>
 
       <div className="flex items-center justify-center gap-4 pt-1">
@@ -60,7 +60,7 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           onClick={onContinue}
           aria-label="Sign in with Google"
           title="Sign in with Google"
-          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#1D222E] shadow-sm transition hover:border-[#FCB040] hover:bg-[#252C3A] active:scale-95"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card shadow-sm transition hover:border-[#FCB040] active:scale-95"
         >
           <GoogleMark />
         </button>
@@ -69,7 +69,7 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           onClick={onContinue}
           aria-label="Continue with Facebook"
           title="Continue with Facebook"
-          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#1D222E] shadow-sm transition hover:border-[#FCB040] hover:bg-[#252C3A] active:scale-95"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card shadow-sm transition hover:border-[#FCB040] active:scale-95"
         >
           <FacebookMark />
         </button>
@@ -78,7 +78,7 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           onClick={onContinue}
           aria-label="Sign in with Apple"
           title="Sign in with Apple"
-          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-[#1D222E] text-white shadow-sm transition hover:border-[#FCB040] hover:bg-[#252C3A] active:scale-95"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card text-mac-fg shadow-sm transition hover:border-[#FCB040] active:scale-95"
         >
           <AppleMark />
         </button>

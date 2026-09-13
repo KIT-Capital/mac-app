@@ -1,8 +1,8 @@
 # Mechanical Art Capital
 
-Prototype of the Mechanical Art Capital collector app. The iPhone frame is the source of truth, rebuilt from Vladimir’s November 2022 screens and the official MAC palette.
+Prototype of the Mechanical Art Capital collector app. The iPhone frame is the source of truth, rebuilt from the 14 November 2022 Limus Design presentation (Mechanical Art Capital app screens) and the official MAC palette.
 
-The original mobile source was lost. This web app follows Vladimir’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, black screens, white/navy actions, and the official gold wordmark.
+The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official jeweled wordmark. See `docs/design-reference.md`.
 
 ## What you can do
 
@@ -70,6 +70,7 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 - Champagne `#E8D5C0` — add-timepiece FAB
 - Black screens, white Save / Get started
 - Official Logo-FF only: black gear, three gold pinions, colored jewels in the center. The gold single-gear mark is not used.
+- Dark and light collector appearances, toggled in Account → Settings, matching the 2022 deck.
 
 ## Product notes
 

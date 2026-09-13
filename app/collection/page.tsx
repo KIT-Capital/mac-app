@@ -11,7 +11,7 @@ export default function CollectionPage() {
   const empty = timepieces.length === 0;
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader
         title="My Timepieces"
         right={
@@ -27,17 +27,18 @@ export default function CollectionPage() {
       />
 
       {/* Membership banner */}
-      <div className="border-b border-white/10 bg-[#161B24] px-5 py-3">
+      <div className="border-b border-mac-line bg-mac-card px-5 py-3">
         {!user?.member ? (
-          <p className="text-[12px] leading-relaxed text-white/70">
-            Monthly market reappraisals are included with premium membership.{" "}
+          <p className="text-[12px] leading-relaxed text-mac-muted">
+            If you want to have the timepiece appraised on a monthly basis, become a{" "}
             <Link href="/profile/membership" className="font-semibold text-[#FCB040] hover:underline">
-              Upgrade membership ($4.99/mo)
+              premium member
             </Link>
+            .
           </p>
         ) : (
           <p className="text-[12px] font-medium text-[#FCB040]">
-            ★ Premium Member — Monthly certified revaluations active.
+            Premium member — monthly certified revaluations are active.
           </p>
         )}
       </div>
@@ -46,11 +47,11 @@ export default function CollectionPage() {
       <div className="relative flex-1 p-4 pb-24">
         {empty ? (
           <div className="flex h-full min-h-[360px] flex-col items-center justify-center px-4 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-[#161B24]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-mac-line bg-mac-card">
               <Plus className="h-8 w-8 text-[#FCB040]" />
             </div>
-            <h3 className="mt-4 text-[17px] font-medium text-white">Your collection is empty</h3>
-            <p className="mt-1 max-w-[260px] text-[13px] text-white/60">
+            <h3 className="mt-4 text-[17px] font-medium text-mac-fg">Your collection is empty</h3>
+            <p className="mt-1 max-w-[260px] text-[13px] text-mac-muted">
               Upload photographs of your luxury timepiece to request a certified confidential appraisal.
             </p>
             <Link

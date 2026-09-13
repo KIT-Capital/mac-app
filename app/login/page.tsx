@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { MacWordmark } from "@/components/mac-logo";
+import { MacLogoMark, MacWordmark } from "@/components/mac-logo";
 import { SocialLogin } from "@/components/social-login";
 import { roleFromEmail } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn } = useStore();
+  const { signIn, settings } = useStore();
   const [email, setEmail] = useState("jonathan.hale@mechartcap.com");
   const [password, setPassword] = useState("••••••••");
   const [showPassword, setShowPassword] = useState(false);
@@ -37,7 +37,7 @@ export default function LoginPage() {
       <div className="flex items-center justify-between pb-3">
         <Link
           href="/"
-          className="mac-tap -ml-2 flex items-center gap-1.5 px-2 text-white/70 transition hover:text-white"
+          className="mac-tap -ml-2 flex items-center gap-1.5 px-2 text-mac-muted transition hover:text-mac-fg"
           aria-label="Back to welcome"
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={2} />
@@ -51,12 +51,12 @@ export default function LoginPage() {
       {/* Brand Hero */}
       <div className="my-auto pt-2 pb-6 text-center">
         <div className="mx-auto w-[205px]">
-          <MacWordmark />
+          {settings.appearance === "light" ? <MacLogoMark /> : <MacWordmark />}
         </div>
-        <h1 className="mt-4 text-[20px] font-medium tracking-tight text-white">
+        <h1 className="mt-4 text-[20px] font-medium tracking-tight text-mac-fg">
           Sign In to Your Collection
         </h1>
-        <p className="mt-1 text-[12px] text-white/60">
+        <p className="mt-1 text-[12px] text-mac-muted">
           Confidential appraisals & sale-and-repurchase desk
         </p>
       </div>
@@ -64,19 +64,19 @@ export default function LoginPage() {
       {/* Form */}
       <form onSubmit={onSubmit} className="space-y-4">
         {/* Email Field */}
-        <div className="rounded-xl border border-white/20 bg-[#161B24] p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
           <div className="flex items-center justify-between">
             <label htmlFor="login-email" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
               Email Address
             </label>
-            <Mail className="h-3.5 w-3.5 text-white/40" />
+            <Mail className="h-3.5 w-3.5 text-mac-faint" />
           </div>
           <input
             id="login-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/35"
+            className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
             placeholder="collector@example.com"
             autoComplete="email"
             required
@@ -84,12 +84,12 @@ export default function LoginPage() {
         </div>
 
         {/* Password Field */}
-        <div className="rounded-xl border border-white/20 bg-[#161B24] p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
           <div className="flex items-center justify-between">
             <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
               Password
             </label>
-            <Lock className="h-3.5 w-3.5 text-white/40" />
+            <Lock className="h-3.5 w-3.5 text-mac-faint" />
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -97,14 +97,14 @@ export default function LoginPage() {
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full bg-transparent text-[15px] text-white outline-none placeholder:text-white/35"
+              className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
               autoComplete="current-password"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="text-white/50 hover:text-white"
+              className="text-mac-faint hover:text-mac-fg"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -127,7 +127,7 @@ export default function LoginPage() {
         {/* Submit */}
         <button
           type="submit"
-          className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59] active:scale-[0.99]"
+          className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-[#0E2A44] text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
         >
           Sign In
         </button>
@@ -140,7 +140,7 @@ export default function LoginPage() {
 
       {/* Footer & Demo shortcuts */}
       <div className="pt-6 pb-2 text-center space-y-3">
-        <p className="text-[12px] text-white/60">
+        <p className="text-[12px] text-mac-muted">
           Don&apos;t have an account?{" "}
           <Link href="/signup" className="font-semibold text-[#FCB040] underline underline-offset-4">
             Sign up
@@ -148,19 +148,19 @@ export default function LoginPage() {
         </p>
 
         {/* 1-tap evaluator shortcuts */}
-        <div className="flex items-center justify-center gap-2 pt-1 text-[11px] text-white/50">
+        <div className="flex items-center justify-center gap-2 pt-1 text-[11px] text-mac-faint">
           <span>Demo:</span>
           <button
             type="button"
             onClick={() => go("jonathan.hale@mechartcap.com")}
-            className="rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-white/80 transition hover:border-[#FCB040] hover:text-[#FCB040]"
+            className="rounded-full border border-mac-line bg-mac-card px-2.5 py-1 text-mac-fg transition hover:border-[#FCB040] hover:text-[#FCB040]"
           >
             Collector
           </button>
           <button
             type="button"
             onClick={() => go("admin@mechartcap.com")}
-            className="rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-white/80 transition hover:border-[#FCB040] hover:text-[#FCB040]"
+            className="rounded-full border border-mac-line bg-mac-card px-2.5 py-1 text-mac-fg transition hover:border-[#FCB040] hover:text-[#FCB040]"
           >
             Admin Desk
           </button>

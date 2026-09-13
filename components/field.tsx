@@ -14,7 +14,7 @@ export function Field({
   return (
     <div
       className={cn(
-        "rounded-xl border border-white/20 bg-[#161B24] p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50",
+        "rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50",
         className,
       )}
     >
@@ -35,7 +35,7 @@ export function NativeSelect({
     <div className="relative flex items-center">
       <select
         className={cn(
-          "w-full appearance-none bg-transparent pr-7 text-[15px] font-medium text-white outline-none cursor-pointer",
+          "w-full appearance-none bg-transparent pr-7 text-[15px] font-medium text-mac-fg outline-none cursor-pointer",
           className,
         )}
         {...props}
@@ -59,7 +59,7 @@ export function PillButton({
     champagne: "bg-[#E8D5C0] text-[#0A0D14] hover:bg-[#faebd7]",
     white: "bg-white text-[#0A0D14] hover:bg-white/90",
     navy: "bg-[#0E2A44] text-white border border-[#FCB040]/50 hover:bg-[#133758]",
-    ghost: "bg-transparent text-white border border-white/25 hover:bg-white/5",
+    ghost: "bg-transparent text-mac-fg border border-mac-line hover:bg-mac-card",
     gold: "bg-[#FCB040] text-[#0A0D14] hover:bg-[#ffbe59]",
   }[variant];
 

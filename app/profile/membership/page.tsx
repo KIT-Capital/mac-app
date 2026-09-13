@@ -28,28 +28,28 @@ export default function MembershipPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Membership" backHref="/profile" />
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <div className="rounded-2xl border border-[#FCB040]/30 bg-gradient-to-br from-[#161B24] to-[#0E2A44]/40 p-5 shadow-sm">
           <p className="text-[10px] font-bold tracking-[0.22em] text-[#FCB040] uppercase">
             Certified Horology Revaluations
           </p>
-          <h2 className="mt-2 text-[26px] font-bold leading-tight text-white">
+          <h2 className="mt-2 text-[26px] font-bold leading-tight text-mac-fg">
             ${settings.membershipMonthly.toFixed(2)}
-            <span className="text-[14px] font-normal text-white/60"> / month</span>
+            <span className="text-[14px] font-normal text-mac-muted"> / month</span>
           </h2>
-          <p className="mt-2 text-[12px] leading-relaxed text-white/70">
+          <p className="mt-2 text-[12px] leading-relaxed text-mac-muted">
             Active sale-and-repurchase clients receive complimentary monthly certified valuations.
             Independent collectors may subscribe to keep insurance schedules and title logs updated.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
-          <h3 className="text-[11px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase pb-2 border-b border-white/10">
+        <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
+          <h3 className="text-[11px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase pb-2 border-b border-mac-line">
             Member Privileges
           </h3>
-          <ul className="mt-3 space-y-3 text-[13px] text-white/80">
+          <ul className="mt-3 space-y-3 text-[13px] text-mac-muted">
             {[
               "Monthly mark-to-market valuations on registered timepieces",
               "Insurance-grade PDF certificates for family offices and insurers",
@@ -71,7 +71,7 @@ export default function MembershipPage() {
               <p className="text-[13px] font-semibold text-emerald-300">
                 You are currently an active Premium Member.
               </p>
-              <p className="mt-1 text-[11px] text-white/60">
+              <p className="mt-1 text-[11px] text-mac-muted">
                 Next automatic mark-to-market certificate generates in 18 days.
               </p>
             </div>

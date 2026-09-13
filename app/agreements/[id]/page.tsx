@@ -20,18 +20,18 @@ export default function AgreementDetailPage() {
 
   if (!agreement) {
     return (
-      <main className="flex flex-1 items-center justify-center text-white/50">Agreement not found.</main>
+      <main className="flex flex-1 items-center justify-center text-mac-faint">Agreement not found.</main>
     );
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Repurchase Agreement" backHref="/agreements" />
-      <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-relaxed text-white/80">
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-white/10 bg-[#161B24] p-3">
+      <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-relaxed text-mac-muted">
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-mac-line bg-mac-card p-3">
           <div>
             <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Status: {agreement.status.replace("_", " ")}</span>
-            <p className="text-[12px] text-white/70">Contract #{agreement.agreementCode || agreement.id}</p>
+            <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
           </div>
           {agreement.status !== "signed" ? (
             <button
@@ -87,7 +87,7 @@ export default function AgreementDetailPage() {
           ) : null}
         </article>
       </div>
-      <div className="border-t border-white/10 bg-[#161B24] p-4">
+      <div className="border-t border-mac-line bg-mac-card p-4">
         <PillButton
           variant="gold"
           disabled={!started || agreement.status === "signed"}
@@ -95,7 +95,7 @@ export default function AgreementDetailPage() {
         >
           {agreement.status === "signed" ? "Executed & Verified" : "Sign Repurchase Agreement"}
         </PillButton>
-        <p className="mt-2 text-center text-[11px] text-white/50">
+        <p className="mt-2 text-center text-[11px] text-mac-faint">
           Custody Questions: {COMPANY.phone} · {COMPANY.financingEmail}
         </p>
       </div>

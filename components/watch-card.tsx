@@ -25,16 +25,15 @@ export function WatchCard({ watch }: { watch: Timepiece }) {
   return (
     <Link
       href={`/collection/${watch.id}`}
-      className="group block overflow-hidden rounded-2xl border border-white/10 bg-[#161B24] shadow-sm transition hover:border-[#FCB040]/50 hover:shadow-md"
+      className="group block overflow-hidden rounded-2xl border border-mac-line bg-mac-card shadow-sm transition hover:border-[#FCB040]/50 hover:shadow-md"
     >
-      <div className="relative aspect-square w-full bg-[#0D1017]">
+      <div className="relative aspect-square w-full bg-mac-bg">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={watch.images[0]}
           alt={`${watch.brand} ${watch.model}`}
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
         />
-        {/* Status Badge */}
         <span
           className={cn(
             "absolute bottom-0 left-0 flex items-center gap-1 rounded-tr-lg px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] uppercase shadow-sm",
@@ -47,15 +46,9 @@ export function WatchCard({ watch }: { watch: Timepiece }) {
       </div>
 
       <div className="p-3">
-        <p className="text-[11px] font-semibold tracking-[0.12em] text-[#FCB040] uppercase">
-          {watch.brand}
-        </p>
-        <p className="line-clamp-1 text-[14px] font-medium text-white">
-          {watch.model}
-        </p>
-        <p className="mt-1 text-[13px] font-semibold text-white/80">
-          {moneyRange(watch.valueLow, watch.valueHigh)}
-        </p>
+        <p className="text-[11px] font-semibold tracking-[0.12em] text-[#FCB040] uppercase">{watch.brand}</p>
+        <p className="line-clamp-1 text-[14px] font-medium text-mac-fg">{watch.model}</p>
+        <p className="mt-1 text-[13px] font-semibold text-mac-muted">{moneyRange(watch.valueLow, watch.valueHigh)}</p>
       </div>
     </Link>
   );

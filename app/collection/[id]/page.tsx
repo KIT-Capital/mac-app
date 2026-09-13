@@ -16,12 +16,12 @@ export default function WatchDetailPage() {
 
   if (!watch) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center p-6 text-center bg-[#10141D]">
-        <HelpCircle className="h-10 w-10 text-white/30" />
-        <p className="mt-3 text-[14px] font-medium text-white/70">Timepiece Not Found</p>
+      <main className="flex flex-1 flex-col items-center justify-center p-6 text-center bg-mac-bg">
+        <HelpCircle className="h-10 w-10 text-mac-faint" />
+        <p className="mt-3 text-[14px] font-medium text-mac-muted">Timepiece Not Found</p>
         <Link
           href="/collection"
-          className="mt-4 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-[#FCB040]"
+          className="mt-4 rounded-xl border border-mac-line bg-white/5 px-4 py-2 text-xs font-semibold text-[#FCB040]"
         >
           Return to Collection
         </Link>
@@ -32,7 +32,7 @@ export default function WatchDetailPage() {
   const locked = watch.status !== "not_evaluated";
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title={watch.brand} backHref="/collection" />
 
       <div className="flex-1 overflow-y-auto pb-8">
@@ -47,7 +47,7 @@ export default function WatchDetailPage() {
               {watch.images.map((src, i) => (
                 <div
                   key={src + i}
-                  className="h-12 w-12 overflow-hidden rounded-lg border-2 border-white/50 bg-[#161B24] shadow-md"
+                  className="h-12 w-12 overflow-hidden rounded-lg border-2 border-white/50 bg-mac-card shadow-md"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt="" className="h-full w-full object-cover" />
@@ -58,7 +58,7 @@ export default function WatchDetailPage() {
 
           {/* Status Badge */}
           <div className="absolute top-3 right-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase backdrop-blur-md">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-mac-line bg-black/70 px-3 py-1 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase backdrop-blur-md">
               {watch.status === "appraised" ? <Check className="h-3 w-3" strokeWidth={3} /> : <Clock className="h-3 w-3" />}
               {watch.status.replace("_", " ")}
             </span>
@@ -72,25 +72,25 @@ export default function WatchDetailPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-[#FCB040] uppercase">
               {watch.brand}
             </p>
-            <h1 className="mt-0.5 text-[24px] font-semibold text-white tracking-tight">
+            <h1 className="mt-0.5 text-[24px] font-semibold text-mac-fg tracking-tight">
               {watch.model}
             </h1>
             {watch.reference ? (
-              <p className="text-[13px] text-white/55 font-mono">Ref. {watch.reference}</p>
+              <p className="text-[13px] text-mac-faint font-mono">Ref. {watch.reference}</p>
             ) : null}
           </div>
 
           {/* Valuation Card */}
-          <div className="rounded-2xl border border-white/15 bg-[#161B24] p-4">
+          <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
             <p className="text-[10px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
               Certified Valuation
             </p>
-            <p className="mt-1 text-[22px] font-bold text-white">
+            <p className="mt-1 text-[22px] font-bold text-mac-fg">
               {moneyRange(watch.valueLow, watch.valueHigh)}
             </p>
 
             {watch.status === "appraised" && watch.financeable ? (
-              <p className="mt-3 border-t border-white/10 pt-3 text-[12px] text-white/65">
+              <p className="mt-3 border-t border-mac-line pt-3 text-[12px] text-mac-muted">
                 Eligible for a sale-and-repurchase application. MAC would buy this piece; you may
                 buy it back on the preset scale. This is not a loan.
               </p>
@@ -98,34 +98,34 @@ export default function WatchDetailPage() {
           </div>
 
           {/* Specifications Table */}
-          <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
-            <h3 className="text-[11px] font-bold tracking-[0.16em] text-white/50 uppercase pb-2 border-b border-white/10">
+          <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
+            <h3 className="text-[11px] font-bold tracking-[0.16em] text-mac-faint uppercase pb-2 border-b border-mac-line">
               Technical Specifications
             </h3>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
               <div>
-                <dt className="text-[10px] font-semibold uppercase text-white/45">Condition</dt>
-                <dd className="font-medium text-white">{watch.condition}</dd>
+                <dt className="text-[10px] font-semibold uppercase text-mac-faint">Condition</dt>
+                <dd className="font-medium text-mac-fg">{watch.condition}</dd>
               </div>
               <div>
-                <dt className="text-[10px] font-semibold uppercase text-white/45">Case Metal</dt>
-                <dd className="font-medium text-white">{watch.caseMetal}</dd>
+                <dt className="text-[10px] font-semibold uppercase text-mac-faint">Case Metal</dt>
+                <dd className="font-medium text-mac-fg">{watch.caseMetal}</dd>
               </div>
               <div>
-                <dt className="text-[10px] font-semibold uppercase text-white/45">Case Diameter</dt>
-                <dd className="font-medium text-white">{watch.caseDiameter}</dd>
+                <dt className="text-[10px] font-semibold uppercase text-mac-faint">Case Diameter</dt>
+                <dd className="font-medium text-mac-fg">{watch.caseDiameter}</dd>
               </div>
               <div>
-                <dt className="text-[10px] font-semibold uppercase text-white/45">Dial Color</dt>
-                <dd className="font-medium text-white">{watch.dialColor}</dd>
+                <dt className="text-[10px] font-semibold uppercase text-mac-faint">Dial Color</dt>
+                <dd className="font-medium text-mac-fg">{watch.dialColor}</dd>
               </div>
               <div>
-                <dt className="text-[10px] font-semibold uppercase text-white/45">Box & Papers</dt>
-                <dd className="font-medium text-white">{watch.boxPapers}</dd>
+                <dt className="text-[10px] font-semibold uppercase text-mac-faint">Box & Papers</dt>
+                <dd className="font-medium text-mac-fg">{watch.boxPapers}</dd>
               </div>
               <div>
-                <dt className="text-[10px] font-semibold uppercase text-white/45">Complication</dt>
-                <dd className="font-medium text-white">{watch.complication}</dd>
+                <dt className="text-[10px] font-semibold uppercase text-mac-faint">Complication</dt>
+                <dd className="font-medium text-mac-fg">{watch.complication}</dd>
               </div>
             </dl>
           </div>
@@ -175,7 +175,7 @@ export default function WatchDetailPage() {
               type="button"
               disabled={locked}
               onClick={() => router.push("/collection/add")}
-              className="flex-1 rounded-xl border border-white/20 bg-white/5 py-3 text-[11px] font-semibold tracking-wider text-white uppercase disabled:opacity-30"
+              className="flex-1 rounded-xl border border-mac-line bg-white/5 py-3 text-[11px] font-semibold tracking-wider text-mac-fg uppercase disabled:opacity-30"
             >
               {locked ? "Locked for Review" : "Edit Details"}
             </button>

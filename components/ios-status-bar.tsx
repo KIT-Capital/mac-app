@@ -6,7 +6,7 @@ export function IosStatusBar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative z-30 flex h-11 shrink-0 items-center justify-between px-6 pt-1 text-[13px] font-semibold text-white select-none",
+        "relative z-30 flex h-11 shrink-0 items-center justify-between px-6 pt-1 text-[13px] font-semibold text-mac-status select-none",
         className,
       )}
       aria-hidden
@@ -44,7 +44,7 @@ export function IosStatusBar({ className }: { className?: string }) {
 export function IosHomeIndicator({ className }: { className?: string }) {
   return (
     <div className={cn("relative z-30 flex justify-center py-2 select-none", className)} aria-hidden>
-      <div className="h-[4.5px] w-[134px] rounded-full bg-white/40 shadow-sm" />
+      <div className="h-[4.5px] w-[134px] rounded-full bg-mac-status/40 shadow-sm" />
     </div>
   );
 }

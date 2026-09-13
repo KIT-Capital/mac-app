@@ -22,14 +22,15 @@ import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 import type { Timepiece } from "@/lib/types";
 
-const SLOTS = ["Front", "Back", "Left"] as const;
+const SLOTS = ["Front", "Back", "Left", "More"] as const;
 
 function AddForm() {
   const router = useRouter();
   const params = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
   const { addTimepiece, updateTimepiece, catalog, user, settings } = useStore();
-  const [images, setImages] = useState<string[]>(["", "", ""]);
+  const [images, setImages] = useState<string[]>(["", "", "", ""]);
+  const [videoName, setVideoName] = useState("");
   const [brand, setBrand] = useState("Audemars Piguet");
   const [model, setModel] = useState("Royal Oak Selfwinding");
   const [reference, setReference] = useState("");
@@ -122,7 +123,7 @@ function AddForm() {
 
   function missingFields() {
     const missing: string[] = [];
-    const needed = settings.requireFourPhotos ? 3 : 1;
+    const needed = settings.requireFourPhotos ? 4 : 1;
     if (images.filter(Boolean).length < needed) missing.push("front, back, and left photos");
     if (!model.trim()) missing.push("a model name");
     return missing;
@@ -157,29 +158,15 @@ function AddForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-[#10141D]">
-      <ScreenHeader title="Add Timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
+    <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
+      <ScreenHeader title="Add a Timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
       <form onSubmit={onSave} className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-10">
-        <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
-            <div className="flex items-center justify-between pb-2">
-              <span className="text-[11px] font-bold tracking-[0.14em] text-[#E8D5C0] uppercase">
-                Intake Photographs (Min. 3 Angles)
-              </span>
-              <button
-                type="button"
-                onClick={() => setImages(["/watches/patek-5524g.png", "/watches/patek-nautilus.jpg", "/watches/royal-oak.png"])}
-                className="text-[10px] font-semibold text-[#FCB040] hover:underline"
-              >
-                + Quick Samples
-              </button>
-            </div>
-          <p className="mt-1 text-[12px] text-white/60">
-            Please provide clear shots for manufacturer authenticity verification.
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
+        <div>
+          <p className="text-[12px] text-mac-muted">Please upload at least 4 images of the timepiece</p>
+          <div className="mt-3 grid grid-cols-4 gap-2">
             {SLOTS.map((label, i) => (
               <label key={label} className="group block text-center cursor-pointer">
-                <span className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/30 bg-[#0F131A] text-white/50 transition group-hover:border-[#FCB040] group-hover:text-white">
+                <span className="flex aspect-square items-center justify-center overflow-hidden rounded-lg border border-dashed border-mac-line bg-mac-card text-mac-faint transition group-hover:border-[#FCB040] group-hover:text-mac-fg">
                   {images[i] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={images[i]} alt={label} className="h-full w-full object-cover" />
@@ -187,7 +174,7 @@ function AddForm() {
                     <span className="text-xl">+</span>
                   )}
                 </span>
-                <span className="mt-1.5 block text-[10px] font-semibold tracking-wider text-white/60 uppercase">
+                <span className="mt-1.5 block text-[10px] font-semibold tracking-wider text-mac-faint uppercase">
                   {label}
                 </span>
                 <input
@@ -199,11 +186,31 @@ function AddForm() {
               </label>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() =>
+              setImages([
+                "/watches/patek-5524g.png",
+                "/watches/patek-nautilus.jpg",
+                "/watches/royal-oak.png",
+                "/watches/patek-wrist.jpg",
+              ])
+            }
+            className="mt-2 text-[10px] font-semibold text-[#FCB040] hover:underline"
+          >
+            + Quick samples
+          </button>
         </div>
         {settings.allowVideo ? (
-          <button type="button" className="mac-tap w-full text-left text-[13px] text-white/80">
-            + Upload video
-          </button>
+          <label className="mac-tap flex w-full cursor-pointer items-center justify-between rounded-xl border border-mac-line bg-mac-card px-3 py-3 text-[13px] text-mac-fg">
+            <span>{videoName ? videoName : "+ Upload video"}</span>
+            <input
+              type="file"
+              accept="video/*"
+              className="sr-only"
+              onChange={(e) => setVideoName(e.target.files?.[0]?.name || "")}
+            />
+          </label>
         ) : null}
 
         <Field label="Manufacturer / Brand">
@@ -216,7 +223,7 @@ function AddForm() {
             }}
           >
             {TIER_ONE_BRANDS.map((b) => (
-              <option key={b} value={b} className="bg-black">
+              <option key={b} value={b} className="bg-mac-card">
                 {b}
               </option>
             ))}
@@ -225,12 +232,12 @@ function AddForm() {
         <button
           type="button"
           onClick={() => setMissingBrand((v) => !v)}
-          className="text-[12px] text-white underline underline-offset-4"
+          className="text-[12px] text-mac-fg underline underline-offset-4"
         >
           Missing a brand?
         </button>
         {missingBrand ? (
-          <p className="text-[12px] text-white/50">
+          <p className="text-[12px] text-mac-faint">
             Email {settings.financingEmail} and the desk will add the manufacturer to the catalog.
           </p>
         ) : null}
@@ -238,7 +245,7 @@ function AddForm() {
           {models.length ? (
             <NativeSelect value={model} onChange={(e) => setModel(e.target.value)}>
               {models.map((m) => (
-                <option key={m} value={m} className="bg-black">
+                <option key={m} value={m} className="bg-mac-card">
                   {m}
                 </option>
               ))}
@@ -261,7 +268,7 @@ function AddForm() {
         <Field label="Condition">
           <NativeSelect value={condition} onChange={(e) => setCondition(e.target.value)}>
             {CONDITIONS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -270,7 +277,7 @@ function AddForm() {
         <Field label="Box and papers">
           <NativeSelect value={boxPapers} onChange={(e) => setBoxPapers(e.target.value)}>
             {BOX_PAPERS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -279,7 +286,7 @@ function AddForm() {
         <Field label="Case metal">
           <NativeSelect value={caseMetal} onChange={(e) => setCaseMetal(e.target.value)}>
             {CASE_METALS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -288,7 +295,7 @@ function AddForm() {
         <Field label="Case type">
           <NativeSelect value={caseType} onChange={(e) => setCaseType(e.target.value)}>
             {CASE_TYPES.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -297,7 +304,7 @@ function AddForm() {
         <Field label="Case diameter">
           <NativeSelect value={caseDiameter} onChange={(e) => setCaseDiameter(e.target.value)}>
             {CASE_DIAMETERS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -306,7 +313,7 @@ function AddForm() {
         <Field label="Dial color">
           <NativeSelect value={dialColor} onChange={(e) => setDialColor(e.target.value)}>
             {DIAL_COLORS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -315,29 +322,29 @@ function AddForm() {
         <Field label="Buckle">
           <NativeSelect value={buckle} onChange={(e) => setBuckle(e.target.value)}>
             {BUCKLES.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
           </NativeSelect>
         </Field>
-        <div className="rounded-xl border border-white/20 bg-[#161B24] p-3">
-          <p className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">Band Configuration</p>
+        <div className="rounded-xl border border-mac-line bg-mac-card p-3">
+          <p className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">Band</p>
           <div className="mt-2 flex gap-8 text-[14px]">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" checked={band === "strap"} onChange={() => setBand("strap")} className="accent-[#FCB040]" />
-              <span>Leather / Rubber Strap</span>
+              <span>Strap</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" checked={band === "bracelet"} onChange={() => setBand("bracelet")} className="accent-[#FCB040]" />
-              <span>Integrated Bracelet</span>
+              <span>Metal Bracelet</span>
             </label>
           </div>
         </div>
         <Field label={band === "strap" ? "Strap material" : "Bracelet material"}>
           <NativeSelect value={bandMaterial} onChange={(e) => setBandMaterial(e.target.value)}>
             {STRAP_MATERIALS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
@@ -346,23 +353,23 @@ function AddForm() {
         <Field label="Complication">
           <NativeSelect value={complication} onChange={(e) => setComplication(e.target.value)}>
             {COMPLICATIONS.map((c) => (
-              <option key={c} className="bg-black">
+              <option key={c} className="bg-mac-card">
                 {c}
               </option>
             ))}
           </NativeSelect>
         </Field>
 
-        <p className="text-[11px] leading-5 text-white/40">
+        <p className="text-[11px] leading-5 text-mac-faint">
           *Once you click appraise, the timepiece profile can only be modified by contacting us.
         </p>
-        {error ? <p className="text-sm text-red-300">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <div className="grid grid-cols-2 gap-3 pt-3">
           <PillButton type="submit" variant="white">
-            Save as Draft
+            Save
           </PillButton>
-          <PillButton type="button" variant="gold" onClick={onAppraise}>
-            Appraise Now
+          <PillButton type="button" variant="navy" onClick={onAppraise}>
+            Appraise
           </PillButton>
         </div>
       </form>
