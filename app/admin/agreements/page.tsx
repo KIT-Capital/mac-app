@@ -46,7 +46,9 @@ export default function AdminAgreementsPage() {
             <option className="bg-black" value="closed">Closed</option>
           </NativeSelect>
         </Field>
-        <PillButton type="submit">Save shell</PillButton>
+        <PillButton type="submit" variant="gold" className="md:col-span-3">
+          Save Agreement Shell
+        </PillButton>
       </form>
       <AdminTable
         headers={["Code", "Title", "Term", "LTV", ""]}

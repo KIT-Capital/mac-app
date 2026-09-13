@@ -137,7 +137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("mac-app-state-v1");
       if (raw) {
         const parsed = JSON.parse(raw) as AppState;
-        const timepieces = parsed.timepieces ?? [];
+        const timepieces = parsed.timepieces && parsed.timepieces.length > 0 ? parsed.timepieces : DEMO_TIMEPIECES;
         setState({
           ...withDeskDefaults(parsed, timepieces),
           user: normalizeUser(parsed.user, timepieces.length),
@@ -147,7 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* start empty */
     }
-    setState({ ...emptyState(), hydrated: true, user: null });
+    setState(demoState());
   }, []);
 
   useEffect(() => {

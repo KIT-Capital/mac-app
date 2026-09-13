@@ -50,8 +50,8 @@ export default function AdminPhotosPage() {
             ))}
           </NativeSelect>
         </label>
-        <label className="mac-tap flex h-12 items-center bg-[#0E2A44] px-5 text-[12px] tracking-[0.16em] uppercase">
-          Upload photo
+        <label className="mac-tap flex h-11 items-center rounded-xl bg-[#FCB040] px-5 text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm cursor-pointer hover:bg-[#ffbe59]">
+          Upload Photo
           <input type="file" accept="image/*" className="sr-only" onChange={(e) => onUpload(e.target.files?.[0])} />
         </label>
       </div>

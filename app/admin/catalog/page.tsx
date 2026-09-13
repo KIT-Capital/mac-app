@@ -56,7 +56,9 @@ export default function AdminCatalogPage() {
         <Field label="Notes">
           <input value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} className="w-full bg-transparent py-1 text-[16px] outline-none" />
         </Field>
-        <PillButton type="submit">{draft.id ? "Update reference" : "Add reference"}</PillButton>
+        <PillButton type="submit" variant="gold" className="md:col-span-2 xl:col-span-3">
+          {draft.id ? "Update Reference" : "Add Reference"}
+        </PillButton>
       </form>
       <AdminTable
         headers={["Brand", "Model", "Reference", "Range", ""]}

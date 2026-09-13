@@ -103,7 +103,9 @@ export default function AdminConfigPage() {
           Require front / back / left photos
         </label>
         {saved ? <p className="text-sm text-[#FCB040]">Configuration saved to this device.</p> : null}
-        <PillButton type="submit">Save configuration</PillButton>
+        <PillButton type="submit" variant="gold" className="mt-4">
+          Save Configuration
+        </PillButton>
       </form>
     </AdminChrome>
   );

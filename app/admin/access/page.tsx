@@ -58,9 +58,9 @@ export default function AdminAccessPage() {
             <option className="bg-black" value="suspended">Suspended</option>
           </NativeSelect>
         </Field>
-        <div className="flex items-end">
-          <PillButton type="submit">{draft.id ? "Update user" : "Add user"}</PillButton>
-        </div>
+        <PillButton type="submit" variant="gold">
+          {draft.id ? "Update User" : "Add User"}
+        </PillButton>
       </form>
       <AdminTable
         headers={["Name", "Email", "Role", "Status", ""]}

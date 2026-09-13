@@ -150,9 +150,18 @@ function AddForm() {
       <ScreenHeader title="Add Timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
       <form onSubmit={onSave} className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-10">
         <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4">
-          <p className="text-[11px] font-bold tracking-[0.14em] text-[#E8D5C0] uppercase">
-            Intake Photographs (Min. 3 Angles)
-          </p>
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-[11px] font-bold tracking-[0.14em] text-[#E8D5C0] uppercase">
+                Intake Photographs (Min. 3 Angles)
+              </span>
+              <button
+                type="button"
+                onClick={() => setImages(["/watches/patek-5524g.png", "/watches/patek-nautilus.jpg", "/watches/royal-oak.png"])}
+                className="text-[10px] font-semibold text-[#FCB040] hover:underline"
+              >
+                + Quick Samples
+              </button>
+            </div>
           <p className="mt-1 text-[12px] text-white/60">
             Please provide clear shots for manufacturer authenticity verification.
           </p>
