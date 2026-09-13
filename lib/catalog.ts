@@ -122,3 +122,7 @@ export function roleFromEmail(email: string) {
   }
   return "collector" as const;
 }
+
+export function isDesk(user: { role?: string } | null) {
+  return user?.role === "admin" || user?.role === "staff";
+}

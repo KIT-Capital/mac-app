@@ -5,7 +5,8 @@ import { useEffect, type ReactNode } from "react";
 import { BottomNav } from "@/components/bottom-nav";
 import { PhoneShell } from "@/components/phone-shell";
 import { SideNav } from "@/components/side-nav";
-import { isDesk, useStore } from "@/lib/store";
+import { isDesk } from "@/lib/catalog";
+import { useStore } from "@/lib/store";
 
 const PUBLIC = ["/", "/login", "/signup", "/privacy"];
 const ONBOARDING = ["/collection/setup", "/collection/add", "/collection/continue"];

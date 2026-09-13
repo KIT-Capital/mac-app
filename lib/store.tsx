@@ -332,7 +332,3 @@ export function useStore() {
   if (!ctx) throw new Error("useStore must be used within StoreProvider");
   return ctx;
 }
-
-export function isDesk(user: Profile | null) {
-  return user?.role === "admin" || user?.role === "staff";
-}

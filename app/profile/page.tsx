@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { LogOut, Pencil, Settings, Star, Ticket, Users } from "lucide-react";
-import { isDesk, useStore } from "@/lib/store";
+import { isDesk } from "@/lib/catalog";
+import { useStore } from "@/lib/store";
 
 const TILES = [
   { href: "/profile/membership", label: "Membership", icon: Star },

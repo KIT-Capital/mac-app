@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Clock, LayoutDashboard, Mail, Plus, UserRound } from "lucide-react";
 import { MacWordmark } from "@/components/mac-logo";
-import { isDesk, useStore } from "@/lib/store";
+import { isDesk } from "@/lib/catalog";
+import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const COLLECTOR = [
