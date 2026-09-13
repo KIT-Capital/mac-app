@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { BottomNav } from "@/components/bottom-nav";
 import { PhoneShell } from "@/components/phone-shell";
 import { isDesk } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
@@ -17,8 +16,6 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const isPublic = PUBLIC.includes(pathname);
   const isAdmin = pathname.startsWith("/admin");
   const desk = isDesk(user);
-  const showCollectorNav = Boolean(hydrated && user && !isPublic && !isAdmin && user.onboardingComplete);
-
   useEffect(() => {
     if (!hydrated) return;
     if (!user && !isPublic) {
@@ -54,7 +51,6 @@ export function AppFrame({ children }: { children: ReactNode }) {
         ) : (
           children
         )}
-        {showCollectorNav ? <BottomNav /> : null}
       </div>
     </PhoneShell>
   );

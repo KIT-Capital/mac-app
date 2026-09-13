@@ -1,3 +1,4 @@
+import { deskRoleForEmail } from "@/lib/auth";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 
 export const TIER_ONE_BRANDS = [
@@ -128,12 +129,7 @@ export function hasApplication(
 }
 
 export function roleFromEmail(email: string) {
-  const lower = email.trim().toLowerCase();
-  if (lower === "admin@mechartcap.com" || lower.startsWith("admin@")) return "admin" as const;
-  if (lower === "desk@mechartcap.com" || lower.startsWith("desk@") || lower.startsWith("financing@")) {
-    return "staff" as const;
-  }
-  return "collector" as const;
+  return deskRoleForEmail(email) ?? "collector";
 }
 
 export function isDesk(user: { role?: string } | null) {

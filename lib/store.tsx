@@ -15,7 +15,8 @@ import {
   DEMO_USERS,
   photosFromWatches,
 } from "@/lib/admin-seed";
-import { roleFromEmail } from "@/lib/catalog";
+import { deskRoleForEmail } from "@/lib/auth";
+import { mergePreferences } from "@/lib/preferences";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import type {
   Agreement,
@@ -27,15 +28,17 @@ import type {
   PhotoRecord,
   Profile,
   Timepiece,
+  UserPreferences,
 } from "@/lib/types";
 
-const STORAGE_KEY = "mac-app-state-v2";
+const STORAGE_KEY = "mac-app-state-v3";
 
 type Store = AppState & {
   signIn: (profile?: Partial<Profile>) => void;
   signUp: (profile: Pick<Profile, "name" | "email"> & Partial<Profile>) => void;
   signOut: () => void;
   updateProfile: (patch: Partial<Profile>) => void;
+  updatePreferences: (patch: Partial<UserPreferences>) => void;
   completeOnboarding: () => void;
   addTimepiece: (watch: Timepiece) => void;
   updateTimepiece: (id: string, patch: Partial<Timepiece>) => void;
@@ -86,13 +89,22 @@ function demoState(): AppState {
   };
 }
 
+function assignedRole(email: string, requested?: Profile["role"]) {
+  const desk = deskRoleForEmail(email);
+  if (requested === "admin" || requested === "staff") {
+    return desk === requested ? requested : "collector";
+  }
+  return "collector";
+}
+
 function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
-  const role = patch?.role ?? roleFromEmail(email);
+  const role = assignedRole(email, patch?.role);
+  const preferences = mergePreferences(patch?.preferences);
   if (role === "admin") {
-    return { ...ADMIN_PROFILE, ...patch, email, role };
+    return { ...ADMIN_PROFILE, ...patch, email, role, preferences };
   }
   if (role === "staff") {
-    return { ...STAFF_PROFILE, ...patch, email, role };
+    return { ...STAFF_PROFILE, ...patch, email, role, preferences };
   }
   return {
     name: patch?.name || "Collector",
@@ -103,6 +115,7 @@ function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
     role: "collector",
     onboardingComplete: patch?.onboardingComplete ?? false,
     applicationSubmitted: patch?.applicationSubmitted ?? false,
+    preferences,
   };
 }
 
@@ -112,11 +125,14 @@ function normalizeUser(
   agreementCount = 0,
 ): Profile | null {
   if (!user) return null;
+  const desk = deskRoleForEmail(user.email);
+  const role = desk && (user.role === "admin" || user.role === "staff") ? desk : "collector";
   return {
     ...user,
-    role: user.role ?? roleFromEmail(user.email),
+    role,
+    preferences: mergePreferences(user.preferences),
     onboardingComplete:
-      user.onboardingComplete ?? (timepieceCount > 0 || user.role === "admin" || user.role === "staff"),
+      user.onboardingComplete ?? (timepieceCount > 0 || role === "admin" || role === "staff"),
     applicationSubmitted: user.applicationSubmitted ?? agreementCount > 0,
   };
 }
@@ -144,7 +160,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("mac-app-state-v1");
+      const raw =
+        localStorage.getItem(STORAGE_KEY) ??
+        localStorage.getItem("mac-app-state-v2") ??
+        localStorage.getItem("mac-app-state-v1");
       if (raw) {
         const parsed = JSON.parse(raw) as AppState;
         const timepieces = parsed.timepieces && parsed.timepieces.length > 0 ? parsed.timepieces : DEMO_TIMEPIECES;
@@ -196,7 +215,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return {
             ...prev,
             user: normalizeUser(
-              { ...prev.user, ...profile, email, role: profile?.role ?? prev.user.role ?? roleFromEmail(email) },
+              {
+                ...prev.user,
+                ...profile,
+                email,
+                role: assignedRole(email, profile?.role ?? prev.user.role),
+                preferences: mergePreferences({ ...prev.user.preferences, ...profile?.preferences }),
+              },
               prev.timepieces.length,
               prev.agreements.length,
             ),
@@ -217,8 +242,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       updateProfile: (patch) =>
         setState((prev) =>
-          prev.user ? { ...prev, user: { ...prev.user, ...patch } } : prev
+          prev.user
+            ? {
+                ...prev,
+                user: {
+                  ...prev.user,
+                  ...patch,
+                  preferences: mergePreferences({ ...prev.user.preferences, ...patch.preferences }),
+                },
+              }
+            : prev,
         ),
+      updatePreferences: (patch) =>
+        setState((prev) => {
+          const nextPrefs = mergePreferences({ ...prev.user?.preferences, ...patch });
+          return {
+            ...prev,
+            settings: patch.appearance ? { ...prev.settings, appearance: patch.appearance } : prev.settings,
+            user: prev.user ? { ...prev.user, preferences: nextPrefs } : prev.user,
+          };
+        }),
       completeOnboarding: () =>
         setState((prev) =>
           prev.user ? { ...prev, user: { ...prev.user, onboardingComplete: true } } : prev

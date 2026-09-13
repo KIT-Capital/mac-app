@@ -50,11 +50,12 @@ On a phone the app is full-bleed. On a notebook it stays a 430px iPhone on a sla
 
 ### Demo accounts
 
-| Account | Opens |
-| --- | --- |
-| `jonathan.hale@mechartcap.com` | Collector collection |
-| `admin@mechartcap.com` | Admin desk |
-| New email via Get started | Empty vault |
+| Account | Password | Opens |
+| --- | --- | --- |
+| `jonathan.hale@mechartcap.com` | any collector password | Collection |
+| New email via Get started | — | Empty vault |
+
+The admin desk is not linked from the collector app. It opens only when the preset desk email and password are entered on Sign In: `admin@mechartcap.com` / `MAC-Desk-2022`.
 
 **Restore demo collection** on Account reloads the sample watches.
 

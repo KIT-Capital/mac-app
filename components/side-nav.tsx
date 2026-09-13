@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Clock, LayoutDashboard, Mail, Plus, UserRound } from "lucide-react";
+import { Clock, Mail, Plus, UserRound } from "lucide-react";
 import { MacWordmark } from "@/components/mac-logo";
-import { isDesk } from "@/lib/catalog";
-import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const COLLECTOR = [
@@ -17,8 +15,6 @@ const COLLECTOR = [
 
 export function SideNav() {
   const pathname = usePathname();
-  const { user } = useStore();
-  const desk = isDesk(user);
 
   return (
     <aside className="hidden w-[240px] shrink-0 flex-col border-r border-white/10 bg-black xl:flex">
@@ -43,18 +39,6 @@ export function SideNav() {
             </Link>
           );
         })}
-        {desk ? (
-          <Link
-            href="/admin"
-            className={cn(
-              "mac-tap mt-6 flex items-center gap-3 rounded-sm px-3 text-[12px] tracking-[0.12em] uppercase text-white/45",
-              pathname.startsWith("/admin") && "bg-white/5 text-white",
-            )}
-          >
-            <LayoutDashboard className={cn("h-4 w-4", pathname.startsWith("/admin") && "text-[#FCB040]")} strokeWidth={1.5} />
-            Admin
-          </Link>
-        ) : null}
       </nav>
     </aside>
   );

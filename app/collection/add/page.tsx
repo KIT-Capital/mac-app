@@ -28,7 +28,7 @@ function AddForm() {
   const params = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
   const { addTimepiece, updateTimepiece, catalog, user, settings } = useStore();
-  const light = settings.appearance === "light";
+  const light = (user?.preferences.appearance ?? settings.appearance) === "light";
   const [images, setImages] = useState<string[]>(["", "", ""]);
   const [videoName, setVideoName] = useState("");
   const [brand, setBrand] = useState("Audemars Piguet");

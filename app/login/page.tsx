@@ -6,34 +6,43 @@ import { FormEvent, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { MacLockup } from "@/components/mac-logo";
 import { SocialLogin } from "@/components/social-login";
-import { roleFromEmail } from "@/lib/catalog";
+import { authenticate, isReservedDeskEmail } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, settings } = useStore();
+  const { signIn, settings, user } = useStore();
   const [email, setEmail] = useState("jonathan.hale@mechartcap.com");
-  const [password, setPassword] = useState("••••••••");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const light = (user?.preferences.appearance ?? settings.appearance) === "light";
 
-  function go(nextEmail: string) {
-    signIn({ email: nextEmail });
-    router.push(roleFromEmail(nextEmail) === "collector" ? "/collection" : "/admin");
+  function enter(nextEmail: string, nextPassword: string) {
+    const result = authenticate(nextEmail, nextPassword);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    signIn({ email: nextEmail.trim(), role: result.role });
+    router.replace(result.role === "collector" ? "/collection" : "/admin");
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!email.includes("@")) {
-      setError("Enter a valid email address.");
+    enter(email, password);
+  }
+
+  function onSocial() {
+    if (isReservedDeskEmail(email)) {
+      setError("Desk accounts must sign in with email and the preset password.");
       return;
     }
-    go(email);
+    enter(email, password || "collection");
   }
 
   return (
     <main className="flex flex-1 flex-col justify-between px-6 py-4">
-      {/* Top Navigation */}
       <div className="flex items-center justify-between pb-3">
         <Link
           href="/"
@@ -43,15 +52,11 @@ export default function LoginPage() {
           <ArrowLeft className="h-4 w-4" strokeWidth={2} />
           <span className="text-[11px] font-medium tracking-[0.16em] uppercase">Back</span>
         </Link>
-        <span className="text-[10px] font-semibold tracking-[0.2em] text-[#FCB040] uppercase">
-          Client Vault
-        </span>
       </div>
 
-      {/* Brand Hero */}
       <div className="my-auto pt-2 pb-6 text-center">
         <div className="mx-auto">
-          <MacLockup onDark={settings.appearance !== "light"} />
+          <MacLockup onDark={!light} />
         </div>
         <h1 className="mt-4 text-[20px] font-medium tracking-tight text-mac-fg">
           Sign In to Your Collection
@@ -61,9 +66,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* Form */}
       <form onSubmit={onSubmit} className="space-y-4">
-        {/* Email Field */}
         <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
           <div className="flex items-center justify-between">
             <label htmlFor="login-email" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
@@ -83,7 +86,6 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* Password Field */}
         <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
           <div className="flex items-center justify-between">
             <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
@@ -112,19 +114,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Forgot password */}
-        <div className="flex justify-end pt-0.5">
-          <button
-            type="button"
-            className="text-[11px] font-medium text-[#FCB040] hover:underline"
-          >
-            Forgot password?
-          </button>
-        </div>
-
         {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
 
-        {/* Submit */}
         <button
           type="submit"
           className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-[#0E2A44] text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
@@ -133,38 +124,17 @@ export default function LoginPage() {
         </button>
       </form>
 
-      {/* Social login alternatives */}
       <div className="pt-5">
-        <SocialLogin onContinue={() => go(email)} />
+        <SocialLogin onContinue={onSocial} />
       </div>
 
-      {/* Footer & Demo shortcuts */}
-      <div className="pt-6 pb-2 text-center space-y-3">
+      <div className="pt-6 pb-2 text-center">
         <p className="text-[12px] text-mac-muted">
           Don&apos;t have an account?{" "}
           <Link href="/signup" className="font-semibold text-[#FCB040] underline underline-offset-4">
             Sign up
           </Link>
         </p>
-
-        {/* 1-tap evaluator shortcuts */}
-        <div className="flex items-center justify-center gap-2 pt-1 text-[11px] text-mac-faint">
-          <span>Demo:</span>
-          <button
-            type="button"
-            onClick={() => go("jonathan.hale@mechartcap.com")}
-            className="rounded-full border border-mac-line bg-mac-card px-2.5 py-1 text-mac-fg transition hover:border-[#FCB040] hover:text-[#FCB040]"
-          >
-            Collector
-          </button>
-          <button
-            type="button"
-            onClick={() => go("admin@mechartcap.com")}
-            className="rounded-full border border-mac-line bg-mac-card px-2.5 py-1 text-mac-fg transition hover:border-[#FCB040] hover:text-[#FCB040]"
-          >
-            Admin Desk
-          </button>
-        </div>
       </div>
     </main>
   );

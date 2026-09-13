@@ -6,7 +6,7 @@ import { ScreenHeader } from "@/components/screen-header";
 export default function PrivacyPage() {
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
-      <ScreenHeader title="Privacy Policy" backHref="/signup" />
+      <ScreenHeader title="Privacy Policy" backHref="/signup" menu={false} />
       <article className="mx-auto w-full max-w-xl flex-1 space-y-4 overflow-y-auto px-6 py-6 text-[13px] leading-relaxed text-mac-muted">
         <span className="inline-block rounded-full border border-[#FCB040]/30 bg-[#FCB040]/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">
           Client Data & Title Verification Standard

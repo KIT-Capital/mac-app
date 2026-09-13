@@ -2,20 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Asterisk, Camera, Mail, Pencil, Phone, Power, RefreshCw, Settings, ShieldAlert, Star, User } from "lucide-react";
-import { isDesk } from "@/lib/catalog";
+import { Asterisk, Camera, Mail, Pencil, Phone, Power, RefreshCw, Settings, SlidersHorizontal, Star } from "lucide-react";
+import { BurgerButton } from "@/components/burger-menu";
 import { useStore } from "@/lib/store";
 
 const TILES = [
   { href: "/profile/membership", label: "Membership", icon: Star },
   { href: "/profile/promo", label: "Promo Codes", icon: Asterisk },
-  { href: "/profile/partners", label: "Partners", icon: User },
+  { href: "/profile/preferences", label: "Preferences", icon: SlidersHorizontal },
   { href: "/profile/settings", label: "Settings", icon: Settings },
 ];
 
 export default function ProfilePage() {
   const { user, signOut, resetDemo } = useStore();
-  const desk = isDesk(user);
   const avatar = user?.avatar || "/watches/patek-wrist.jpg";
 
   return (
@@ -30,6 +29,8 @@ export default function ProfilePage() {
           priority
         />
         <div className="relative flex items-start justify-between px-5 pt-14">
+          <div className="flex items-start gap-3">
+            <BurgerButton className="-ml-1 min-h-11 min-w-11" />
           <Link
             href="/profile/settings"
             className="flex min-h-11 min-w-11 flex-col items-start gap-1 text-white"
@@ -37,6 +38,7 @@ export default function ProfilePage() {
             <Pencil className="h-4 w-4" strokeWidth={1.5} />
             <span className="text-[8px] tracking-[0.14em] uppercase">Edit Profile</span>
           </Link>
+          </div>
           <button
             type="button"
             onClick={signOut}
@@ -98,16 +100,6 @@ export default function ProfilePage() {
             );
           })}
         </div>
-
-        {desk ? (
-          <Link
-            href="/admin"
-            className="mt-5 flex items-center justify-center gap-2 py-3 text-[11px] tracking-[0.14em] text-mac-faint uppercase"
-          >
-            <ShieldAlert className="h-3.5 w-3.5" />
-            Desk
-          </Link>
-        ) : null}
 
         <button
           type="button"

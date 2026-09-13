@@ -8,8 +8,10 @@ import { cn } from "@/lib/utils";
 
 export function PhoneShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { settings } = useStore();
-  const appearance = pathname.startsWith("/admin") ? "dark" : settings.appearance;
+  const { settings, user } = useStore();
+  const appearance = pathname.startsWith("/admin")
+    ? "dark"
+    : (user?.preferences.appearance ?? settings.appearance);
   const navyStatus = pathname === "/profile";
 
   return (

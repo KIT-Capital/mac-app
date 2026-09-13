@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
+import { isReservedDeskEmail } from "@/lib/auth";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
@@ -22,6 +23,10 @@ export default function SignupPage() {
     e.preventDefault();
     if (!name || !email.includes("@")) {
       setError("Please enter your name and a valid email address.");
+      return;
+    }
+    if (isReservedDeskEmail(email)) {
+      setError("That address is reserved.");
       return;
     }
     if (!adult) {
@@ -46,7 +51,7 @@ export default function SignupPage() {
 
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
-      <ScreenHeader title="Create Account" backHref="/" />
+      <ScreenHeader title="Create Account" backHref="/" menu={false} />
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mb-6 space-y-1">
           <span className="text-[10px] font-semibold tracking-[0.2em] text-[#FCB040] uppercase">

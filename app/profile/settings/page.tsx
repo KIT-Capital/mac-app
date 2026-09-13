@@ -43,7 +43,11 @@ export default function SettingsPage() {
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
         <p className="text-[12px] text-mac-muted">
-          Partner codes live on{" "}
+          Appearance, notices, and contact method live on{" "}
+          <Link href="/profile/preferences" className="underline underline-offset-2">
+            Preferences
+          </Link>
+          . Partner codes live on{" "}
           <Link href="/profile/promo" className="underline underline-offset-2">
             Promo Codes
           </Link>

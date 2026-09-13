@@ -1,3 +1,4 @@
+import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 import type { Agreement, Profile, Timepiece } from "@/lib/types";
 
 export const DEMO_PROFILE: Profile = {
@@ -9,6 +10,7 @@ export const DEMO_PROFILE: Profile = {
   role: "collector",
   onboardingComplete: true,
   applicationSubmitted: true,
+  preferences: { ...DEFAULT_PREFERENCES },
 };
 
 export const ADMIN_PROFILE: Profile = {
@@ -19,6 +21,7 @@ export const ADMIN_PROFILE: Profile = {
   avatar: "/brand/logo-ff-mark.png",
   role: "admin",
   onboardingComplete: true,
+  preferences: { ...DEFAULT_PREFERENCES },
 };
 
 export const STAFF_PROFILE: Profile = {
@@ -29,6 +32,7 @@ export const STAFF_PROFILE: Profile = {
   avatar: "/brand/logo-ff-mark.png",
   role: "staff",
   onboardingComplete: true,
+  preferences: { ...DEFAULT_PREFERENCES },
 };
 
 export const DEMO_TIMEPIECES: Timepiece[] = [

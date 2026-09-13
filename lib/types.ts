@@ -45,6 +45,15 @@ export type Agreement = {
   agreementCode?: string;
 };
 
+export type UserPreferences = {
+  appearance: Appearance;
+  pushNotifications: boolean;
+  emailUpdates: boolean;
+  smsUpdates: boolean;
+  preferredContact: "email" | "phone";
+  language: "en";
+};
+
 export type Profile = {
   name: string;
   email: string;
@@ -54,6 +63,7 @@ export type Profile = {
   role: Role;
   onboardingComplete: boolean;
   applicationSubmitted?: boolean;
+  preferences: UserPreferences;
 };
 
 export type ManagedUser = {

@@ -5,14 +5,14 @@ import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export function AppearanceToggle({ className }: { className?: string }) {
-  const { settings, updateSettings } = useStore();
-  const light = settings.appearance === "light";
+  const { user, settings, updatePreferences } = useStore();
+  const light = (user?.preferences.appearance ?? settings.appearance) === "light";
 
   return (
     <div className={cn("grid grid-cols-2 gap-2", className)}>
       <button
         type="button"
-        onClick={() => updateSettings({ appearance: "dark" })}
+        onClick={() => updatePreferences({ appearance: "dark" })}
         className={cn(
           "mac-tap flex h-11 items-center justify-center gap-2 rounded-xl border text-[11px] font-bold tracking-[0.14em] uppercase",
           !light
@@ -25,7 +25,7 @@ export function AppearanceToggle({ className }: { className?: string }) {
       </button>
       <button
         type="button"
-        onClick={() => updateSettings({ appearance: "light" })}
+        onClick={() => updatePreferences({ appearance: "light" })}
         className={cn(
           "mac-tap flex h-11 items-center justify-center gap-2 rounded-xl border text-[11px] font-bold tracking-[0.14em] uppercase",
           light
