@@ -1,6 +1,6 @@
 "use client";
 
-function GoogleMark() {
+export function GoogleMark() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
       <path
@@ -23,18 +23,19 @@ function GoogleMark() {
   );
 }
 
-function FacebookMark() {
+export function FacebookMark() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+      <circle cx="12" cy="12" r="12" fill="#1877F2" />
       <path
-        fill="#fff"
-        d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047v-2.66c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97H15.83c-1.491 0-1.956.93-1.956 1.886v2.265h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"
+        fill="#FFFFFF"
+        d="M15.14 12.07h-2.14v7.93h-3.28v-7.93H8.25V9.31h1.47V7.52c0-2.06 1.23-3.19 3.1-3.19.9 0 1.67.07 1.9.1v2.2h-1.3c-1 0-1.2.48-1.2 1.18v1.5h2.44l-.32 2.76z"
       />
     </svg>
   );
 }
 
-function AppleMark({ className }: { className?: string }) {
+export function AppleMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className ?? "h-5 w-5"} fill="currentColor" aria-hidden>
       <path d="M16.37 12.23c-.03-3.04 2.48-4.5 2.59-4.57-1.41-2.06-3.61-2.34-4.39-2.37-1.87-.19-3.65 1.1-4.6 1.1-.95 0-2.42-1.07-3.98-1.04-2.05.03-3.94 1.19-5 3.02-2.13 3.69-.54 9.15 1.53 12.14 1.01 1.46 2.22 3.1 3.8 3.04 1.54-.06 2.12-.99 3.98-.99 1.86 0 2.38.99 4 .96 1.65-.03 2.7-1.49 3.71-2.96 1.17-1.7 1.65-3.35 1.68-3.44-.04-.01-3.22-1.24-3.25-4.89zM13.76 3.99c.85-1.03 1.42-2.46 1.26-3.89-1.22.05-2.7.81-3.57 1.84-.79.91-1.48 2.37-1.3 3.77 1.37.11 2.77-.7 3.61-1.72z" />
@@ -44,32 +45,36 @@ function AppleMark({ className }: { className?: string }) {
 
 export function SocialLogin({ onContinue }: { onContinue: () => void }) {
   return (
-    <div className="space-y-3">
-      <p className="text-[12px] text-white/70">Or continue with</p>
-      <button
-        type="button"
-        onClick={onContinue}
-        className="mac-tap flex h-11 w-full items-center justify-center gap-3 rounded-[4px] bg-white text-[14px] font-medium text-[#1F1F1F] shadow-[inset_0_0_0_1px_#747775]"
-      >
-        <GoogleMark />
-        Sign in with Google
-      </button>
-      <button
-        type="button"
-        onClick={onContinue}
-        className="mac-tap flex h-11 w-full items-center justify-center gap-3 rounded-[4px] bg-[#1877F2] text-[14px] font-semibold text-white"
-      >
-        <FacebookMark />
-        Continue with Facebook
-      </button>
-      <button
-        type="button"
-        onClick={onContinue}
-        className="mac-tap flex h-11 w-full items-center justify-center gap-3 rounded-[6px] bg-white text-[16px] font-medium text-black"
-      >
-        <AppleMark className="h-[18px] w-[18px]" />
-        Sign in with Apple
-      </button>
+    <div className="space-y-3 text-center">
+      <p className="text-[12px] tracking-[0.06em] text-white/60 uppercase">
+        Or log in with
+      </p>
+      <div className="flex items-center justify-center gap-4">
+        <button
+          type="button"
+          onClick={onContinue}
+          aria-label="Sign in with Google"
+          className="mac-tap flex h-12 w-12 items-center justify-center rounded-full bg-[#242424] ring-1 ring-white/25 transition hover:bg-[#2e2e2e] active:scale-95"
+        >
+          <GoogleMark />
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          aria-label="Continue with Facebook"
+          className="mac-tap flex h-12 w-12 items-center justify-center rounded-full bg-[#242424] ring-1 ring-white/25 transition hover:bg-[#2e2e2e] active:scale-95"
+        >
+          <FacebookMark />
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          aria-label="Sign in with Apple"
+          className="mac-tap flex h-12 w-12 items-center justify-center rounded-full bg-[#242424] text-white ring-1 ring-white/25 transition hover:bg-[#2e2e2e] active:scale-95"
+        >
+          <AppleMark className="h-5 w-5" />
+        </button>
+      </div>
     </div>
   );
 }
