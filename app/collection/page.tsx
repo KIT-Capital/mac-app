@@ -22,7 +22,7 @@ export default function CollectionPage() {
       />
 
       {!user?.member ? (
-        <p className="px-5 py-4 text-[13px] leading-5 text-white/70">
+        <p className="px-5 py-4 text-[13px] leading-5 text-white/80">
           If you want to have the timepieces appraised on a monthly basis,{" "}
           <Link href="/profile/membership" className="text-white underline underline-offset-2">
             become a premium member

@@ -27,7 +27,7 @@ export function BottomNav() {
               <Link
                 href={item.href}
                 className={cn(
-                  "mac-tap flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] tracking-[0.04em] text-white/45",
+                  "mac-tap flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] tracking-[0.04em] text-white/60",
                   active && "text-white",
                 )}
               >
