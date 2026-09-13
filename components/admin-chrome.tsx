@@ -49,8 +49,8 @@ export function AdminChrome({
           Collector App
         </Link>
         <span className="flex items-center gap-2 text-[12px] font-bold tracking-[0.2em] text-[#FCB040] uppercase">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white p-0.5">
-            <MacLogoMark />
+          <span className="flex h-8 w-8 items-center justify-center">
+            <MacLogoMark onDark />
           </span>
           Desk · {title}
         </span>

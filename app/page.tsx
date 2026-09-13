@@ -9,24 +9,8 @@ export default function WelcomePage() {
   const light = settings.appearance === "light";
 
   return (
-    <main className={`relative flex flex-1 flex-col justify-between overflow-hidden px-7 pb-8 pt-6 ${light ? "bg-white" : "bg-black"}`}>
-      <div className="absolute inset-0 z-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={light ? "/watches/patek-wrist.jpg" : "/watches/richard-mille.jpg"}
-          alt=""
-          className={`h-full w-full object-cover object-center ${light ? "opacity-35" : "opacity-45"}`}
-        />
-        <div
-          className={`absolute inset-0 ${
-            light
-              ? "bg-gradient-to-b from-white via-white/70 to-white"
-              : "bg-gradient-to-b from-black/70 via-black/45 to-black"
-          }`}
-        />
-      </div>
-
-      <div className="relative z-10 flex justify-center pt-2">
+    <main className={`relative flex flex-1 flex-col justify-between overflow-hidden px-7 pb-8 pt-10 ${light ? "bg-white" : "bg-black"}`}>
+      <div className="relative z-10 flex justify-center pt-4">
         <MacLockup onDark={!light} />
       </div>
 

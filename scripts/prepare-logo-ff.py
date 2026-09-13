@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build web assets from official Logo-FF (Final Logo 2 Gold). Never invert."""
+"""Build web assets from official Logo-FF (Final Logo 2 Gold).
+
+On dark: black ink becomes white. Gray arc / CAPITAL and jeweled gold pinions stay.
+Do not draw a white plate, and do not outline-invert the gear.
+"""
 
 from pathlib import Path
 
@@ -52,6 +56,19 @@ def knock_out_paper(arr: np.ndarray) -> np.ndarray:
     return trim(out)
 
 
+def on_dark(lockup: np.ndarray) -> np.ndarray:
+    """Official reversed lockup: solid white gear + MECHANICAL ART, gray CAPITAL."""
+    out = lockup.copy()
+    rgb = out[:, :, :3].astype(np.int16)
+    a = out[:, :, 3]
+    mx = rgb.max(axis=2)
+    mn = rgb.min(axis=2)
+    sat = mx - mn
+    ink = (a > 8) & (sat < 28) & (mx < 80)
+    out[ink, :3] = (255 - rgb[ink]).astype(np.uint8)
+    return out
+
+
 def gear_crop(arr: np.ndarray) -> np.ndarray:
     rgb = arr[:, :, :3].astype(np.int16)
     a = arr[:, :, 3]
@@ -98,7 +115,11 @@ def main() -> None:
     mark = gear_crop(lockup)
     save_png(mark, OUT / "brand/logo-ff-mark.png", 640)
 
-    # Favicon keeps the official black mark on white — do not invert.
+    dark = on_dark(lockup)
+    save_png(dark, OUT / "brand/logo-ff-on-dark.png", 1200)
+    save_png(on_dark(mark), OUT / "brand/logo-ff-mark-on-dark.png", 640)
+
+    # Favicon keeps the official black mark on white.
     square_icon(mark, 192, (255, 255, 255, 255)).convert("RGB").save(
         OUT / "icon.png", "PNG", optimize=True
     )
