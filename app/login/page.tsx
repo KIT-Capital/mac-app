@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { MacLogoMark, MacWordmark } from "@/components/mac-logo";
+import { MacWordmark } from "@/components/mac-logo";
 import { SocialLogin } from "@/components/social-login";
 import { roleFromEmail } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
@@ -51,7 +51,7 @@ export default function LoginPage() {
       {/* Brand Hero */}
       <div className="my-auto pt-2 pb-6 text-center">
         <div className="mx-auto w-[205px]">
-          {settings.appearance === "light" ? <MacLogoMark /> : <MacWordmark />}
+          <MacWordmark onDark={settings.appearance !== "light"} />
         </div>
         <h1 className="mt-4 text-[20px] font-medium tracking-tight text-mac-fg">
           Sign In to Your Collection

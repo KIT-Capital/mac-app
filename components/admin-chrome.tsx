@@ -14,6 +14,7 @@ import {
   Sliders,
   Users2,
 } from "lucide-react";
+import { MacLogoMark } from "@/components/mac-logo";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -47,7 +48,10 @@ export function AdminChrome({
           <ChevronLeft className="h-4 w-4" />
           Collector App
         </Link>
-        <span className="text-[12px] font-bold tracking-[0.2em] text-[#FCB040] uppercase">
+        <span className="flex items-center gap-2 text-[12px] font-bold tracking-[0.2em] text-[#FCB040] uppercase">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white p-0.5">
+            <MacLogoMark />
+          </span>
           Desk · {title}
         </span>
         <div className="w-16" />

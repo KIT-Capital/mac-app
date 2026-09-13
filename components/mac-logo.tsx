@@ -1,25 +1,45 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** Official Logo-FF wordmark with the three jeweled center gears, for dark screens. */
-export function MacWordmark({ className }: { className?: string }) {
+/**
+ * Official Logo-FF only: black gear, three gold pinions, colored jewels,
+ * MECHANICAL ART CAPITAL. Never invert this into a ghost outline, and never
+ * substitute an MB&F lockup.
+ */
+const WORDMARK = "/brand/mac-logo-jeweled.png";
+const MARK = "/brand/mac-logo-jeweled-mark.png";
+
+export function MacWordmark({
+  className,
+  onDark = false,
+}: {
+  className?: string;
+  onDark?: boolean;
+}) {
   return (
-    <Image
-      src="/brand/mac-logo-jeweled-on-dark.png"
-      alt="Mechanical Art Capital"
-      width={600}
-      height={367}
-      className={cn("h-auto w-full", className)}
-      priority
-    />
+    <div
+      className={cn(
+        "mx-auto w-full",
+        onDark && "rounded-2xl bg-white px-4 py-3 shadow-sm",
+        className,
+      )}
+    >
+      <Image
+        src={WORDMARK}
+        alt="Mechanical Art Capital"
+        width={600}
+        height={367}
+        className="h-auto w-full object-contain"
+        priority
+      />
+    </div>
   );
 }
 
-/** Official Logo-FF on light grounds — black gear, gold pinions, colored jewels. */
 export function MacLogoMark({ className }: { className?: string }) {
   return (
     <Image
-      src="/brand/mac-logo-jeweled.png"
+      src={MARK}
       alt="Mechanical Art Capital"
       width={600}
       height={367}
@@ -30,10 +50,9 @@ export function MacLogoMark({ className }: { className?: string }) {
 }
 
 export function MacDarkLogo({ className }: { className?: string }) {
-  return <MacWordmark className={className} />;
+  return <MacWordmark onDark className={className} />;
 }
 
-/** @deprecated Use MacLogoMark — kept so older screens keep compiling. */
 export function MacMark({ className }: { className?: string }) {
   return <MacLogoMark className={className} />;
 }

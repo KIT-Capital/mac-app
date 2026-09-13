@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AppearanceToggle } from "@/components/appearance-toggle";
-import { MacLogoMark, MacWordmark } from "@/components/mac-logo";
+import { MacWordmark } from "@/components/mac-logo";
 import { useStore } from "@/lib/store";
 
 export default function WelcomePage() {
@@ -29,7 +29,7 @@ export default function WelcomePage() {
 
       <div className="relative z-10 pt-4 text-center">
         <div className="mx-auto w-[220px]">
-          {light ? <MacLogoMark /> : <MacWordmark />}
+          <MacWordmark onDark={!light} />
         </div>
       </div>
 

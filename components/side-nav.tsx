@@ -23,7 +23,7 @@ export function SideNav() {
   return (
     <aside className="hidden w-[240px] shrink-0 flex-col border-r border-white/10 bg-black xl:flex">
       <div className="border-b border-white/10 px-5 py-6">
-        <MacWordmark className="w-[180px]" />
+        <MacWordmark onDark className="w-[180px]" />
       </div>
       <nav className="flex flex-1 flex-col px-3 py-4">
         {COLLECTOR.map((item) => {
