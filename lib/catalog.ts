@@ -65,7 +65,7 @@ export const COMPLICATIONS = [
   "Perpetual calendar",
   "I don't know",
 ];
-export const TERMS = [3, 6, 9, 12];
+export const TERMS = [3, 6, 8, 9, 12];
 export const DELIVERY_METHODS = [
   "Insured courier",
   "Desk arranges intake",
