@@ -18,11 +18,24 @@ export function MacWordmark({ className }: { className?: string }) {
 export function MacLogoMark({ className }: { className?: string }) {
   return (
     <Image
-      src="/brand/mac-logo.png"
+      src="/brand/mac-logo-light.jpg"
       alt="Mechanical Art Capital"
       width={180}
       height={180}
-      className={cn("h-auto w-full rounded-2xl bg-white object-contain p-2", className)}
+      className={cn("h-auto w-full object-contain", className)}
+      priority
+    />
+  );
+}
+
+export function MacDarkLogo({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/brand/mac-logo-dark.png"
+      alt="Mechanical Art Capital"
+      width={200}
+      height={200}
+      className={cn("h-auto w-full object-contain", className)}
       priority
     />
   );
