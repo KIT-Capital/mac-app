@@ -52,6 +52,7 @@ export type Profile = {
   avatar: string;
   role: Role;
   onboardingComplete: boolean;
+  applicationSubmitted?: boolean;
 };
 
 export type ManagedUser = {

@@ -102,16 +102,22 @@ function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
     avatar: patch?.avatar || "/watches/patek-wrist.jpg",
     role: "collector",
     onboardingComplete: patch?.onboardingComplete ?? false,
+    applicationSubmitted: patch?.applicationSubmitted ?? false,
   };
 }
 
-function normalizeUser(user: Profile | null, timepieceCount: number): Profile | null {
+function normalizeUser(
+  user: Profile | null,
+  timepieceCount: number,
+  agreementCount = 0,
+): Profile | null {
   if (!user) return null;
   return {
     ...user,
     role: user.role ?? roleFromEmail(user.email),
     onboardingComplete:
       user.onboardingComplete ?? (timepieceCount > 0 || user.role === "admin" || user.role === "staff"),
+    applicationSubmitted: user.applicationSubmitted ?? agreementCount > 0,
   };
 }
 
@@ -140,7 +146,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const timepieces = parsed.timepieces && parsed.timepieces.length > 0 ? parsed.timepieces : DEMO_TIMEPIECES;
         setState({
           ...withDeskDefaults(parsed, timepieces),
-          user: normalizeUser(parsed.user, timepieces.length),
+          user: normalizeUser(parsed.user, timepieces.length, parsed.agreements?.length ?? 0),
         });
         return;
       }
@@ -187,7 +193,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             user: normalizeUser(
               { ...prev.user, ...profile, email, role: profile?.role ?? prev.user.role ?? roleFromEmail(email) },
-              prev.timepieces.length
+              prev.timepieces.length,
+              prev.agreements.length,
             ),
           };
         }),
@@ -251,7 +258,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
         };
-        setState((prev) => ({ ...prev, agreements: [agreement, ...prev.agreements] }));
+        setState((prev) => ({
+          ...prev,
+          agreements: [agreement, ...prev.agreements],
+          user: prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user,
+        }));
         return agreement;
       },
       updateAgreement: (id, patch) =>

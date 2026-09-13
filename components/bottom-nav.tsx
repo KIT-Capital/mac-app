@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store";
 
 const ITEMS = [
   { href: "/collection", label: "Timepieces", icon: Clock },
-  { href: "/financing", label: "Financing", icon: FileText },
+  { href: "/financing", label: "Repurchase", icon: FileText },
   { href: "/contact", label: "Contact us", icon: Mail },
 ];
 

@@ -15,10 +15,11 @@ export default function PrivacyPage() {
           Effective November 20, 2020 · Updated for Mobile Client Desk
         </p>
         <p>
-          Mechanical Art Capital LLC collects account, collection, photograph, and financing information strictly to
-          appraise timepieces and originate confidential sale-and-repurchase agreements. We never sell or share
-          client collection data with unauthorized third parties. Photographs and serial data are used solely for manufacturer verification and Manhattan vault
-          custody intake.
+          Mechanical Art Capital LLC collects account, collection, and photograph information to
+          appraise timepieces and complete confidential sale-and-repurchase purchases. This is not
+          a loan. We never sell or share client collection data with unauthorized third parties.
+          Photographs and serial data are used solely for manufacturer verification and, after an
+          application, custody intake.
         </p>
         <p>
           You may request access, certified export, or deletion of your collection profile at any time by contacting{" "}

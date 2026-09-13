@@ -2,7 +2,7 @@
 
 Prototype of the Mechanical Art Capital collector app. The iPhone frame is the source of truth, rebuilt from Vladimir’s November 2022 screens and the official MAC palette.
 
-The original mobile source was lost. This web app follows Vladimir’s information architecture — Timepieces, Financing, Contact us, Account — with navy headers, black screens, white/navy actions, and the official gold wordmark.
+The original mobile source was lost. This web app follows Vladimir’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, black screens, white/navy actions, and the official gold wordmark.
 
 ## What you can do
 
@@ -12,14 +12,14 @@ Collector app (Vladimir look):
 - Empty vault for new members, then add pieces one by one
 - 2-column collection with Appraised / Reviewing badges
 - Add a timepiece: front / back / left photos, catalog dropdowns, Save or Appraise
-- Financing estimator and repurchase agreement
+- Sale-and-repurchase application (MAC buys; collector may buy back — not a loan)
 - Collection appraisal certificate
 - $4.99/month membership
 
 Admin desk (`admin@mechartcap.com`):
 
 - Overview with collection stats
-- Configure rates, LTV, vault, and contact copy
+- Configure internal buyback scale, purchase caps, custody location, and contact copy
 - Access management (collectors, staff, admins)
 - CRUD for the timepiece catalog, assets, agreement shells, live agreements, and photos
 - Outbound mail log (Resend, or preview outbox without a key)
@@ -65,7 +65,7 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 
 ## Brand
 
-- Navy `#0E2A44` — headers, Sign in, Appraise, Get estimate
+- Navy `#0E2A44` — headers, Sign in, Appraise, Send Application
 - Gold `#FCB040` — official CAPITAL wordmark, active tab, desk accents
 - Champagne `#E8D5C0` — add-timepiece FAB
 - Black screens, white Save / Get started
@@ -73,4 +73,6 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 
 ## Product notes
 
-Mechanical Art Capital offers overnight repo financing to dealers and collectors on a limited set of brands and models, typically above $40,000, stored in Manhattan. Advances are usually 45–50% of FMV / 60–65% of liquidation value, never above 65% LTV, starting at 18% plus fees, $10,000 minimum.
+Mechanical Art Capital is a repo desk: it **buys** qualifying timepieces and the collector may **buy them back** later on a preset pricing scale. This is not a loan, there is no interest rate, and the collector app must not describe it as one.
+
+Custody location and the pricing scale stay off collector screens until an application is sent (contact inquiry or repurchase application). The desk still stores those values internally.

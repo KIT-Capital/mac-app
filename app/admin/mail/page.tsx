@@ -49,7 +49,7 @@ export default function AdminMailPage() {
   return (
     <AdminChrome title="Outbound mail">
       <p className="mb-4 max-w-2xl text-sm text-white/55">
-        Collector inquiries, vault welcomes, desk invites, appraisals, and repo drafts go out through Resend.
+        Collector inquiries, welcome notes, desk invites, appraisals, and repo applications go out through Resend.
         Without an API key the messages stay in this session outbox so you can still read them.
       </p>
 

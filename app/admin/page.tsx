@@ -47,15 +47,15 @@ export default function AdminOverviewPage() {
           <p className="text-[10px] tracking-[0.16em] text-white/40 uppercase">Policy in force</p>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-white/40">Starting rate</dt>
+              <dt className="text-white/40">Buyback scale</dt>
               <dd>{Math.round(settings.startingRate * 100)}%</dd>
             </div>
             <div>
-              <dt className="text-white/40">Max LTV</dt>
+              <dt className="text-white/40">Max purchase</dt>
               <dd>{Math.round(settings.maxLtv * 100)}%</dd>
             </div>
             <div>
-              <dt className="text-white/40">Min advance</dt>
+              <dt className="text-white/40">Min purchase</dt>
               <dd>{money(settings.minAdvance)}</dd>
             </div>
             <div>

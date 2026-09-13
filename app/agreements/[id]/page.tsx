@@ -4,15 +4,19 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
-import { COMPANY, money } from "@/lib/catalog";
+import { buybackPrice, COMPANY, hasApplication, money } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function AgreementDetailPage() {
   const params = useParams<{ id: string }>();
-  const { agreements, timepieces, signAgreement } = useStore();
+  const { agreements, timepieces, signAgreement, user, settings } = useStore();
   const agreement = agreements.find((a) => a.id === params.id);
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
   const [started, setStarted] = useState(false);
+  const applied = hasApplication(user, agreements.length);
+  const repurchase = agreement
+    ? buybackPrice(agreement.amount, agreement.termMonths, settings.startingRate)
+    : 0;
 
   if (!agreement) {
     return (
@@ -53,21 +57,25 @@ export default function AgreementDetailPage() {
             Buyer name: Mechanical Art Capital LLC
           </p>
           <p>
-            The Buyer and the Seller agree that the Seller sells the timepieces listed in this
-            agreement, including original box, papers, and verification, at the Sale Amount, and
-            may repurchase them at the same Sale Amount at the conclusion of the term, provided
-            title remains clear and the pieces remain in the described condition.
+            This is a sale and repurchase, not a loan. The Seller sells the timepieces listed in
+            this agreement, including original box, papers, and verification, to Mechanical Art
+            Capital LLC at the Sale Amount. The Seller may buy them back at the repurchase price
+            on MAC&apos;s preset scale for the selected term, provided title remains clear and the
+            pieces remain in the described condition.
           </p>
           <p>
-            Description of assets:{" "}
+            Description of timepieces:{" "}
             {watches.map((w) => `${w.brand} ${w.model} (${w.reference || w.id})`).join("; ") ||
               "Selected collection timepieces"}
             .
           </p>
           <p>
-            Sale amount: {money(agreement.amount)} ({agreement.termMonths} months). Delivery:{" "}
-            {agreement.delivery}. Assets are stored in a secure Manhattan facility and may be shown
-            to prospective buyers by pre-scheduling with MAC.
+            Sale amount (MAC purchases): {money(agreement.amount)}. Term: {agreement.termMonths}{" "}
+            months. Repurchase price on the scale: {money(repurchase)}. Delivery:{" "}
+            {agreement.delivery}.
+            {applied
+              ? ` After purchase, the pieces are held in secure custody${settings.vaultLocation ? ` at ${settings.vaultLocation}` : ""} and may be shown by pre-scheduling with MAC.`
+              : " Custody details are confirmed after this application is received."}
           </p>
           <p>
             Authorized seller: {agreement.ownerName}

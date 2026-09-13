@@ -4,11 +4,12 @@ import { FormEvent, useState } from "react";
 import { CheckCircle2, Mail, MapPin, Phone, Send } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
+import { hasApplication } from "@/lib/catalog";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function ContactPage() {
-  const { settings, user } = useStore();
+  const { settings, user, updateProfile, agreements } = useStore();
   const [sent, setSent] = useState(false);
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,6 +36,7 @@ export default function ContactPage() {
       setError(result.error || "The desk could not send that inquiry.");
       return;
     }
+    updateProfile({ applicationSubmitted: true });
     setPreview(result.preview);
     setSent(true);
   }
@@ -48,10 +50,11 @@ export default function ContactPage() {
           <span className="text-[10px] font-bold tracking-[0.16em] text-[#FCB040] uppercase">
             Private Horology Partners
           </span>
-          <h2 className="mt-1 text-[18px] font-semibold text-white">New York Trading Desk</h2>
+          <h2 className="mt-1 text-[18px] font-semibold text-white">Private desk</h2>
           <p className="mt-1 text-[12px] leading-relaxed text-white/70">
-            For bespoke sale-and-repurchase requests, physical vault showings in Manhattan, or
-            large multi-piece portfolios, contact our managing partners directly.
+            For sale-and-repurchase applications or multi-piece collections, write the desk. MAC
+            buys qualifying timepieces; you may buy them back on a preset scale. This is not a loan.
+            Custody details follow after an application.
           </p>
 
           <div className="mt-4 space-y-2.5 border-t border-white/10 pt-3 text-[13px]">
@@ -73,12 +76,14 @@ export default function ContactPage() {
               </span>
               <span>{settings.financingEmail}</span>
             </a>
-            <div className="flex items-center gap-3 text-white/80">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-[#FCB040]">
-                <MapPin className="h-3.5 w-3.5" />
-              </span>
-              <span>{settings.vaultLocation} (By appointment only)</span>
-            </div>
+            {hasApplication(user, agreements.length) ? (
+              <div className="flex items-center gap-3 text-white/80">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-[#FCB040]">
+                  <MapPin className="h-3.5 w-3.5" />
+                </span>
+                <span>{settings.vaultLocation} (By appointment only)</span>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -130,7 +135,7 @@ export default function ContactPage() {
                   onChange={(e) => setMessage(e.target.value)}
                   required
                   rows={3}
-                  placeholder="Details regarding your timepieces or liquidity timeline..."
+                  placeholder="Timepieces you may wish to sell and later repurchase..."
                   className="w-full resize-none bg-transparent text-[15px] text-white outline-none placeholder:text-white/30"
                 />
               </Field>

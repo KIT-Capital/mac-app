@@ -1,78 +1,74 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Calculator, CheckCircle2, Clock, Plus, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, FilePlus, ShieldCheck } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
-import { money } from "@/lib/catalog";
+import { hasApplication, money } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function FinancingPage() {
-  const { agreements, timepieces, settings } = useStore();
+  const { agreements, timepieces, settings, user } = useStore();
+  const applied = hasApplication(user, agreements.length);
 
   return (
     <main className="flex flex-1 flex-col bg-[#10141D]">
       <ScreenHeader
-        title="Financing Desk"
+        title="Sale & Repurchase"
         right={
           <Link
             href="/financing/new"
-            aria-label="New Financing Estimate"
-            title="New Financing Estimate"
+            aria-label="Submit repurchase application"
+            title="Submit repurchase application"
             className="mac-tap -mr-1 flex items-center justify-center text-white/80 hover:text-white"
           >
-            <Plus className="h-5 w-5" strokeWidth={2} />
+            <FilePlus className="h-5 w-5" strokeWidth={2} />
           </Link>
         }
       />
 
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-        {/* Value Proposition Card */}
         <div className="rounded-2xl border border-[#FCB040]/30 bg-gradient-to-br from-[#161B24] to-[#0E2A44]/40 p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FCB040]/20 text-[#FCB040]">
               <ShieldCheck className="h-4 w-4" />
             </span>
             <span className="text-[11px] font-bold tracking-[0.16em] text-[#FCB040] uppercase">
-              Sale-and-Repurchase Liquidity
+              Repo desk — not a loan
             </span>
           </div>
-          <h2 className="mt-2 text-[18px] font-semibold text-white">
-            Instant Advances up to {Math.round(settings.maxLtv * 100)}% LTV
-          </h2>
+          <h2 className="mt-2 text-[18px] font-semibold text-white">MAC buys. You buy back.</h2>
           <p className="mt-1 text-[12px] leading-relaxed text-white/70">
-            Confidential liquidity against top horology references. No credit checks or bureaucratic
-            delays. Closed in {settings.closeBusinessDays} business days via Manhattan vault custody.
+            Mechanical Art Capital purchases qualifying timepieces. You may repurchase them later at
+            the price on our preset scale for the term you choose. There is no interest rate and
+            this is not a loan.
           </p>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-3 text-center">
-            <div>
-              <p className="text-[10px] text-white/50 uppercase">Base Rate</p>
-              <p className="text-[14px] font-bold text-white">{Math.round(settings.startingRate * 100)}% + fees</p>
+          {applied ? (
+            <div className="mt-4 space-y-2 border-t border-white/10 pt-3 text-[12px] text-white/75">
+              <p>
+                Custody after purchase is arranged by the desk
+                {settings.vaultLocation ? ` (${settings.vaultLocation})` : ""}.
+              </p>
+              <p>Your repurchase price is confirmed on the scale attached to each application.</p>
             </div>
-            <div>
-              <p className="text-[10px] text-white/50 uppercase">Min Advance</p>
-              <p className="text-[14px] font-bold text-white">{money(settings.minAdvance)}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-white/50 uppercase">Closing</p>
-              <p className="text-[14px] font-bold text-[#FCB040]">{settings.closeBusinessDays} Days</p>
-            </div>
-          </div>
+          ) : (
+            <p className="mt-4 border-t border-white/10 pt-3 text-[12px] text-white/60">
+              Custody location and the pricing scale are shared after you send an application.
+            </p>
+          )}
 
           <Link
             href="/financing/new"
             className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#FCB040] text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
           >
-            <Calculator className="h-4 w-4" />
-            Calculate Advance
+            Submit an Application
           </Link>
         </div>
 
-        {/* Existing Agreements */}
         <div>
           <div className="flex items-center justify-between pb-2">
             <h3 className="text-[11px] font-bold tracking-[0.16em] text-white/60 uppercase">
-              Your Repurchase Agreements
+              Your repurchase agreements
             </h3>
             <Link href="/agreements" className="text-[11px] font-medium text-[#FCB040] hover:underline">
               View All
@@ -82,9 +78,10 @@ export default function FinancingPage() {
           {agreements.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-[#161B24] p-6 text-center">
               <Clock className="mx-auto h-8 w-8 text-white/30" />
-              <p className="mt-2 text-[14px] font-medium text-white">No active agreements</p>
+              <p className="mt-2 text-[14px] font-medium text-white">No applications yet</p>
               <p className="mt-1 text-[12px] text-white/55">
-                Run an estimate on any appraised timepiece to create your first repurchase contract.
+                Appraise a timepiece, then send a sale-and-repurchase application. The desk confirms
+                the buyback scale after it arrives.
               </p>
             </div>
           ) : (
@@ -120,13 +117,13 @@ export default function FinancingPage() {
                     </div>
 
                     <p className="mt-1 text-[12px] text-white/70 line-clamp-1">
-                      Collateral: {watches.map((w) => `${w.brand} ${w.model}`).join(" · ") || "Selected watch"}
+                      Timepiece: {watches.map((w) => `${w.brand} ${w.model}`).join(" · ") || "Selected watch"}
                     </p>
 
                     <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] text-white/50">
-                      <span>{a.delivery}</span>
+                      <span>{applied ? a.delivery : "Custody confirmed after review"}</span>
                       <span className="flex items-center gap-1 text-[#FCB040] group-hover:translate-x-0.5 transition">
-                        Contract Details <ArrowRight className="h-3 w-3" />
+                        Agreement <ArrowRight className="h-3 w-3" />
                       </span>
                     </div>
                   </Link>

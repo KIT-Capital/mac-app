@@ -52,10 +52,10 @@ export default function SignupPage() {
           <span className="text-[10px] font-semibold tracking-[0.2em] text-[#FCB040] uppercase">
             New Client Registration
           </span>
-          <h2 className="text-[20px] font-medium text-white">Open Your Confidential Vault</h2>
+          <h2 className="text-[20px] font-medium text-white">Open Your Collection</h2>
           <p className="text-[13px] leading-relaxed text-white/65">
-            Register your timepieces for unbiased market valuations and access overnight financing
-            against select models.
+            Register timepieces for unbiased valuations. After you apply, MAC may purchase
+            qualifying pieces and you may buy them back on a preset scale. This is not a loan.
           </p>
         </div>
 
@@ -139,7 +139,7 @@ export default function SignupPage() {
               disabled={busy}
               className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59] active:scale-[0.99] disabled:opacity-40"
             >
-              {busy ? "Opening vault…" : "Create Account"}
+              {busy ? "Creating account…" : "Create Account"}
             </button>
             <p className="text-center text-[12px] text-white/55">
               Already registered?{" "}

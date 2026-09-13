@@ -10,7 +10,7 @@ export default function AgreementsPage() {
 
   return (
     <main className="flex flex-1 flex-col bg-[#10141D]">
-      <ScreenHeader title="Repurchase Vault" backHref="/financing" />
+      <ScreenHeader title="Repurchase agreements" backHref="/financing" />
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5">
         {agreements.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-[#161B24] p-8 text-center text-sm text-white/50">

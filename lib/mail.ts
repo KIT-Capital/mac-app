@@ -148,13 +148,12 @@ function composeMail(request: MailRequest): ComposedMail[] {
         letter({
           kind: "welcome",
           to: [request.email],
-          subject: "Your Mechanical Art Capital vault is open",
+          subject: "Your Mechanical Art Capital collection is open",
           heading: `Welcome, ${greeting}`,
           intro:
-            "Your confidential vault is ready. Register timepieces for market valuations and overnight financing on qualifying models typically above $40,000.",
+            "Your collection is ready. Register timepieces for market valuations. After you apply, MAC may purchase qualifying pieces and you may buy them back on a preset scale. This is not a loan.",
           rows: [
             ["Account", request.email],
-            ["Vault", DEFAULT_SETTINGS.vaultLocation],
           ],
         }),
       ];
@@ -194,16 +193,16 @@ function composeMail(request: MailRequest): ComposedMail[] {
           kind: "financing",
           to: [desk, request.email],
           replyTo: request.email,
-          subject: `Repo draft: ${request.watch || "timepiece"}`,
-          heading: "Repurchase agreement draft",
-          intro: `${request.name} generated a sale-and-repurchase draft. Review collateral, advance, and custody before signature.`,
+          subject: `Sale-and-repurchase application: ${request.watch || "timepiece"}`,
+          heading: "Application received",
+          intro: `${request.name} submitted a sale-and-repurchase application. MAC would purchase the timepiece; the collector may buy it back on the preset scale. This is not a loan.`,
           rows: [
-            ["Owner", request.name],
+            ["Seller", request.name],
             ["Email", request.email],
-            ["Collateral", request.watch || "Untitled"],
-            ["Advance", request.amount || "—"],
+            ["Timepiece", request.watch || "Untitled"],
+            ["Proposed sale", request.amount || "—"],
             ["Term", request.termMonths ? `${request.termMonths} months` : "—"],
-            ["Custody", request.delivery || "—"],
+            ["Delivery", request.delivery || "—"],
           ],
         }),
       ];
@@ -214,7 +213,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
           to: [request.email],
           subject: "Monthly appraisal membership is active",
           heading: "Membership confirmed",
-          intro: `${greeting}, monthly mark-to-market certificates are now on your vault. Sale-and-repurchase clients keep this complimentary while an agreement is live.`,
+          intro: `${greeting}, monthly mark-to-market certificates are now on your collection. Active sale-and-repurchase clients keep this complimentary while an agreement is live.`,
           rows: [
             ["Plan", `$${DEFAULT_SETTINGS.membershipMonthly.toFixed(2)} / month`],
             ["Account", request.email],
@@ -289,7 +288,7 @@ function letter({
             </tr>
             <tr>
               <td style="padding:16px 28px 22px;border-top:1px solid #2a3140;color:#8b93a3;font-size:12px;line-height:1.5">
-                Manhattan vault · ${escapeHtml(DEFAULT_SETTINGS.phone)} · ${escapeHtml(DEFAULT_SETTINGS.financingEmail)}
+                Mechanical Art Capital · ${escapeHtml(DEFAULT_SETTINGS.phone)} · ${escapeHtml(DEFAULT_SETTINGS.financingEmail)}
               </td>
             </tr>
           </table>

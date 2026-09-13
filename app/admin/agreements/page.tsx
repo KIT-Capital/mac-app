@@ -51,7 +51,7 @@ export default function AdminAgreementsPage() {
         </PillButton>
       </form>
       <AdminTable
-        headers={["Code", "Title", "Term", "LTV", ""]}
+        headers={["Code", "Title", "Term", "Max purchase", ""]}
         rows={shells.map((s) => [
           s.code,
           s.title,

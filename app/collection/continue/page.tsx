@@ -23,7 +23,7 @@ export default function CollectionContinuePage() {
             {last ? `${last.brand} ${last.model}` : "Timepiece registered"}
           </h2>
           <p className="text-[13px] leading-relaxed text-white/70">
-            Your piece is now recorded in your private portfolio. You can add more watches to request a consolidated advance, or enter your collection dashboard directly.
+            Your piece is now recorded in your private portfolio. Add more watches, or open the collection. Sale-and-repurchase terms are shared only after you send an application.
           </p>
         </div>
 

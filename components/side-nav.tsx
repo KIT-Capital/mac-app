@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const COLLECTOR = [
   { href: "/collection", label: "Timepieces", icon: Clock },
-  { href: "/financing", label: "Financing", icon: Plus },
+  { href: "/financing", label: "Repurchase", icon: Plus },
   { href: "/contact", label: "Contact us", icon: Mail },
   { href: "/profile", label: "Account", icon: UserRound },
 ];

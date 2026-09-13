@@ -20,17 +20,17 @@ export default function AdminConfigPage() {
     <AdminChrome title="Configure the app">
       <form onSubmit={onSubmit} className="mx-auto max-w-xl space-y-5">
         <p className="text-sm text-white/55">
-          These values drive the collector app: LTV caps, minimum advance, membership price, vault copy, and
-          contact lines.
+          Internal desk settings. Collectors do not see custody location or the pricing scale until
+          they send an application. Never present this as a loan.
         </p>
         {(
           [
             ["companyName", "Company name"],
             ["phone", "Phone"],
             ["email", "Info email"],
-            ["financingEmail", "Financing email"],
+            ["financingEmail", "Desk email"],
             ["handle", "Handle"],
-            ["vaultLocation", "Vault"],
+            ["vaultLocation", "Custody location"],
           ] as const
         ).map(([key, label]) => (
           <Field key={key} label={label}>
@@ -42,7 +42,7 @@ export default function AdminConfigPage() {
           </Field>
         ))}
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Starting rate">
+          <Field label="Buyback scale (internal)">
             <input
               type="number"
               step="0.01"
@@ -51,7 +51,7 @@ export default function AdminConfigPage() {
               className="w-full bg-transparent py-1 text-[16px] outline-none"
             />
           </Field>
-          <Field label="Max LTV">
+          <Field label="Max purchase vs appraisal">
             <input
               type="number"
               step="0.01"
@@ -60,7 +60,7 @@ export default function AdminConfigPage() {
               className="w-full bg-transparent py-1 text-[16px] outline-none"
             />
           </Field>
-          <Field label="Min advance">
+          <Field label="Min purchase">
             <input
               type="number"
               value={form.minAdvance}

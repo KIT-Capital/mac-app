@@ -7,7 +7,7 @@ import { PillButton } from "@/components/field";
 export default function CollectionSetupPage() {
   return (
     <main className="flex flex-1 flex-col bg-[#10141D]">
-      <ScreenHeader title="Collection Vault" />
+      <ScreenHeader title="Your collection" />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-between p-6">
         <div className="space-y-4 pt-4">
           <span className="inline-block rounded-full border border-[#FCB040]/30 bg-[#FCB040]/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">
@@ -17,14 +17,14 @@ export default function CollectionSetupPage() {
             Welcome to Mechanical Art Capital
           </h2>
           <p className="text-[13px] leading-relaxed text-white/70">
-            Every registered member begins with a confidential, empty vault. Add timepieces one by one by providing Front, Back, and Side angles, matching against our verified manufacturer database.
+            Every registered member begins with a confidential, empty collection. Add timepieces one by one with front, back, and side photographs, matched against our manufacturer catalog.
           </p>
 
           <div className="rounded-2xl border border-white/10 bg-[#161B24] p-4 text-[12px] space-y-2 text-white/80">
             <p className="font-semibold text-[#E8D5C0] uppercase tracking-wider text-[11px]">Intake Checklist</p>
             <p>✓ High-resolution dial & movement photographs</p>
             <p>✓ Box & papers status verification</p>
-            <p>✓ Instant liquidation valuation & loan-to-value cap</p>
+            <p>✓ Certified market valuation on qualifying models</p>
           </div>
         </div>
 

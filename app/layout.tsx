@@ -12,7 +12,7 @@ const geist = Geist({
 export const metadata: Metadata = {
   title: "Mechanical Art Capital",
   description:
-    "Confidential appraisals and sale-and-repurchase financing for high-end timepieces.",
+    "Confidential appraisals and sale-and-repurchase of high-end timepieces. Not a loan.",
   applicationName: "MAC",
   manifest: "/manifest.json",
   icons: {

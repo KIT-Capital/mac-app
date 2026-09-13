@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Check, Clock, Edit3, HelpCircle, Shield, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
-import { estimateAdvance, money, moneyRange } from "@/lib/catalog";
+import { moneyRange } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function WatchDetailPage() {
@@ -29,7 +29,6 @@ export default function WatchDetailPage() {
     );
   }
 
-  const advance = estimateAdvance(watch.valueLow, watch.valueHigh, settings.maxLtv);
   const locked = watch.status !== "not_evaluated";
 
   return (
@@ -91,10 +90,10 @@ export default function WatchDetailPage() {
             </p>
 
             {watch.status === "appraised" && watch.financeable ? (
-              <div className="mt-3 border-t border-white/10 pt-3 flex items-center justify-between text-[12px]">
-                <span className="text-white/65">Est. Max Advance ({Math.round(settings.maxLtv * 100)}% LTV):</span>
-                <span className="font-bold text-[#FCB040]">{money(advance)}</span>
-              </div>
+              <p className="mt-3 border-t border-white/10 pt-3 text-[12px] text-white/65">
+                Eligible for a sale-and-repurchase application. MAC would buy this piece; you may
+                buy it back on the preset scale. This is not a loan.
+              </p>
             ) : null}
           </div>
 
@@ -166,7 +165,7 @@ export default function WatchDetailPage() {
               onClick={() => router.push(`/financing/new?watch=${watch.id}`)}
               className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
             >
-              Estimate Sale-and-Repurchase Advance
+              Apply to Sell &amp; Repurchase
             </button>
           ) : null}
 

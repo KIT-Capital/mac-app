@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
+import { hasApplication } from "@/lib/catalog";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function MembershipPage() {
-  const { user, updateProfile, settings } = useStore();
+  const { user, updateProfile, settings, agreements } = useStore();
+  const applied = hasApplication(user, agreements.length);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,8 +53,10 @@ export default function MembershipPage() {
             {[
               "Monthly mark-to-market valuations on registered timepieces",
               "Insurance-grade PDF certificates for family offices and insurers",
-              "Priority 48-hour liquidity execution on qualifying models",
-              "Direct white-glove intake at the Manhattan vault",
+              "Priority review of sale-and-repurchase applications",
+              applied
+                ? `White-glove intake at ${settings.vaultLocation}`
+                : "Custody details after you send an application",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2.5">
                 <span className="text-[#FCB040] text-sm">✦</span>

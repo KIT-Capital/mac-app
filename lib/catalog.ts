@@ -67,9 +67,9 @@ export const COMPLICATIONS = [
 ];
 export const TERMS = [3, 6, 9, 12];
 export const DELIVERY_METHODS = [
-  "Pickup in Manhattan",
   "Insured courier",
-  "NYC vault drop-off",
+  "Desk arranges intake",
+  "Private appointment",
 ];
 
 export const MODELS_BY_BRAND: Record<string, string[]> = {
@@ -112,6 +112,19 @@ export function moneyRange(low?: number, high?: number) {
 export function estimateAdvance(valueLow?: number, valueHigh?: number, ltv = COMPANY.ltv) {
   const base = valueLow ?? (valueHigh ? valueHigh * 0.75 : 0);
   return Math.round((base * ltv) / 500) * 500;
+}
+
+/** Dollar buyback on the desk scale. Never display the scale as a rate or interest. */
+export function buybackPrice(saleAmount: number, termMonths: number, annualScale = COMPANY.rate) {
+  return Math.round((saleAmount * (1 + annualScale * (termMonths / 12))) / 100) * 100;
+}
+
+export function hasApplication(
+  user: { applicationSubmitted?: boolean; role?: string } | null,
+  agreementCount = 0,
+) {
+  if (user?.role === "admin" || user?.role === "staff") return true;
+  return Boolean(user?.applicationSubmitted) || agreementCount > 0;
 }
 
 export function roleFromEmail(email: string) {

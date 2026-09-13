@@ -8,6 +8,7 @@ export const DEMO_PROFILE: Profile = {
   avatar: "/watches/patek-wrist.jpg",
   role: "collector",
   onboardingComplete: true,
+  applicationSubmitted: true,
 };
 
 export const ADMIN_PROFILE: Profile = {
@@ -131,7 +132,7 @@ export const DEMO_AGREEMENTS: Agreement[] = [
     watchIds: ["rm-011", "pp-nautilus"],
     amount: 200000,
     termMonths: 12,
-    delivery: "Pickup in Manhattan",
+    delivery: "Desk arranges intake",
     ownerName: "Jonathan Hale",
     email: "jonathan.hale@mechartcap.com",
     status: "pending_signature",
