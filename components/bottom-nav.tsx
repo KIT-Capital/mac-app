@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Clock, Mail, Plus, UserRound } from "lucide-react";
+import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -14,6 +16,7 @@ const ITEMS = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { user } = useStore();
 
   return (
     <nav className="sticky bottom-0 z-20 border-t border-mac-line bg-mac-nav">
@@ -21,6 +24,7 @@ export function BottomNav() {
         {ITEMS.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
+          const accountPhoto = item.href === "/profile" ? user?.avatar : undefined;
           return (
             <li key={item.href}>
               <Link
@@ -30,7 +34,19 @@ export function BottomNav() {
                   active ? "text-mac-fg" : "text-mac-faint",
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={1.6} />
+                {accountPhoto ? (
+                  <span className="h-5 w-5 overflow-hidden rounded-full">
+                    <Image
+                      src={accountPhoto}
+                      alt=""
+                      width={20}
+                      height={20}
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                ) : (
+                  <Icon className="h-5 w-5" strokeWidth={1.6} />
+                )}
                 <span>{item.label}</span>
               </Link>
             </li>

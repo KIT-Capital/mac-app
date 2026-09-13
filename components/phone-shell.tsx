@@ -4,11 +4,13 @@ import type { ReactNode } from "react";
 import { IosHomeIndicator, IosStatusBar } from "@/components/ios-status-bar";
 import { useStore } from "@/lib/store";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export function PhoneShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { settings } = useStore();
   const appearance = pathname.startsWith("/admin") ? "dark" : settings.appearance;
+  const navyStatus = pathname === "/profile";
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-[#DFE3E8] p-3 md:p-8">
@@ -17,7 +19,9 @@ export function PhoneShell({ children }: { children: ReactNode }) {
           data-appearance={appearance}
           className="mac-phone-screen relative flex min-h-[min(100dvh-2rem,852px)] w-full flex-col overflow-hidden rounded-[43px] bg-mac-bg text-mac-fg md:min-h-[852px]"
         >
-          <IosStatusBar />
+          <IosStatusBar
+            className={cn(navyStatus && "absolute inset-x-0 top-0 text-white")}
+          />
           <div className="relative flex flex-1 flex-col overflow-y-auto">{children}</div>
           <IosHomeIndicator />
         </div>

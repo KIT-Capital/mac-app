@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { AppearanceToggle } from "@/components/appearance-toggle";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
@@ -11,9 +12,7 @@ export default function SettingsPage() {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
-  const [promo, setPromo] = useState("");
   const [saved, setSaved] = useState(false);
-  const [promoMsg, setPromoMsg] = useState("");
 
   function onSave(e: FormEvent) {
     e.preventDefault();
@@ -43,34 +42,13 @@ export default function SettingsPage() {
         <Field label="Verified Phone">
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
-        <Field label="Partner / Desk Promo Code">
-          <input
-            value={promo}
-            onChange={(e) => setPromo(e.target.value)}
-            placeholder="e.g. HOUSE65"
-            className="w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint uppercase"
-          />
-        </Field>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() =>
-              setPromoMsg(
-                promo.trim().toUpperCase() === "HOUSE65"
-                  ? "✓ Code verified: next membership month is complimentary."
-                  : "Code not recognized by the desk."
-              )
-            }
-            className="text-[12px] font-semibold text-[#FCB040] hover:underline"
-          >
-            Verify Promo Code
-          </button>
-        </div>
-        {promoMsg ? (
-          <p className="rounded-xl border border-mac-line bg-mac-card p-3 text-xs text-mac-muted">
-            {promoMsg}
-          </p>
-        ) : null}
+        <p className="text-[12px] text-mac-muted">
+          Partner codes live on{" "}
+          <Link href="/profile/promo" className="underline underline-offset-2">
+            Promo Codes
+          </Link>
+          .
+        </p>
         {saved ? (
           <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-xs text-emerald-300">
             Profile successfully updated.
