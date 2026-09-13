@@ -4,18 +4,38 @@ import { FormEvent, useState } from "react";
 import { CheckCircle2, Mail, MapPin, Phone, Send } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function ContactPage() {
-  const { settings } = useStore();
+  const { settings, user } = useStore();
   const [sent, setSent] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [preview, setPreview] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [message, setMessage] = useState("");
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!email.includes("@")) return;
+    setBusy(true);
+    setError("");
+    const result = await sendAppEmail({
+      kind: "inquiry",
+      name,
+      email,
+      message,
+      phone: user?.phone,
+      deskEmail: settings.financingEmail,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error || "The desk could not send that inquiry.");
+      return;
+    }
+    setPreview(result.preview);
     setSent(true);
   }
 
@@ -75,6 +95,11 @@ export default function ContactPage() {
               <p className="text-[12px] text-white/70">
                 A managing partner will review your collection requirements and respond privately within two hours.
               </p>
+              {preview ? (
+                <p className="text-[11px] text-[#FCB040]">
+                  Preview only — add a Resend API key to deliver the email.
+                </p>
+              ) : null}
             </div>
           ) : (
             <form onSubmit={onSubmit} className="mt-4 space-y-3.5">
@@ -110,8 +135,9 @@ export default function ContactPage() {
                 />
               </Field>
 
-              <PillButton type="submit" variant="gold" className="mt-2">
-                <Send className="mr-2 h-4 w-4" /> Send Inquiry
+              {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
+              <PillButton type="submit" variant="gold" className="mt-2" disabled={busy}>
+                <Send className="mr-2 h-4 w-4" /> {busy ? "Sending…" : "Send Inquiry"}
               </PillButton>
             </form>
           )}

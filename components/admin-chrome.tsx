@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
+  Mail,
   Sliders,
   Users2,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const LINKS = [
   { href: "/admin/assets", label: "Client Assets", icon: FileSpreadsheet },
   { href: "/admin/agreements", label: "Repo Agreements", icon: FileText },
   { href: "/admin/photos", label: "Photo Vault", icon: Camera },
+  { href: "/admin/mail", label: "Outbound Mail", icon: Mail },
 ];
 
 export function AdminChrome({

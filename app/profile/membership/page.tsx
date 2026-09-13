@@ -1,11 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function MembershipPage() {
   const { user, updateProfile, settings } = useStore();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function subscribe() {
+    if (!user) return;
+    setBusy(true);
+    updateProfile({ member: true });
+    const result = await sendAppEmail({
+      kind: "membership",
+      name: user.name,
+      email: user.email,
+      deskEmail: settings.financingEmail,
+    });
+    setBusy(false);
+    if (!result.ok) setError(result.error || "Membership is on, but the confirmation email failed.");
+  }
 
   return (
     <main className="flex flex-1 flex-col bg-[#10141D]">
@@ -59,8 +77,9 @@ export default function MembershipPage() {
           </div>
         ) : (
           <div className="pt-2">
-            <PillButton variant="gold" onClick={() => updateProfile({ member: true })}>
-              Subscribe to Monthly Appraisals
+            {error ? <p className="mb-3 text-center text-xs text-red-400">{error}</p> : null}
+            <PillButton variant="gold" onClick={() => void subscribe()} disabled={busy}>
+              {busy ? "Confirming…" : "Subscribe to Monthly Appraisals"}
             </PillButton>
           </div>
         )}

@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useMemo, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, NativeSelect, PillButton } from "@/components/field";
 import { DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 function EstimatorForm() {
@@ -21,6 +22,7 @@ function EstimatorForm() {
   const [name, setName] = useState(user?.name || "");
   const [adult, setAdult] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const watch = timepieces.find((w) => w.id === watchId);
   const maxAdvance = useMemo(
@@ -28,7 +30,7 @@ function EstimatorForm() {
     [watch, settings.maxLtv]
   );
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const n = Number(amount.replace(/[^0-9]/g, ""));
     if (!watch) {
@@ -47,6 +49,7 @@ function EstimatorForm() {
       setError(`Amount cannot exceed ${money(maxAdvance)} for this collateral.`);
       return;
     }
+    setBusy(true);
     const agreement = createAgreement({
       watchIds: [watch.id],
       amount: n,
@@ -55,6 +58,17 @@ function EstimatorForm() {
       ownerName: name,
       email,
     });
+    await sendAppEmail({
+      kind: "financing",
+      name,
+      email,
+      watch: `${watch.brand} ${watch.model}`,
+      amount: money(n),
+      termMonths: term,
+      delivery,
+      deskEmail: settings.financingEmail,
+    });
+    setBusy(false);
     router.push(`/agreements/${agreement.id}`);
   }
 
@@ -135,8 +149,8 @@ function EstimatorForm() {
           <span>I confirm that I am at least {settings.ageMinimum} years old and authorized to pledge this asset.</span>
         </label>
         {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
-        <PillButton type="submit" variant="gold" className="mt-2">
-          Generate Agreement Draft
+        <PillButton type="submit" variant="gold" className="mt-2" disabled={busy}>
+          {busy ? "Sending draft…" : "Generate Agreement Draft"}
         </PillButton>
       </form>
     </main>

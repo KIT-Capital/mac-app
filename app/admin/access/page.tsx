@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 import type { ManagedUser, Role, UserStatus } from "@/lib/types";
 
@@ -18,13 +19,36 @@ const BLANK: ManagedUser = {
 };
 
 export default function AdminAccessPage() {
-  const { users, upsertUser, removeUser } = useStore();
+  const { users, upsertUser, removeUser, settings } = useStore();
   const [draft, setDraft] = useState<ManagedUser>(BLANK);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!draft.name || !draft.email.includes("@")) return;
+    const creating = !draft.id;
     upsertUser({ ...draft, id: draft.id || `usr-${Date.now()}` });
+    if (creating) {
+      setBusy(true);
+      const result = await sendAppEmail({
+        kind: "invite",
+        name: draft.name,
+        email: draft.email,
+        role: draft.role,
+        phone: draft.phone,
+        deskEmail: settings.financingEmail,
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setError(result.error || "User saved, but the invite email failed.");
+        setNotice("");
+      } else {
+        setError("");
+        setNotice(result.preview ? "User saved. Invite is in the preview outbox." : "Invite sent through Resend.");
+      }
+    }
     setDraft(BLANK);
   }
 
@@ -58,10 +82,12 @@ export default function AdminAccessPage() {
             <option className="bg-black" value="suspended">Suspended</option>
           </NativeSelect>
         </Field>
-        <PillButton type="submit" variant="gold">
-          {draft.id ? "Update User" : "Add User"}
+        <PillButton type="submit" variant="gold" disabled={busy}>
+          {busy ? "Sending invite…" : draft.id ? "Update User" : "Invite User"}
         </PillButton>
       </form>
+      {notice ? <p className="mb-4 text-sm text-[#FCB040]">{notice}</p> : null}
+      {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
       <AdminTable
         headers={["Name", "Email", "Role", "Status", ""]}
         rows={users.map((u) => [

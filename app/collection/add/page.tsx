@@ -18,6 +18,7 @@ import {
   TIER_ONE_BRANDS,
 } from "@/lib/catalog";
 import { readImageFile } from "@/lib/image";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 import type { Timepiece } from "@/lib/types";
 
@@ -104,8 +105,18 @@ function AddForm() {
     }
   }
 
-  function persist(watch: Timepiece) {
+  function persist(watch: Timepiece, notify = false) {
     addTimepiece(watch);
+    if (notify && user) {
+      void sendAppEmail({
+        kind: "appraisal",
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        watch: `${watch.brand} ${watch.model}`,
+        deskEmail: settings.financingEmail,
+      });
+    }
     router.push(onboarding ? "/collection/continue" : `/collection/${watch.id}`);
   }
 
@@ -134,7 +145,7 @@ function AddForm() {
       return;
     }
     const watch: Timepiece = { ...draft, status: "reviewing" };
-    persist(watch);
+    persist(watch, true);
     window.setTimeout(() => {
       updateTimepiece(watch.id, {
         status: "appraised",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function SignupPage() {
@@ -15,8 +16,9 @@ export default function SignupPage() {
   const [adult, setAdult] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name || !email.includes("@")) {
       setError("Please enter your name and a valid email address.");
@@ -30,12 +32,15 @@ export default function SignupPage() {
       setError("Please accept the privacy policy to continue.");
       return;
     }
+    setBusy(true);
     signUp({
       name,
       email,
       phone: phone || "+1 (212) 555-0100",
       member: false,
     });
+    await sendAppEmail({ kind: "welcome", name, email, phone });
+    setBusy(false);
     router.push("/collection/setup");
   }
 
@@ -131,9 +136,10 @@ export default function SignupPage() {
           <div className="pt-4 space-y-3">
             <button
               type="submit"
-              className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59] active:scale-[0.99]"
+              disabled={busy}
+              className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59] active:scale-[0.99] disabled:opacity-40"
             >
-              Create Account
+              {busy ? "Opening vault…" : "Create Account"}
             </button>
             <p className="text-center text-[12px] text-white/55">
               Already registered?{" "}
