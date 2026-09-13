@@ -8,7 +8,7 @@ export default function MembershipPage() {
   const { user, updateProfile, settings } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Membership" backHref="/profile" />
       <div className="flex-1 space-y-6 px-6 py-8">
         <p className="text-[11px] tracking-[0.22em] text-[#FCB040] uppercase">Premium collection service</p>
@@ -28,7 +28,7 @@ export default function MembershipPage() {
             "Priority two-day close on qualifying repos",
             "White-glove coordination with the Manhattan vault",
           ].map((item) => (
-            <li key={item} className="border-b border-white/10 pb-3">
+            <li key={item} className="border-b border-white/25 pb-3">
               {item}
             </li>
           ))}

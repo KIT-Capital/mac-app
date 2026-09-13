@@ -21,7 +21,7 @@ export default function AgreementDetailPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Repurchase agreement" backHref="/agreements" />
       <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-6 text-white/80">
         <div className="mb-4 flex items-center justify-between">
@@ -76,7 +76,7 @@ export default function AgreementDetailPage() {
           ) : null}
         </article>
       </div>
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-white/25 p-4">
         <PillButton
           disabled={!started || agreement.status === "signed"}
           onClick={() => signAgreement(agreement.id)}

@@ -12,7 +12,7 @@ export default function CollectionContinuePage() {
   const last = timepieces[0];
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="My timepieces" />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-10">
         <p className="text-[13px] tracking-[0.18em] text-[#FCB040] uppercase">Saved</p>

@@ -5,7 +5,7 @@ import { ScreenHeader } from "@/components/screen-header";
 
 export default function PrivacyPage() {
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Privacy policy" backHref="/signup" />
       <article className="mx-auto w-full max-w-xl flex-1 space-y-4 overflow-y-auto px-5 py-6 text-[13px] leading-6 text-white/70">
         <p className="text-[11px] tracking-[0.16em] text-[#FCB040] uppercase">Effective November 20, 2020</p>

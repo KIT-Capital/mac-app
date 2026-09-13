@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { MacWordmark } from "@/components/mac-logo";
 import { PillButton } from "@/components/field";
+import { SocialLogin } from "@/components/social-login";
 import { roleFromEmail } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
@@ -30,7 +31,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <div className="relative h-40 overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -45,8 +46,8 @@ export default function LoginPage() {
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-1 flex-col px-6 pb-8 pt-6">
-        <label className="space-y-1 border-b border-white/15 pb-3">
-          <span className="text-[11px] text-white/45">Email address or phone number</span>
+        <label className="space-y-1.5 border-b-2 border-white/45 pb-3">
+          <span className="text-[11px] text-white/70">Email address or phone number</span>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -54,8 +55,8 @@ export default function LoginPage() {
             autoComplete="email"
           />
         </label>
-        <label className="mt-6 space-y-1 border-b border-white/15 pb-3">
-          <span className="text-[11px] text-white/45">Password</span>
+        <label className="mt-6 space-y-1.5 border-b-2 border-white/45 pb-3">
+          <span className="text-[11px] text-white/70">Password</span>
           <input
             type="password"
             value={password}
@@ -63,24 +64,14 @@ export default function LoginPage() {
             className="w-full bg-transparent py-1 text-[16px] outline-none"
           />
         </label>
-        <button type="button" className="mac-tap mt-2 self-end text-[12px] text-white/45">
+        <button type="button" className="mac-tap mt-2 self-end text-[12px] text-white/70">
           Forgot password
         </button>
 
         {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
 
-        <p className="mt-8 text-[12px] text-white/40">Or log in with</p>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          {["G", "f", "a"].map((mark) => (
-            <button
-              key={mark}
-              type="button"
-              onClick={() => go(email)}
-              className="mac-tap flex h-12 items-center justify-center rounded-full bg-[#1c1c1c] text-lg"
-            >
-              {mark}
-            </button>
-          ))}
+        <div className="mt-8">
+          <SocialLogin onContinue={() => go(email)} />
         </div>
 
         <div className="mt-auto space-y-4 pt-10">

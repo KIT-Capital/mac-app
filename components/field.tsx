@@ -11,8 +11,8 @@ export function Field({
   className?: string;
 }) {
   return (
-    <label className={cn("block space-y-1 border-b border-white/12 pb-3", className)}>
-      <span className="text-[11px] tracking-[0.04em] text-white/40">{label}</span>
+    <label className={cn("block space-y-1.5 border-b-2 border-white/45 pb-3", className)}>
+      <span className="text-[11px] tracking-[0.04em] text-white/70">{label}</span>
       {children}
     </label>
   );
@@ -44,8 +44,8 @@ export function PillButton({
   const styles = {
     champagne: "bg-[#E8D5C0] text-black",
     white: "bg-white text-black",
-    navy: "bg-[#0E2A44] text-white",
-    ghost: "bg-transparent text-white ring-1 ring-white/25",
+    navy: "bg-[#0E2A44] text-white ring-1 ring-[#FCB040]/40",
+    ghost: "bg-transparent text-white ring-1 ring-white/50",
     gold: "bg-[#FCB040] text-black",
   }[variant];
 

@@ -48,7 +48,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
     <PhoneShell>
       <div className="flex min-h-[min(100dvh-2rem,844px)] flex-1 flex-col md:min-h-[844px]">
         {!hydrated ? (
-          <div className="flex flex-1 items-center justify-center text-[12px] tracking-[0.2em] text-white/40 uppercase">
+          <div className="flex flex-1 items-center justify-center text-[12px] tracking-[0.2em] text-white/70 uppercase">
             Loading collection
           </div>
         ) : (

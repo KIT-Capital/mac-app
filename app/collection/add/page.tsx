@@ -146,14 +146,14 @@ function AddForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Add a timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
       <form onSubmit={onSave} className="mx-auto w-full max-w-xl flex-1 space-y-6 overflow-y-auto px-5 py-5 pb-10">
-        <p className="text-[13px] text-white/55">Please upload at least 4 images of the timepiece</p>
+        <p className="text-[13px] text-white/75">Please upload at least 4 images of the timepiece</p>
         <div className="grid grid-cols-3 gap-4">
           {SLOTS.map((label, i) => (
             <label key={label} className="block text-center">
-              <span className="flex aspect-square items-center justify-center overflow-hidden bg-[#1a1a1a] text-white/35">
+              <span className="flex aspect-square items-center justify-center overflow-hidden bg-[#2A2A2A] text-white/70 ring-1 ring-white/35">
                 {images[i] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={images[i]} alt={label} className="h-full w-full object-cover" />
@@ -161,7 +161,7 @@ function AddForm() {
                   <span className="text-2xl">+</span>
                 )}
               </span>
-              <span className="mt-2 block text-[11px] tracking-[0.12em] text-white/45 uppercase">{label}</span>
+              <span className="mt-2 block text-[11px] tracking-[0.12em] text-white/70 uppercase">{label}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -292,8 +292,8 @@ function AddForm() {
             ))}
           </NativeSelect>
         </Field>
-        <div className="space-y-3 border-b border-white/12 pb-3">
-          <p className="text-[11px] text-white/40">Band</p>
+        <div className="space-y-3 border-b-2 border-white/45 pb-3">
+          <p className="text-[11px] text-white/70">Band</p>
           <div className="flex gap-10 text-[15px]">
             <label className="flex items-center gap-2">
               <input type="radio" checked={band === "strap"} onChange={() => setBand("strap")} />

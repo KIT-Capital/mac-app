@@ -11,7 +11,7 @@ export default function CollectionPage() {
   const empty = timepieces.length === 0;
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader
         title="My timepieces"
         right={

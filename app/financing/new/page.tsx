@@ -59,7 +59,7 @@ function EstimatorForm() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Financing estimator" backHref="/financing" />
       {watch ? (
         // eslint-disable-next-line @next/next/no-img-element

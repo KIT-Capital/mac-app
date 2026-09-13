@@ -28,7 +28,7 @@ export default function WatchDetailPage() {
   const locked = watch.status !== "not_evaluated";
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title={watch.brand} backHref="/collection" />
       <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto pb-8">
         <div className="grid grid-cols-2 gap-px bg-white/5 md:grid-cols-3">

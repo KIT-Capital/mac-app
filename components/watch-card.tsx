@@ -15,7 +15,7 @@ export function WatchCard({ watch }: { watch: Timepiece }) {
 
   return (
     <Link href={`/collection/${watch.id}`} className="block">
-      <div className="overflow-hidden bg-black">
+      <div className="overflow-hidden bg-[#161616]">
         <div className="relative aspect-square bg-[#111]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={watch.images[0]} alt={`${watch.brand} ${watch.model}`} className="h-full w-full object-cover" />

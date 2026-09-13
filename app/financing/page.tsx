@@ -10,7 +10,7 @@ export default function FinancingPage() {
   const { agreements, timepieces, settings } = useStore();
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader
         title="Financing"
         right={
@@ -27,7 +27,7 @@ export default function FinancingPage() {
           above {Math.round(settings.maxLtv * 100)}% of liquidation value.
         </p>
         {agreements.length === 0 ? (
-          <div className="border border-white/10 px-4 py-10 text-center text-sm text-white/50">
+          <div className="border border-white/30 px-4 py-10 text-center text-sm text-white/70">
             No financing requests yet.
             <Link href="/financing/new" className="mt-3 block text-[#FCB040]">
               Open the estimator
@@ -40,7 +40,7 @@ export default function FinancingPage() {
               <Link
                 key={a.id}
                 href={`/agreements/${a.id}`}
-                className="block border-b border-white/10 py-4"
+                className="block border-b border-white/25 py-4"
               >
                 <div className="flex items-center justify-between text-[11px] tracking-[0.16em] uppercase text-white/45">
                   <span>{a.agreementCode || a.id}</span>

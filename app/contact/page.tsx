@@ -15,7 +15,7 @@ export default function ContactPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Contact us" />
       <div className="mx-auto w-full max-w-md flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <p className="text-sm leading-6 text-white/65">

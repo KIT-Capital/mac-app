@@ -26,7 +26,7 @@ export function AdminChrome({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-black md:flex-row">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#161616] md:flex-row">
       <aside className="shrink-0 border-b border-white/10 bg-[#0E2A44] md:w-56 md:border-r md:border-b-0">
         <div className="px-4 py-4">
           <MacWordmark className="w-[150px]" />
@@ -54,7 +54,7 @@ export function AdminChrome({
         </nav>
       </aside>
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center border-b border-white/10 px-5">
+        <header className="flex h-14 items-center border-b border-white/25 px-5">
           <h1 className="text-[13px] font-medium tracking-[0.22em] uppercase">{title}</h1>
         </header>
         <div className="flex-1 overflow-y-auto p-5">{children}</div>
@@ -73,7 +73,7 @@ export function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="border border-white/10 bg-[#111] px-4 py-4">
+    <div className="border border-white/25 bg-[#222] px-4 py-4">
       <p className="text-[10px] tracking-[0.16em] text-white/40 uppercase">{label}</p>
       <p className="mt-2 text-2xl text-[#FCB040]">{value}</p>
       {hint ? <p className="mt-1 text-[12px] text-white/45">{hint}</p> : null}
@@ -89,7 +89,7 @@ export function AdminTable({
   rows: ReactNode[][];
 }) {
   return (
-    <div className="overflow-x-auto border border-white/10">
+    <div className="overflow-x-auto border border-white/25">
       <table className="w-full min-w-[640px] text-left text-[13px]">
         <thead className="bg-[#0E2A44] text-[10px] tracking-[0.16em] text-white/70 uppercase">
           <tr>

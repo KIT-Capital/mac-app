@@ -37,7 +37,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="Create account" backHref="/" />
       <form onSubmit={onSubmit} className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-6 py-8">
         <p className="text-sm leading-6 text-white/65">

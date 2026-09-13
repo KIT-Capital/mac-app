@@ -17,7 +17,7 @@ export default function ProfilePage() {
   const desk = isDesk(user);
 
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <div className="relative isolate h-36">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/splash.jpg" alt="" className="absolute inset-0 h-full w-full object-cover object-[86%_72%] opacity-35" />
@@ -42,12 +42,12 @@ export default function ProfilePage() {
           {user?.name}
         </h2>
         <div className="mx-auto mt-6 w-full max-w-md space-y-3 text-sm">
-          <p className="flex items-center gap-3 bg-[#111] px-4 py-3 text-white/80">
-            <span className="text-white/35">@</span>
+          <p className="flex items-center gap-3 bg-[#222] px-4 py-3 ring-1 ring-white/20">
+            <span className="text-white/55">@</span>
             {user?.email}
           </p>
-          <p className="flex items-center gap-3 bg-[#111] px-4 py-3 text-white/80">
-            <span className="text-white/35">#</span>
+          <p className="flex items-center gap-3 bg-[#222] px-4 py-3 ring-1 ring-white/20">
+            <span className="text-white/55">#</span>
             {user?.phone}
           </p>
         </div>
@@ -58,7 +58,7 @@ export default function ProfilePage() {
               <Link
                 key={tile.label}
                 href={tile.href}
-                className="flex h-28 flex-col items-center justify-center gap-2 bg-[#141414] text-[12px] tracking-[0.08em] text-white/80"
+                className="flex h-28 flex-col items-center justify-center gap-2 bg-[#222] text-[12px] tracking-[0.08em] text-white ring-1 ring-white/20"
               >
                 <Icon className="h-6 w-6 text-white/55" strokeWidth={1.4} />
                 {tile.label}

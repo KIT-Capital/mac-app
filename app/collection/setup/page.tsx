@@ -6,7 +6,7 @@ import { PillButton } from "@/components/field";
 
 export default function CollectionSetupPage() {
   return (
-    <main className="flex flex-1 flex-col bg-black">
+    <main className="flex flex-1 flex-col bg-[#161616]">
       <ScreenHeader title="My timepieces" />
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-10">
         <p className="text-[13px] leading-6 text-white/65">

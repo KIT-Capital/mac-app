@@ -10,7 +10,7 @@ export function PhoneShell({ children }: { children: ReactNode }) {
       style={{ background: STAGE }}
     >
       <div className="relative mx-auto w-full max-w-[430px] rounded-[2.15rem] bg-[#1a1c1e] p-[10px] shadow-[0_22px_50px_rgba(12,16,20,0.38)] ring-1 ring-black/25">
-        <div className="relative flex min-h-[min(100dvh-2rem,844px)] flex-col overflow-hidden rounded-[1.65rem] bg-black text-white md:min-h-[844px]">
+        <div className="relative flex min-h-[min(100dvh-2rem,844px)] flex-col overflow-hidden rounded-[1.65rem] bg-[#161616] text-white md:min-h-[844px]">
           {children}
         </div>
       </div>

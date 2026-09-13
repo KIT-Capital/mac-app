@@ -28,7 +28,7 @@ export default function AdminOverviewPage() {
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
-        <section className="border border-white/10 bg-[#111] p-4">
+        <section className="border border-white/25 bg-[#222] p-4">
           <p className="text-[10px] tracking-[0.16em] text-white/40 uppercase">Collection status</p>
           <div className="mt-4 flex h-40 items-end gap-4">
             {bars.map((bar) => (
@@ -43,7 +43,7 @@ export default function AdminOverviewPage() {
             ))}
           </div>
         </section>
-        <section className="border border-white/10 bg-[#111] p-4">
+        <section className="border border-white/25 bg-[#222] p-4">
           <p className="text-[10px] tracking-[0.16em] text-white/40 uppercase">Policy in force</p>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
