@@ -69,7 +69,7 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 - Gold `#FCB040` — official CAPITAL wordmark, active tab, desk accents
 - Champagne `#E8D5C0` — add-timepiece FAB
 - Black screens, white Save / Get started
-- Official Mechanical Art Capital mark (not the MB&F lockup from the 2022 mock)
+- Official Logo-FF only: black gear, three gold pinions, colored jewels in the center. The gold single-gear mark is not used.
 
 ## Product notes
 

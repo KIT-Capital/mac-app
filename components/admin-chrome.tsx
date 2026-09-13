@@ -14,7 +14,6 @@ import {
   Sliders,
   Users2,
 } from "lucide-react";
-import { MacWordmark } from "@/components/mac-logo";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
