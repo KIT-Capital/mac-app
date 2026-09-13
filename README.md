@@ -2,7 +2,7 @@
 
 Prototype of the Mechanical Art Capital collector app. The iPhone frame is the source of truth, rebuilt from the 14 November 2022 Limus Design presentation (Mechanical Art Capital app screens) and the official MAC palette.
 
-The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official jeweled wordmark. See `docs/design-reference.md`.
+The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official Logo-FF wordmark (Final Logo 2 Gold). See `docs/design-reference.md`.
 
 ## What you can do
 

@@ -16,7 +16,7 @@ export const ADMIN_PROFILE: Profile = {
   email: "admin@mechartcap.com",
   phone: "+1 (833) 209-0972",
   member: true,
-  avatar: "/brand/mac-logo-jeweled-mark-on-dark.png",
+  avatar: "/brand/logo-ff-mark.png",
   role: "admin",
   onboardingComplete: true,
 };
@@ -26,7 +26,7 @@ export const STAFF_PROFILE: Profile = {
   email: "desk@mechartcap.com",
   phone: "+1 (833) 209-0972",
   member: true,
-  avatar: "/brand/mac-logo-jeweled-mark-on-dark.png",
+  avatar: "/brand/logo-ff-mark.png",
   role: "staff",
   onboardingComplete: true,
 };
