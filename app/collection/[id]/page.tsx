@@ -159,7 +159,7 @@ export default function WatchDetailPage() {
           {watch.status === "appraised" && watch.financeable ? (
             <button
               type="button"
-              onClick={() => router.push(`/financing/new?watch=${watch.id}`)}
+              onClick={() => router.push(`/repurchase/new?watch=${watch.id}`)}
               className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
             >
               Apply to Sell &amp; Repurchase

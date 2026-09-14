@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 const COLLECTOR_LINKS = [
   { href: "/collection", label: "Timepieces", icon: Clock },
   { href: "/collection/add", label: "Add a timepiece", icon: Plus },
-  { href: "/financing", label: "Repurchase", icon: Plus },
+  { href: "/repurchase", label: "Repurchase", icon: Plus },
   { href: "/contact", label: "Contact us", icon: Mail },
   { href: "/profile", label: "Account", icon: UserRound },
   { href: "/profile/preferences", label: "Preferences", icon: SlidersHorizontal },
