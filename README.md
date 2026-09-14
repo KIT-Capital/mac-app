@@ -81,7 +81,7 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 - Gold `#FCB040` — official CAPITAL wordmark, active tab, desk accents
 - Champagne `#E8D5C0` — add-timepiece FAB
 - Black screens, white Save / Get started
-- Official Logo-FF only: black gear, three gold pinions, colored jewels in the center. The gold single-gear mark is not used.
+- Official Logo-FF only (Illustrator vector): black gear, three gold pinions, colored jewels. On dark, the gear is solid white — never a hollow outline or a white plate. The gold single-gear mark is not used.
 - Dark and light collector appearances, toggled in Account → Settings, matching the 2022 deck.
 
 ## Product notes

@@ -56,7 +56,7 @@ export default function LoginPage() {
 
       <div className="my-auto pt-2 pb-6 text-center">
         <div className="mx-auto">
-          <MacLockup onDark={!light} />
+          <MacLockup onDark={!light} size="hero" />
         </div>
         <h1 className="mt-4 text-[20px] font-medium tracking-tight text-mac-fg">
           Sign In to Your Collection

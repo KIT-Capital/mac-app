@@ -2,14 +2,20 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * Official Logo-FF (Final Logo 2 Gold).
+ * Official Logo-FF (Final Logo 2 Gold) as the Illustrator vector.
  * Light: black gear, gray arc, gold jeweled pinions, MECHANICAL ART CAPITAL.
- * Dark: the same lockup with black ink flipped to white — no plate, no outline invert.
+ * Dark: black ink is solid white — no plate, no outline invert.
  */
-const WORDMARK = "/brand/logo-ff.png";
-const WORDMARK_ON_DARK = "/brand/logo-ff-on-dark.png";
+const WORDMARK = "/brand/logo-ff.svg";
+const WORDMARK_ON_DARK = "/brand/logo-ff-on-dark.svg";
 const MARK = "/brand/logo-ff-mark.png";
 const MARK_ON_DARK = "/brand/logo-ff-mark-on-dark.png";
+
+const LOCKUP_WIDTH = {
+  hero: "w-[min(304px,78%)]",
+  default: "w-[260px]",
+  compact: "w-[168px]",
+} as const;
 
 export function MacWordmark({
   className,
@@ -19,16 +25,15 @@ export function MacWordmark({
   onDark?: boolean;
 }) {
   return (
-    <div className={cn("mx-auto w-full", className)}>
-      <Image
-        src={onDark ? WORDMARK_ON_DARK : WORDMARK}
-        alt="Mechanical Art Capital"
-        width={1200}
-        height={730}
-        className="h-auto w-full object-contain"
-        priority
-      />
-    </div>
+    <Image
+      src={onDark ? WORDMARK_ON_DARK : WORDMARK}
+      alt="Mechanical Art Capital"
+      width={1200}
+      height={730}
+      unoptimized
+      priority
+      className={cn("h-auto w-full object-contain", className)}
+    />
   );
 }
 
@@ -43,10 +48,10 @@ export function MacLogoMark({
     <Image
       src={onDark ? MARK_ON_DARK : MARK}
       alt="Mechanical Art Capital"
-      width={640}
-      height={615}
+      width={722}
+      height={697}
+      unoptimized
       className={cn("h-auto w-full object-contain", className)}
-      priority
     />
   );
 }
@@ -59,11 +64,19 @@ export function MacMark({ className }: { className?: string }) {
   return <MacLogoMark className={className} />;
 }
 
-/** Full official lockup — splash and sign-in. */
-export function MacLockup({ onDark = false, className }: { onDark?: boolean; className?: string }) {
+/** Full official lockup — splash, sign-in, and chrome. */
+export function MacLockup({
+  onDark = false,
+  className,
+  size = "default",
+}: {
+  onDark?: boolean;
+  className?: string;
+  size?: keyof typeof LOCKUP_WIDTH;
+}) {
   return (
     <div className={cn("flex w-full justify-center", className)}>
-      <MacWordmark onDark={onDark} className="w-[236px]" />
+      <MacWordmark onDark={onDark} className={LOCKUP_WIDTH[size]} />
     </div>
   );
 }

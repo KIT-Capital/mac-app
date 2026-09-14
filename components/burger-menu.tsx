@@ -16,6 +16,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { MacWordmark } from "@/components/mac-logo";
 import { isDesk } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -75,10 +76,10 @@ function BurgerDrawer({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-50 flex">
       <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/55" onClick={onClose} />
       <nav className="relative z-10 flex h-full w-[78%] max-w-[300px] flex-col bg-[#0E2A44] text-white shadow-2xl">
-        <div className="flex items-center justify-between px-4 pt-12 pb-4">
-          <div>
-            <p className="text-[10px] tracking-[0.18em] text-white/50 uppercase">Menu</p>
-            <p className="mt-1 text-[15px] font-medium">{user?.name || "Collector"}</p>
+        <div className="flex items-center justify-between px-4 pt-10 pb-4">
+          <div className="min-w-0">
+            <MacWordmark onDark className="w-[148px]" />
+            <p className="mt-2 text-[13px] font-medium text-white/80">{user?.name || "Collector"}</p>
           </div>
           <button type="button" aria-label="Close menu" onClick={onClose} className="mac-tap flex items-center justify-center">
             <X className="h-5 w-5" strokeWidth={1.8} />

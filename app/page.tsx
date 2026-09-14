@@ -9,14 +9,15 @@ export default function WelcomePage() {
   const light = settings.appearance === "light";
 
   return (
-    <main className={`relative flex flex-1 flex-col justify-between overflow-hidden px-7 pb-8 pt-10 ${light ? "bg-white" : "bg-black"}`}>
-      <div className="relative z-10 flex justify-center pt-4">
-        <MacLockup onDark={!light} />
-      </div>
-
-      <div className="relative z-10 my-auto text-center">
+    <main
+      className={`relative flex flex-1 flex-col justify-between overflow-hidden px-7 pb-8 pt-8 ${
+        light ? "bg-white" : "bg-black"
+      }`}
+    >
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
+        <MacLockup onDark={!light} size="hero" />
         <h1
-          className={`text-[30px] font-medium leading-[1.12] tracking-[-0.02em] uppercase sm:text-[32px] ${
+          className={`mt-10 text-center text-[28px] font-medium leading-[1.12] tracking-[-0.02em] uppercase sm:text-[30px] ${
             light ? "text-black" : "text-white"
           }`}
         >
@@ -29,7 +30,7 @@ export default function WelcomePage() {
           Timepieces
         </h1>
         <p
-          className={`mx-auto mt-5 max-w-[250px] text-[11px] leading-relaxed ${
+          className={`mx-auto mt-5 max-w-[250px] text-center text-[11px] leading-relaxed ${
             light ? "text-black/55" : "text-white/70"
           }`}
         >

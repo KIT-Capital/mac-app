@@ -1,63 +1,116 @@
 #!/usr/bin/env python3
-"""Build web assets from official Logo-FF (Final Logo 2 Gold).
+"""Build web lockups from official Logo-FF (Illustrator PDF / PSD).
 
-On dark: black ink becomes white. Gray arc / CAPITAL and jeweled gold pinions stay.
-Do not draw a white plate, and do not outline-invert the gear.
+Light: black gear, gray arc, gold jeweled pinions, MECHANICAL ART CAPITAL.
+Dark: black ink becomes solid white. Gray, gold, and jewels stay.
+Do not sit the mark on a plate, and do not outline-invert the gear.
 """
 
+from __future__ import annotations
+
+import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 
-SRC_JPG = Path("/workspace/public/brand/logo-ff.jpg")
-SRC_PNG = Path("/workspace/public/brand/logo-ff-export.png")
-OUT = Path("/workspace/public")
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "public"
+UPLOADS = Path("/home/ubuntu/.cursor/projects/workspace/uploads")
+OFFICIAL_PDF = UPLOADS / "Logo-FF_2ca7.pdf"
+OFFICIAL_PSD = UPLOADS / "Logo-FF_0713.psd"
+SRC_PDF = ROOT / "brand-src" / "Logo-FF.pdf"
+SRC_PSD = ROOT / "brand-src" / "Logo-FF.psd"
+FALLBACK_PNG = OUT / "brand" / "logo-ff-export.png"
+FALLBACK_JPG = OUT / "brand" / "logo-ff.jpg"
+
+BLACK_FILL = "rgb(0%, 0%, 0%)"
+WHITE_FILL = "rgb(100%, 100%, 100%)"
+
+
+def run(cmd: list[str]) -> None:
+    subprocess.run(cmd, check=True)
 
 
 def load_rgba(path: Path) -> np.ndarray:
     return np.array(Image.open(path).convert("RGBA"))
 
 
-def background_mask(arr: np.ndarray) -> np.ndarray:
-    rgb = arr[:, :, :3].astype(np.int16)
-    paper = rgb.min(axis=2) > 246
-    ink = Image.fromarray((~paper * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))
-    sealed = np.array(ink) > 0
-    walk = paper & ~sealed
-    h, w = walk.shape
-    seen = np.zeros((h, w), dtype=bool)
-    stack = [(0, 0), (0, w - 1), (h - 1, 0), (h - 1, w - 1)]
-    while stack:
-        y, x = stack.pop()
-        if y < 0 or x < 0 or y >= h or x >= w or seen[y, x] or not walk[y, x]:
-            continue
-        seen[y, x] = True
-        stack.extend(((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)))
-    return seen
+def raster_from_pdf(pdf: Path, dest: Path, dpi: int = 300) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    run(
+        [
+            "gs",
+            "-dNOPAUSE",
+            "-dBATCH",
+            "-dSAFER",
+            "-sDEVICE=pngalpha",
+            f"-r{dpi}",
+            f"-sOutputFile={dest}",
+            str(pdf),
+        ]
+    )
+    return dest
 
 
-def trim(arr: np.ndarray, pad: int = 16) -> np.ndarray:
-    rgb = arr[:, :, :3].astype(np.int16)
+def svg_from_pdf(pdf: Path, dest: Path) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    run(["pdftocairo", "-svg", str(pdf), str(dest)])
+    return dest
+
+
+def trim_alpha(arr: np.ndarray, pad: int = 12) -> np.ndarray:
     a = arr[:, :, 3]
-    content = (a > 8) & (rgb.min(axis=2) < 248)
-    rows = np.where(content.any(axis=1))[0]
-    cols = np.where(content.any(axis=0))[0]
+    rows = np.where(a > 8)[0]
+    cols = np.where((a > 8).any(axis=0))[0]
     if len(rows) == 0 or len(cols) == 0:
         return arr
-    y0, y1 = max(0, rows[0] - pad), min(arr.shape[0], rows[-1] + pad + 1)
-    x0, x1 = max(0, cols[0] - pad), min(arr.shape[1], cols[-1] + pad + 1)
+    y0, y1 = max(0, int(rows[0]) - pad), min(arr.shape[0], int(rows[-1]) + pad + 1)
+    x0, x1 = max(0, int(cols[0]) - pad), min(arr.shape[1], int(cols[-1]) + pad + 1)
     return arr[y0:y1, x0:x1]
 
 
-def knock_out_paper(arr: np.ndarray) -> np.ndarray:
-    out = arr.copy()
-    out[background_mask(arr), 3] = 0
-    return trim(out)
+def content_viewbox(arr: np.ndarray, page_w: float, page_h: float, pad: float = 8.0) -> str:
+    a = arr[:, :, 3]
+    rows = np.where(a > 8)[0]
+    cols = np.where((a > 8).any(axis=0))[0]
+    h, w = arr.shape[:2]
+    x0 = cols[0] / w * page_w
+    x1 = (cols[-1] + 1) / w * page_w
+    y0 = rows[0] / h * page_h
+    y1 = (rows[-1] + 1) / h * page_h
+    return f"{x0 - pad:.3f} {y0 - pad:.3f} {x1 - x0 + pad * 2:.3f} {y1 - y0 + pad * 2:.3f}"
 
 
-def on_dark(lockup: np.ndarray) -> np.ndarray:
-    """Official reversed lockup: solid white gear + MECHANICAL ART, gray CAPITAL."""
+def simplify_gradients(svg: str) -> str:
+    def shrink(match: re.Match[str]) -> str:
+        block = match.group(0)
+        stops = list(re.finditer(r"<stop\b[^/]*/>", block))
+        if len(stops) <= 6:
+            return block
+        keep_idx = {0, len(stops) // 4, len(stops) // 2, (3 * len(stops)) // 4, len(stops) - 1}
+        kept = [stops[i].group(0) for i in sorted(keep_idx)]
+        inner = "\n".join(kept)
+        return re.sub(r"(<linearGradient\b[^>]*>).*(</linearGradient>)", rf"\1{inner}\2", block, flags=re.S)
+
+    return re.sub(r"<linearGradient\b.*?</linearGradient>", shrink, svg, flags=re.S)
+
+
+def tight_svg(svg: str, viewbox: str) -> str:
+    svg = re.sub(r'width="[^"]+"', 'width="1200"', svg, count=1)
+    svg = re.sub(r'height="[^"]+"', 'height="730"', svg, count=1)
+    svg = re.sub(r'viewBox="[^"]+"', f'viewBox="{viewbox}"', svg, count=1)
+    return simplify_gradients(svg)
+
+
+def on_dark_svg(svg: str) -> str:
+    return svg.replace(f'fill="{BLACK_FILL}"', f'fill="{WHITE_FILL}"')
+
+
+def on_dark_raster(lockup: np.ndarray) -> np.ndarray:
+    """Solid white gear + MECHANICAL ART. Gray CAPITAL, arc, and jewels stay."""
     out = lockup.copy()
     rgb = out[:, :, :3].astype(np.int16)
     a = out[:, :, 3]
@@ -65,27 +118,25 @@ def on_dark(lockup: np.ndarray) -> np.ndarray:
     mn = rgb.min(axis=2)
     sat = mx - mn
     ink = (a > 8) & (sat < 28) & (mx < 80)
-    out[ink, :3] = (255 - rgb[ink]).astype(np.uint8)
+    out[ink, 0] = 255
+    out[ink, 1] = 255
+    out[ink, 2] = 255
     return out
 
 
 def gear_crop(arr: np.ndarray) -> np.ndarray:
-    rgb = arr[:, :, :3].astype(np.int16)
     a = arr[:, :, 3]
-    content = (a > 8) & (rgb.min(axis=2) < 248)
-    row_counts = content.sum(axis=1)
-    # Wordmark is a wide band under a gap. Keep the gear + gray arc above that gap.
+    row_counts = (a > 8).sum(axis=1)
     active = np.where(row_counts > 8)[0]
     if len(active) == 0:
         return arr
     gap = None
     for i in range(len(active) - 1):
-        if active[i + 1] - active[i] > 8:
-            gap = active[i]
+        if active[i + 1] - active[i] > 10:
+            gap = int(active[i])
             break
-    y1 = (gap + 8) if gap is not None else int(arr.shape[0] * 0.58)
-    slice_ = arr[:y1]
-    return trim(slice_, pad=12)
+    y1 = (gap + 10) if gap is not None else int(arr.shape[0] * 0.62)
+    return trim_alpha(arr[:y1], pad=10)
 
 
 def save_png(arr: np.ndarray, path: Path, width: int) -> None:
@@ -102,33 +153,64 @@ def square_icon(mark: np.ndarray, size: int, bg: tuple[int, int, int, int]) -> I
     canvas = Image.new("RGBA", (size, size), bg)
     icon = Image.fromarray(mark, "RGBA")
     pad = int(size * 0.14)
-    icon = icon.resize((size - pad * 2, size - pad * 2), Image.Resampling.LANCZOS)
-    canvas.paste(icon, (pad, pad), icon)
+    icon.thumbnail((size - pad * 2, size - pad * 2), Image.Resampling.LANCZOS)
+    x = (size - icon.width) // 2
+    y = (size - icon.height) // 2
+    canvas.paste(icon, (x, y), icon)
     return canvas
 
 
+def resolve_source() -> tuple[np.ndarray, str | None]:
+    pdf = SRC_PDF if SRC_PDF.exists() else OFFICIAL_PDF
+    if pdf.exists() and shutil.which("gs"):
+        raster = Path("/tmp/logo-ff-official.png")
+        raster_from_pdf(pdf, raster)
+        svg_text = None
+        if shutil.which("pdftocairo"):
+            raw_svg = Path("/tmp/logo-ff-official.svg")
+            svg_from_pdf(pdf, raw_svg)
+            svg_text = raw_svg.read_text()
+        return load_rgba(raster), svg_text
+
+    psd = SRC_PSD if SRC_PSD.exists() else OFFICIAL_PSD
+    if psd.exists():
+        return load_rgba(psd), None
+    if FALLBACK_PNG.exists():
+        return load_rgba(FALLBACK_PNG), None
+    return load_rgba(FALLBACK_JPG), None
+
+
 def main() -> None:
-    src = load_rgba(SRC_JPG if SRC_JPG.exists() else SRC_PNG)
-    lockup = knock_out_paper(src)
-    save_png(lockup, OUT / "brand/logo-ff.png", 1200)
+    lockup, svg_text = resolve_source()
+    lockup = trim_alpha(lockup, pad=16)
+    save_png(lockup, OUT / "brand/logo-ff.png", 1600)
 
     mark = gear_crop(lockup)
-    save_png(mark, OUT / "brand/logo-ff-mark.png", 640)
+    save_png(mark, OUT / "brand/logo-ff-mark.png", 800)
 
-    dark = on_dark(lockup)
-    save_png(dark, OUT / "brand/logo-ff-on-dark.png", 1200)
-    save_png(on_dark(mark), OUT / "brand/logo-ff-mark-on-dark.png", 640)
+    dark = on_dark_raster(lockup)
+    save_png(dark, OUT / "brand/logo-ff-on-dark.png", 1600)
+    save_png(on_dark_raster(mark), OUT / "brand/logo-ff-mark-on-dark.png", 800)
 
-    # Favicon keeps the official black mark on white.
-    square_icon(mark, 192, (255, 255, 255, 255)).convert("RGB").save(
-        OUT / "icon.png", "PNG", optimize=True
-    )
+    if svg_text:
+        page = re.search(r'viewBox="0 0 ([0-9.]+) ([0-9.]+)"', svg_text)
+        page_w = float(page.group(1)) if page else 600.0
+        page_h = float(page.group(2)) if page else 400.0
+        official = Path("/tmp/logo-ff-official.png")
+        full = load_rgba(official) if official.exists() else lockup
+        vb = content_viewbox(full, page_w, page_h)
+        cleaned = tight_svg(svg_text, vb)
+        (OUT / "brand/logo-ff.svg").write_text(cleaned)
+        (OUT / "brand/logo-ff-on-dark.svg").write_text(on_dark_svg(cleaned))
+        print(f"wrote SVG lockups viewBox={vb} bytes={len(cleaned)}")
+
+    square_icon(mark, 192, (255, 255, 255, 255)).convert("RGB").save(OUT / "icon.png", "PNG", optimize=True)
     square_icon(mark, 180, (255, 255, 255, 255)).convert("RGB").save(
         OUT / "apple-touch-icon.png", "PNG", optimize=True
     )
     ico = square_icon(mark, 64, (255, 255, 255, 255))
     ico.save(OUT / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
-    ico.save(OUT.parent / "app/favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
+    ico.save(ROOT / "app/favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
     print("wrote icons")
 
 
