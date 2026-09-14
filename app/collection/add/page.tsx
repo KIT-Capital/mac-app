@@ -85,13 +85,20 @@ function AddForm() {
       ({
         id: existing?.id ?? `tp-${Date.now()}`,
         ownerEmail: user?.email,
-        assetCode: new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
+        assetCode:
+          existing?.assetCode ??
+          new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
         brand: resolvedBrand || "Untitled manufacturer",
         model: model || "Untitled model",
         reference,
         images: images.filter(Boolean),
-        status: "not_evaluated" as const,
-        financeable: TIER_ONE_BRANDS.includes(resolvedBrand as (typeof TIER_ONE_BRANDS)[number]),
+        status: existing?.status ?? "not_evaluated",
+        valueLow: existing?.valueLow,
+        valueHigh: existing?.valueHigh,
+        evaluatedAt: existing?.evaluatedAt,
+        financeable:
+          existing?.financeable ??
+          TIER_ONE_BRANDS.includes(resolvedBrand as (typeof TIER_ONE_BRANDS)[number]),
         condition,
         boxPapers,
         caseMetal,
@@ -113,6 +120,7 @@ function AddForm() {
       caseType,
       condition,
       dialColor,
+      existing,
       complication,
       images,
       model,
