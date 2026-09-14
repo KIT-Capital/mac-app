@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { WatchPhoto } from "@/components/watch-photo";
 import { moneyRange } from "@/lib/catalog";
 import type { Timepiece } from "@/lib/types";
 
@@ -13,11 +14,11 @@ export function WatchCard({ watch }: { watch: Timepiece }) {
   return (
     <Link href={`/collection/${watch.id}`} className="block">
       <div className="aspect-square w-full overflow-hidden bg-mac-card">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <WatchPhoto
           src={watch.images[0]}
+          watch={watch}
           alt={`${watch.brand} ${watch.model}`}
-          className="h-full w-full object-cover"
+          showCaption
         />
       </div>
       <p className="mt-2 flex items-center gap-1 text-[10px] tracking-[0.12em] text-mac-faint uppercase">

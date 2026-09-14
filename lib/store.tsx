@@ -115,6 +115,7 @@ function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
     role: "collector",
     onboardingComplete: patch?.onboardingComplete ?? false,
     applicationSubmitted: patch?.applicationSubmitted ?? false,
+    promoCode: patch?.promoCode ?? null,
     preferences,
   };
 }
@@ -134,6 +135,7 @@ function normalizeUser(
     onboardingComplete:
       user.onboardingComplete ?? (timepieceCount > 0 || role === "admin" || role === "staff"),
     applicationSubmitted: user.applicationSubmitted ?? agreementCount > 0,
+    promoCode: user.promoCode ?? null,
   };
 }
 

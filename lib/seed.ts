@@ -91,7 +91,7 @@ export const DEMO_TIMEPIECES: Timepiece[] = [
     brand: "Audemars Piguet",
     model: "Royal Oak Selfwinding",
     reference: "15400ST",
-    images: ["/watches/royal-oak.png"],
+    images: ["/watches/royal-oak.jpg"],
     status: "reviewing",
     valueLow: 38000,
     valueHigh: 48000,

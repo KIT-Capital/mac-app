@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Check, Clock, Edit3, HelpCircle, Shield, Trash2 } from "lucide-react";
+import { Check, Clock, HelpCircle, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
-import { PillButton } from "@/components/field";
+import { WatchPhoto } from "@/components/watch-photo";
 import { moneyRange } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
@@ -38,10 +38,8 @@ export default function WatchDetailPage() {
       <div className="flex-1 overflow-y-auto pb-8">
         {/* Gallery Hero */}
         <div className="relative aspect-square w-full bg-[#090C12]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={watch.images[0]} alt={watch.model} className="h-full w-full object-cover" />
+          <WatchPhoto src={watch.images[0]} watch={watch} alt={watch.model} showCaption />
 
-          {/* Thumbnails if multi-angle */}
           {watch.images.length > 1 ? (
             <div className="absolute bottom-3 left-3 flex gap-2">
               {watch.images.map((src, i) => (
@@ -49,8 +47,7 @@ export default function WatchDetailPage() {
                   key={src + i}
                   className="h-12 w-12 overflow-hidden rounded-lg border-2 border-white/50 bg-mac-card shadow-md"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <WatchPhoto src={src} watch={watch} alt="" />
                 </div>
               ))}
             </div>
@@ -174,7 +171,7 @@ export default function WatchDetailPage() {
             <button
               type="button"
               disabled={locked}
-              onClick={() => router.push("/collection/add")}
+              onClick={() => router.push(`/collection/add?id=${watch.id}`)}
               className="flex-1 rounded-xl border border-mac-line bg-white/5 py-3 text-[11px] font-semibold tracking-wider text-mac-fg uppercase disabled:opacity-30"
             >
               {locked ? "Locked for Review" : "Edit Details"}

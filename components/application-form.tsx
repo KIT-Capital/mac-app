@@ -7,6 +7,7 @@ import { FileText } from "lucide-react";
 import { LineField, NativeSelect } from "@/components/field";
 import { ScreenHeader } from "@/components/screen-header";
 import { DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
+import { WatchPhoto } from "@/components/watch-photo";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
@@ -91,8 +92,7 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
 
       {watch ? (
         <div className="relative h-48 w-full overflow-hidden bg-black">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={watch.images[0]} alt="" className="h-full w-full object-cover object-center" />
+          <WatchPhoto src={watch.images[0]} watch={watch} alt={`${watch.brand} ${watch.model}`} showCaption />
         </div>
       ) : (
         <div className="flex h-48 items-center justify-center bg-mac-card px-6 text-center text-[13px] text-mac-muted">

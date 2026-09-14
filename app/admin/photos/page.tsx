@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AdminChrome } from "@/components/admin-chrome";
 import { NativeSelect } from "@/components/field";
+import { WatchPhoto } from "@/components/watch-photo";
 import { readImageFile } from "@/lib/image";
 import { useStore } from "@/lib/store";
 import type { PhotoKind } from "@/lib/types";
@@ -61,8 +62,14 @@ export default function AdminPhotosPage() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {photos.map((photo) => (
             <figure key={photo.id} className="bg-[#111]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.url} alt={photo.caption} className="aspect-square w-full object-cover" />
+              <div className="aspect-square w-full">
+                <WatchPhoto
+                  src={photo.url}
+                  watch={timepieces.find((w) => w.id === photo.assetId)}
+                  alt={photo.caption}
+                  showCaption
+                />
+              </div>
               <figcaption className="flex items-center justify-between px-2 py-2 text-[11px] text-white/55">
                 <span className="uppercase">{photo.kind}</span>
                 <button type="button" className="text-[#FCB040]" onClick={() => removePhoto(photo.id)}>

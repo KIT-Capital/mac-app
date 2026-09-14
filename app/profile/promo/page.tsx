@@ -3,11 +3,13 @@
 import { FormEvent, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
+import { useStore } from "@/lib/store";
 
 export default function PromoCodesPage() {
+  const { user, updateProfile } = useStore();
   const [code, setCode] = useState("");
-  const [applied, setApplied] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const applied = user?.promoCode || null;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -17,7 +19,7 @@ export default function PromoCodesPage() {
       return;
     }
     if (next === "HOUSE65") {
-      setApplied(next);
+      updateProfile({ promoCode: next });
       setError("");
       setCode("");
       return;

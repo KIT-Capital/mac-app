@@ -164,3 +164,14 @@
     color: var(--mac-faint);
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+  }
+  .mac-phone-screen {
+    min-height: auto !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+  }
+}

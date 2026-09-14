@@ -10,7 +10,7 @@ Collector app (Vladimir look):
 
 - Splash, sign in, and create account (18+ and privacy consent) — welcome email via Resend
 - Empty vault for new members, then add pieces one by one
-- 2-column collection with Appraised / Reviewing badges
+- 2-column collection with Appraised / Reviewing badges. Missing photos use a photorealistic illustration until a collector upload is on file.
 - Add a timepiece: front / back / left photos, catalog dropdowns, Save or Appraise
 - Sale-and-repurchase application (MAC buys; collector may buy back — not a loan)
 - Collection appraisal certificate

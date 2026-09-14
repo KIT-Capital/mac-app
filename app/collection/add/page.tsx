@@ -1,15 +1,17 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { LineField, NativeSelect } from "@/components/field";
+import { WatchPhoto } from "@/components/watch-photo";
 import {
   BOX_PAPERS,
   BUCKLES,
   CASE_DIAMETERS,
   CASE_METALS,
   CASE_TYPES,
+  COMPLICATIONS,
   CONDITIONS,
   DIAL_COLORS,
   MODELS_BY_BRAND,
@@ -21,15 +23,17 @@ import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 import type { Timepiece } from "@/lib/types";
 
-const SLOTS = ["Front", "Back", "Left"] as const;
+const SLOTS = ["Front", "Back", "Left", "More"] as const;
 
 function AddForm() {
   const router = useRouter();
   const params = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
-  const { addTimepiece, updateTimepiece, catalog, user, settings } = useStore();
+  const { addTimepiece, updateTimepiece, catalog, user, settings, timepieces } = useStore();
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
-  const [images, setImages] = useState<string[]>(["", "", ""]);
+  const editingId = params.get("id");
+  const existing = timepieces.find((w) => w.id === editingId);
+  const [images, setImages] = useState<string[]>(["", "", "", ""]);
   const [videoName, setVideoName] = useState("");
   const [brand, setBrand] = useState("Audemars Piguet");
   const [customBrand, setCustomBrand] = useState("");
@@ -44,8 +48,34 @@ function AddForm() {
   const [buckle, setBuckle] = useState("Pin buckle");
   const [band, setBand] = useState<"strap" | "bracelet">("strap");
   const [bandMaterial, setBandMaterial] = useState("Leather");
+  const [complication, setComplication] = useState("I don't know");
   const [error, setError] = useState("");
   const [missingBrand, setMissingBrand] = useState(false);
+
+  useEffect(() => {
+    if (!existing) return;
+    const next = [...existing.images, "", "", "", ""].slice(0, 4);
+    setImages(next);
+    if (TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])) {
+      setBrand(existing.brand);
+      setMissingBrand(false);
+    } else {
+      setCustomBrand(existing.brand);
+      setMissingBrand(true);
+    }
+    setModel(existing.model);
+    setReference(existing.reference || "");
+    setCondition(existing.condition);
+    setBoxPapers(existing.boxPapers);
+    setCaseMetal(existing.caseMetal);
+    setCaseType(existing.caseType);
+    setCaseDiameter(existing.caseDiameter);
+    setDialColor(existing.dialColor);
+    setBuckle(existing.buckle);
+    setBand(existing.band);
+    setBandMaterial(existing.bandMaterial);
+    setComplication(existing.complication);
+  }, [existing]);
 
   const resolvedBrand = missingBrand ? customBrand.trim() : brand;
   const models = MODELS_BY_BRAND[brand] ?? catalog.filter((c) => c.brand === brand).map((c) => c.model);
@@ -53,7 +83,7 @@ function AddForm() {
   const draft = useMemo(
     () =>
       ({
-        id: `tp-${Date.now()}`,
+        id: existing?.id ?? `tp-${Date.now()}`,
         ownerEmail: user?.email,
         assetCode: new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
         brand: resolvedBrand || "Untitled manufacturer",
@@ -71,7 +101,7 @@ function AddForm() {
         buckle,
         band,
         bandMaterial,
-        complication: "I don't know",
+        complication,
       }) satisfies Timepiece,
     [
       band,
@@ -83,6 +113,7 @@ function AddForm() {
       caseType,
       condition,
       dialColor,
+      complication,
       images,
       model,
       reference,
@@ -107,7 +138,8 @@ function AddForm() {
   }
 
   function persist(watch: Timepiece, notify = false) {
-    addTimepiece(watch);
+    if (existing) updateTimepiece(existing.id, watch);
+    else addTimepiece(watch);
     if (notify && user) {
       void sendAppEmail({
         kind: "appraisal",
@@ -121,9 +153,13 @@ function AddForm() {
     router.push(onboarding ? "/collection/continue" : `/collection/${watch.id}`);
   }
 
-  function missingFields() {
+  function missingFields(forAppraise = false) {
     const missing: string[] = [];
-    if (images.filter(Boolean).length < 3) missing.push("front, back, and left photos");
+    const uploaded = images.filter(Boolean).length;
+    const need = settings.requireFourPhotos ? 4 : 3;
+    if (forAppraise && uploaded < need) {
+      missing.push(need === 4 ? "four photographs" : "front, back, and left photos");
+    }
     if (!resolvedBrand) missing.push("a manufacturer");
     if (!model.trim()) missing.push("a model name");
     return missing;
@@ -131,7 +167,7 @@ function AddForm() {
 
   function onSave(e: FormEvent) {
     e.preventDefault();
-    const missing = missingFields();
+    const missing = missingFields(false);
     if (missing.length) {
       setError(`Add ${missing.join(" and ")}.`);
       return;
@@ -140,7 +176,7 @@ function AddForm() {
   }
 
   function onAppraise() {
-    const missing = missingFields();
+    const missing = missingFields(true);
     if (missing.length) {
       setError(`Add ${missing.join(" and ")}.`);
       return;
@@ -159,20 +195,34 @@ function AddForm() {
 
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
-      <ScreenHeader title="Add a Timepiece" backHref={onboarding ? "/collection/setup" : "/collection"} />
+      <ScreenHeader
+        title={existing ? "Edit Timepiece" : "Add a Timepiece"}
+        backHref={onboarding ? "/collection/setup" : "/collection"}
+      />
       <form onSubmit={onSave} className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-6">
           <div>
-            <p className="text-[13px] text-mac-muted">Please upload at least 4 images of the timepiece</p>
-            <div className="mt-4 grid grid-cols-3 gap-3">
+            <p className="text-[13px] text-mac-muted">
+              Please upload at least 4 images of the timepiece. Missing angles use a photorealistic
+              illustration until you add a photo.
+            </p>
+            <div className="mt-4 grid grid-cols-4 gap-2">
               {SLOTS.map((label, i) => (
                 <label key={label} className="group block cursor-pointer text-center">
-                  <span className="flex aspect-square items-center justify-center overflow-hidden rounded-md border border-mac-line bg-mac-card text-[28px] font-light text-mac-faint">
+                  <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md border border-mac-line bg-mac-card text-[22px] font-light text-mac-faint">
                     {images[i] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={images[i]} alt={label} className="h-full w-full object-cover" />
                     ) : (
-                      "+"
+                      <>
+                        <WatchPhoto
+                          src={null}
+                          watch={draft}
+                          alt=""
+                          className="opacity-55"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center text-white">+</span>
+                      </>
                     )}
                   </span>
                   <span className="mt-1.5 block text-[9px] tracking-[0.16em] text-mac-faint uppercase">
@@ -355,6 +405,16 @@ function AddForm() {
               </label>
             </div>
           </div>
+
+          <LineField label="Complication">
+            <NativeSelect value={complication} onChange={(e) => setComplication(e.target.value)}>
+              {COMPLICATIONS.map((item) => (
+                <option key={item} className="bg-mac-card">
+                  {item}
+                </option>
+              ))}
+            </NativeSelect>
+          </LineField>
 
           <LineField label={band === "strap" ? "Strap Material" : "Bracelet Material"}>
             <NativeSelect value={bandMaterial} onChange={(e) => setBandMaterial(e.target.value)}>

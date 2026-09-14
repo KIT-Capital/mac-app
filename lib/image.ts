@@ -1,9 +1,9 @@
 export const SAMPLE_WATCH_IMAGES = [
   "/watches/richard-mille.jpg",
   "/watches/patek-nautilus.jpg",
-  "/watches/royal-oak.png",
+  "/watches/royal-oak.jpg",
   "/watches/romain-gauthier.jpg",
-  "/watches/patek-5524g.png",
+  "/watches/patek-5524g.jpg",
 ];
 
 export function readImageFile(file: File): Promise<string> {

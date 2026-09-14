@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FileDown, Plus } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchCard } from "@/components/watch-card";
+import { WatchPhoto } from "@/components/watch-photo";
 import { useStore } from "@/lib/store";
 
 export default function CollectionPage() {
@@ -43,9 +44,18 @@ export default function CollectionPage() {
       <div className="relative flex-1 px-4 pb-24">
         {empty ? (
           <div className="flex h-full min-h-[360px] flex-col items-center justify-center px-4 text-center">
+            <div className="mb-5 h-28 w-28 overflow-hidden rounded-full bg-mac-card">
+              <WatchPhoto
+                src={null}
+                watch={{ caseType: "Round", band: "bracelet" }}
+                alt=""
+                className="opacity-80"
+              />
+            </div>
             <p className="text-[15px] text-mac-fg">Your collection is empty</p>
             <p className="mt-1 max-w-[240px] text-[13px] text-mac-muted">
-              Upload photographs of your timepiece to request a confidential appraisal.
+              Upload photographs of your timepiece. If a photo is missing, MAC shows a
+              photorealistic illustration until you add one.
             </p>
           </div>
         ) : (

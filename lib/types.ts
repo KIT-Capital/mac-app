@@ -63,6 +63,7 @@ export type Profile = {
   role: Role;
   onboardingComplete: boolean;
   applicationSubmitted?: boolean;
+  promoCode?: string | null;
   preferences: UserPreferences;
 };
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
 import { COMPANY, money } from "@/lib/catalog";
 import { MacLogoMark } from "@/components/mac-logo";
+import { WatchPhoto } from "@/components/watch-photo";
 import { useStore } from "@/lib/store";
 
 export default function AppraisalPage() {
@@ -59,8 +60,9 @@ export default function AppraisalPage() {
                       <div>Box & papers: {w.boxPapers}</div>
                     </dl>
                   </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={w.images[0]} alt="" className="h-24 w-24 object-contain" />
+                  <div className="h-24 w-24 overflow-hidden bg-black/5">
+                    <WatchPhoto src={w.images[0]} watch={w} alt="" />
+                  </div>
                 </div>
               </li>
             ))}
@@ -74,7 +76,14 @@ export default function AppraisalPage() {
         </p>
         <p className="mt-4 text-center text-[11px] text-black/35">Prepared for {user?.name}</p>
       </div>
-      <div className="flex justify-end p-4 border-t border-black/10 bg-slate-50">
+      <div className="flex justify-end gap-3 p-4 border-t border-black/10 bg-slate-50 print:hidden">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="mac-tap flex h-11 items-center gap-2 rounded-xl border border-black/15 px-5 text-xs font-bold uppercase tracking-wider text-[#0E2A44] shadow-sm"
+        >
+          Print / PDF
+        </button>
         <Link
           href="/collection"
           className="mac-tap flex h-11 items-center gap-2 rounded-xl bg-[#0E2A44] px-5 text-xs font-bold uppercase tracking-wider text-white shadow-sm"
