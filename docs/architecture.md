@@ -13,7 +13,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`). **Implemented.** This remains the live app store until a tested server persistence path exists. Do not delete or auto-migrate it.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
-- **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** Moving the secret is a separate security plan.
+- **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** `proxy.ts` returns 403 for `/admin` without a valid cookie. Moving the secret is a separate security plan.
 - **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables yet. The collector/desk UI still uses the browser store. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
@@ -24,6 +24,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 app/                 routes
 app/api/mail         outbound mail
 app/api/desk-session desk cookie
+proxy.ts             server 403 for /admin without desk cookie
 components/          shells + shadcn
 lib/                 auth, store, mail, theme, env mapping, Drizzle schema and repositories
 instrumentation.ts   Neon mapping guard on Node server start
@@ -39,7 +40,7 @@ Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 
 
 ## Proposed platform (partially implemented)
 
-Neon + Drizzle repositories exist on the `development` branch. The live collector/desk UI still reads `localStorage`. Cloudflare R2, WorkOS, a Railway worker, and ledger posting are not wired. External accounting systems stay an integration boundary only — no QuickBooks/Xero selection. See `docs/plans/2026-09-15-production-persistence.md`.
+Neon + Drizzle repositories exist on the `development` branch. The live collector/desk UI still reads `localStorage`. `lib/storage/r2-object-store.mjs` can put originals when R2 names are set; production refuses a silent memory fallback. WorkOS, a Railway worker, and ledger posting are not wired. External accounting systems stay an integration boundary only — no QuickBooks/Xero selection. See `docs/plans/2026-09-15-production-persistence.md`.
 
 ## Out of scope for Phase 1 Kit equip
 
