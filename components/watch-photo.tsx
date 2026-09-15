@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { illustrationFor } from "@/lib/illustrations";
 import type { Timepiece } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -22,13 +22,9 @@ export function WatchPhoto({
 }) {
   const fallback = illustrationFor(watch);
   const photo = src?.trim() || "";
-  const [current, setCurrent] = useState(photo || fallback);
-  const [illustrated, setIllustrated] = useState(!photo);
-
-  useEffect(() => {
-    setCurrent(photo || fallback);
-    setIllustrated(!photo);
-  }, [photo, fallback]);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const current = photo && failedSrc !== photo ? photo : fallback;
+  const illustrated = !photo || failedSrc === photo;
 
   return (
     <span className="relative block h-full w-full">
@@ -38,10 +34,7 @@ export function WatchPhoto({
         alt={alt}
         className={cn("h-full w-full object-cover", className)}
         onError={() => {
-          if (current !== fallback) {
-            setCurrent(fallback);
-            setIllustrated(true);
-          }
+          if (photo) setFailedSrc(photo);
         }}
       />
       {showCaption && illustrated ? (

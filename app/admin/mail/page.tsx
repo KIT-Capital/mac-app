@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, use, useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, PillButton } from "@/components/field";
 import { sendAppEmail } from "@/lib/send-mail";
@@ -12,27 +12,33 @@ type MailStatus = {
   messages: OutboxItem[];
 };
 
-export default function AdminMailPage() {
-  const [status, setStatus] = useState<MailStatus | null>(null);
+type MailLoad = { ok: true; status: MailStatus } | { ok: false; error: string };
+
+const mailLoads = new Map<number, Promise<MailLoad>>();
+
+function loadMail(version: number) {
+  const existing = mailLoads.get(version);
+  if (existing) return existing;
+  const request = fetch("/api/mail").then(async (response) => {
+    if (!response.ok) {
+      return { ok: false as const, error: "Could not load the outbox." };
+    }
+    return { ok: true as const, status: (await response.json()) as MailStatus };
+  });
+  mailLoads.set(version, request);
+  return request;
+}
+
+function AdminMailBody() {
+  const [version, setVersion] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("Desk test");
   const [selected, setSelected] = useState<OutboxItem | null>(null);
-
-  async function refresh() {
-    const response = await fetch("/api/mail");
-    if (!response.ok) {
-      setError("Could not load the outbox.");
-      return;
-    }
-    setStatus((await response.json()) as MailStatus);
-    setError("");
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, []);
+  const loaded = use(loadMail(version));
+  const status = loaded.ok ? loaded.status : null;
+  const loadError = loaded.ok ? "" : loaded.error;
 
   async function onTest(e: FormEvent) {
     e.preventDefault();
@@ -43,7 +49,8 @@ export default function AdminMailPage() {
       setError(result.error || "Test send failed.");
       return;
     }
-    await refresh();
+    setError("");
+    setVersion((current) => current + 1);
   }
 
   return (
@@ -62,7 +69,7 @@ export default function AdminMailPage() {
           <p className="mt-1 text-[12px] text-white/55">From {status.from}</p>
         </div>
       ) : (
-        <p className="mb-6 text-sm text-white/45">Loading mail status…</p>
+        <p className="mb-6 text-sm text-white/45">Mail status is unavailable.</p>
       )}
 
       <form onSubmit={onTest} className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -88,7 +95,7 @@ export default function AdminMailPage() {
         </PillButton>
       </form>
 
-      {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
+      {loadError || error ? <p className="mb-4 text-sm text-red-400">{loadError || error}</p> : null}
 
       {!status?.messages.length ? (
         <p className="rounded-2xl border border-dashed border-white/15 bg-[#161B24] p-6 text-sm text-white/50">
@@ -126,5 +133,19 @@ export default function AdminMailPage() {
         </article>
       ) : null}
     </AdminChrome>
+  );
+}
+
+export default function AdminMailPage() {
+  return (
+    <Suspense
+      fallback={
+        <AdminChrome title="Outbound mail">
+          <p className="text-sm text-white/45">Loading mail status…</p>
+        </AdminChrome>
+      }
+    >
+      <AdminMailBody />
+    </Suspense>
   );
 }

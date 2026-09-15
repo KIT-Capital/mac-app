@@ -67,7 +67,7 @@ Add the DKIM / SPF / MX records Resend shows after you verify `mechartcap.com`. 
 
 Private originals bucket: `mac-app` on the Norfolk AI account (location `WNAM`, public `r2.dev` off).
 
-Config names live in Doppler (`dev` / `stg` / `prd`) and Railway (`production` / `Development` / `staging`): `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Never commit those values. The app does not read R2 yet.
+Config names live in Doppler (`dev` / `stg` / `prd`) and Railway (`production` / `Development` / `staging`): `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Never commit those values. `lib/storage/r2-object-store.mjs` can put originals when those names are set. The collector UI still stores preview data URLs in the browser. Do not add a server file proxy.
 
 ## Environment separation
 
@@ -75,4 +75,4 @@ Config names live in Doppler (`dev` / `stg` / `prd`) and Railway (`production` /
 
 ## What this stack does not add
 
-The running Railway app still has no application database connection. Collector state remains in the browser. A Neon project exists (MAC App) and is used only for local/verified connectivity so far — see `architecture.md` and decision `0002`. No mailbox product is required on mechart.app for the app to run. Do not deploy or attach production `DATABASE_URL` until persistence is implemented and approved. The app does not read R2 yet.
+The running Railway app still has no application database connection. Collector state remains in the browser. Neon `development` holds repository tables; production stays empty. No mailbox product is required on mechart.app for the app to run. Do not attach production `DATABASE_URL` until cutover is approved.

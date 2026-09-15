@@ -90,6 +90,6 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified in Doppler | Also on Railway; never print |
 | `R2_SECRET_ACCESS_KEY` | R2 S3 secret | Verified in Doppler | Same; never print or commit |
 
-Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. GitHub `quality` runs `test:unit` and `build` with no database URL. `lint` is still red on pre-existing collector `react-hooks` findings and is not a merge gate yet. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
+Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. GitHub `quality` runs `lint`, `test:unit`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
 
 Do not move mail or demo logins to `@mechart.app`.

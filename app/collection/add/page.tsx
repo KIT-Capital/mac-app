@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { LineField, NativeSelect } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
@@ -29,6 +29,18 @@ import type { Timepiece } from "@/lib/types";
 const SLOTS = ["Front", "Back", "Left", "More"] as const;
 
 function AddForm() {
+  const params = useSearchParams();
+  const editingId = params.get("id");
+  const { timepieces, user } = useStore();
+  const existing = timepieces.find((w) => {
+    if (w.id !== editingId) return false;
+    if (isDesk(user)) return true;
+    return ownerKey(w.ownerEmail) === ownerKey(user?.email);
+  });
+  return <AddFormEditor key={existing?.id ?? (editingId ? `pending:${editingId}` : "new")} />;
+}
+
+function AddFormEditor() {
   const router = useRouter();
   const params = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
@@ -40,50 +52,37 @@ function AddForm() {
     if (isDesk(user)) return true;
     return ownerKey(w.ownerEmail) === ownerKey(user?.email);
   });
-  const [images, setImages] = useState<string[]>(["", "", "", ""]);
+  const [images, setImages] = useState<string[]>(() =>
+    existing ? [...existing.images, "", "", "", ""].slice(0, 4) : ["", "", "", ""],
+  );
   const [videoName, setVideoName] = useState("");
-  const [brand, setBrand] = useState("Audemars Piguet");
-  const [customBrand, setCustomBrand] = useState("");
-  const [model, setModel] = useState("Royal Oak Selfwinding");
-  const [reference, setReference] = useState("");
-  const [condition, setCondition] = useState("Like new");
-  const [boxPapers, setBoxPapers] = useState("Box and papers");
-  const [caseMetal, setCaseMetal] = useState("Titanium");
-  const [caseType, setCaseType] = useState("Round");
-  const [caseDiameter, setCaseDiameter] = useState("40mm");
-  const [dialColor, setDialColor] = useState("Grey");
-  const [buckle, setBuckle] = useState("Pin buckle");
-  const [band, setBand] = useState<"strap" | "bracelet">("strap");
-  const [bandMaterial, setBandMaterial] = useState("Leather");
-  const [complication, setComplication] = useState("I don't know");
+  const [brand, setBrand] = useState(
+    existing && TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])
+      ? existing.brand
+      : "Audemars Piguet",
+  );
+  const [customBrand, setCustomBrand] = useState(
+    existing && !TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])
+      ? existing.brand
+      : "",
+  );
+  const [model, setModel] = useState(existing?.model ?? "Royal Oak Selfwinding");
+  const [reference, setReference] = useState(existing?.reference || "");
+  const [condition, setCondition] = useState(existing?.condition ?? "Like new");
+  const [boxPapers, setBoxPapers] = useState(existing?.boxPapers ?? "Box and papers");
+  const [caseMetal, setCaseMetal] = useState(existing?.caseMetal ?? "Titanium");
+  const [caseType, setCaseType] = useState(existing?.caseType ?? "Round");
+  const [caseDiameter, setCaseDiameter] = useState(existing?.caseDiameter ?? "40mm");
+  const [dialColor, setDialColor] = useState(existing?.dialColor ?? "Grey");
+  const [buckle, setBuckle] = useState(existing?.buckle ?? "Pin buckle");
+  const [band, setBand] = useState<"strap" | "bracelet">(existing?.band ?? "strap");
+  const [bandMaterial, setBandMaterial] = useState(existing?.bandMaterial ?? "Leather");
+  const [complication, setComplication] = useState(existing?.complication ?? "I don't know");
   const [error, setError] = useState("");
-  const [missingBrand, setMissingBrand] = useState(false);
+  const [missingBrand, setMissingBrand] = useState(
+    Boolean(existing && !TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])),
+  );
   const [draftId] = useState(() => nextId("tp"));
-
-  useEffect(() => {
-    if (!existing) return;
-    const next = [...existing.images, "", "", "", ""].slice(0, 4);
-    setImages(next);
-    if (TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])) {
-      setBrand(existing.brand);
-      setMissingBrand(false);
-    } else {
-      setCustomBrand(existing.brand);
-      setMissingBrand(true);
-    }
-    setModel(existing.model);
-    setReference(existing.reference || "");
-    setCondition(existing.condition);
-    setBoxPapers(existing.boxPapers);
-    setCaseMetal(existing.caseMetal);
-    setCaseType(existing.caseType);
-    setCaseDiameter(existing.caseDiameter);
-    setDialColor(existing.dialColor);
-    setBuckle(existing.buckle);
-    setBand(existing.band);
-    setBandMaterial(existing.bandMaterial);
-    setComplication(existing.complication);
-  }, [existing]);
 
   const resolvedBrand = missingBrand ? customBrand.trim() : brand;
   const models = MODELS_BY_BRAND[brand] ?? catalog.filter((c) => c.brand === brand).map((c) => c.model);
@@ -93,9 +92,7 @@ function AddForm() {
       ({
         id: existing?.id ?? draftId,
         ownerEmail: user?.email,
-        assetCode:
-          existing?.assetCode ??
-          new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
+        assetCode: existing?.assetCode ?? "",
         brand: resolvedBrand || "Untitled manufacturer",
         model: model || "Untitled model",
         reference,
@@ -155,18 +152,24 @@ function AddForm() {
   }
 
   function persist(watch: Timepiece, notify = false) {
-    if (existing) updateTimepiece(existing.id, watch);
-    else addTimepiece(watch);
+    const stamped: Timepiece = {
+      ...watch,
+      assetCode:
+        watch.assetCode ||
+        new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
+    };
+    if (existing) updateTimepiece(existing.id, stamped);
+    else addTimepiece(stamped);
     if (notify && user) {
       void sendAppEmail({
         kind: "appraisal",
         name: user.name,
         email: user.email,
         phone: user.phone,
-        watch: `${watch.brand} ${watch.model}`,
+        watch: `${stamped.brand} ${stamped.model}`,
       });
     }
-    router.push(onboarding ? "/collection/continue" : `/collection/${watch.id}`);
+    router.push(onboarding ? "/collection/continue" : `/collection/${stamped.id}`);
   }
 
   function missingFields(forAppraise = false) {
