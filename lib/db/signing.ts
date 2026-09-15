@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { sha256Hex } from "../storage/object-store.mjs";
 import type { ObjectStore } from "./photos";
 import { getAgreement, getCurrentVersion, isVersionExecutable } from "./agreements";
 import type { Database } from "./client";
-import { assertIsolation, canPrepareAgreement, canReadAgreement, canSubmitApplication } from "./isolation.mjs";
+import { assertIsolation, canPrepareAgreement, canReadAgreement } from "./isolation.mjs";
 import type { Actor } from "./records";
 import { archivedDocuments, signatureEnvelopes } from "./schema";
 
@@ -44,43 +44,49 @@ export async function sendForSignature(db: Database, actor: Actor, agreementId: 
 }
 
 export async function applySignatureWebhook(db: Database, payload: SignatureWebhook) {
-  const [envelope] = await db
-    .select()
-    .from(signatureEnvelopes)
-    .where(eq(signatureEnvelopes.externalId, payload.externalId))
-    .limit(1);
-  if (!envelope) {
-    throw new Error("ENVELOPE_NOT_FOUND");
-  }
-  if (envelope.status === "complete" || envelope.status === "archived") {
-    return envelope;
-  }
-  const now = new Date();
-  const next = { ...envelope };
-  if (payload.event === "collector_signed" || payload.event === "complete") {
-    next.collectorSignedAt = next.collectorSignedAt ?? now;
-  }
-  if (payload.event === "mac_signed" || payload.event === "complete") {
-    next.macSignedAt = next.macSignedAt ?? now;
-  }
-  if (next.collectorSignedAt && next.macSignedAt) {
-    next.status = "complete";
-    next.completedAt = next.completedAt ?? now;
-  } else if (payload.event === "collector_signed") {
-    next.status = "collector_signed";
-  }
-  const [row] = await db
-    .update(signatureEnvelopes)
-    .set({
-      status: next.status,
-      collectorSignedAt: next.collectorSignedAt,
-      macSignedAt: next.macSignedAt,
-      completedAt: next.completedAt,
-      updatedAt: now,
-    })
-    .where(eq(signatureEnvelopes.id, envelope.id))
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select id from signature_envelopes where external_id = ${payload.externalId} for update`,
+    );
+    const [envelope] = await tx
+      .select()
+      .from(signatureEnvelopes)
+      .where(eq(signatureEnvelopes.externalId, payload.externalId))
+      .limit(1);
+    if (!envelope) {
+      throw new Error("ENVELOPE_NOT_FOUND");
+    }
+    if (envelope.status === "complete" || envelope.status === "archived") {
+      return envelope;
+    }
+    const now = new Date();
+    const collectorSignedAt =
+      payload.event === "collector_signed" || payload.event === "complete"
+        ? (envelope.collectorSignedAt ?? now)
+        : envelope.collectorSignedAt;
+    const macSignedAt =
+      payload.event === "mac_signed" || payload.event === "complete"
+        ? (envelope.macSignedAt ?? now)
+        : envelope.macSignedAt;
+    const complete = Boolean(collectorSignedAt && macSignedAt);
+    const [row] = await tx
+      .update(signatureEnvelopes)
+      .set({
+        status: complete ? "complete" : payload.event === "collector_signed" ? "collector_signed" : envelope.status,
+        collectorSignedAt,
+        macSignedAt,
+        completedAt: complete ? (envelope.completedAt ?? now) : envelope.completedAt,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(signatureEnvelopes.id, envelope.id),
+          sql`${signatureEnvelopes.status} not in ('complete', 'archived')`,
+        ),
+      )
+      .returning();
+    return row ?? envelope;
+  });
 }
 
 export async function archiveSignedPdf(
@@ -146,11 +152,4 @@ export async function getArchivedDocument(db: Database, actor: Actor, envelopeId
     .where(eq(archivedDocuments.envelopeId, envelopeId))
     .limit(1);
   return doc ?? null;
-}
-
-export function assertCannotReplaceArchive(actor: Actor, ownerCustomerId: string) {
-  if (canSubmitApplication(actor, ownerCustomerId) || actor.role === "staff" || actor.role === "admin") {
-    throw new Error("ARCHIVE_IMMUTABLE");
-  }
-  throw new Error("ARCHIVE_IMMUTABLE");
 }

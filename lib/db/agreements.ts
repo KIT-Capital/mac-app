@@ -1,18 +1,18 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { assertIsolation, canPrepareAgreement, canReadAgreement, canSubmitApplication } from "./isolation.mjs";
 import { dollarsToCents } from "./money.mjs";
-import { photoObjects } from "./schema";
+import type { Actor } from "./records";
 import {
   allocations,
   agreementVersions,
   agreements,
   applications,
   customers,
+  photoObjects,
   timepieces,
 } from "./schema";
-import type { Actor } from "./records";
 
 export type SubmitApplicationInput = {
   timepieceId: string;
@@ -36,10 +36,6 @@ export type AgreementSnapshot = {
   photos: { id: string; kind: string; originalChecksum: string }[];
   terms: { amountCents: number; termMonths: number; delivery: string };
 };
-
-export function isApplicationExecutable() {
-  return false;
-}
 
 export function isVersionExecutable(version: { executable: boolean } | null | undefined) {
   return version?.executable === true;
@@ -106,35 +102,22 @@ export async function getCurrentVersion(db: Database, actor: Actor, agreementId:
   return version ?? null;
 }
 
-export async function prepareAgreement(db: Database, actor: Actor, applicationId: string) {
-  assertIsolation(canPrepareAgreement(actor), "PREPARE_REQUIRES_DESK");
-  const [application] = await db
-    .select()
-    .from(applications)
-    .where(eq(applications.id, applicationId))
-    .limit(1);
-  if (!application) {
-    throw new Error("APPLICATION_NOT_FOUND");
+function isUniqueViolation(error: unknown) {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!current || typeof current !== "object") return false;
+    if ("code" in current && current.code === "23505") return true;
+    current = "cause" in current ? current.cause : undefined;
   }
+  return false;
+}
 
-  const [existing] = await db
-    .select()
-    .from(agreements)
-    .where(eq(agreements.applicationId, application.id))
-    .limit(1);
-  if (existing) {
-    return existing;
-  }
+type DbSession = Pick<Database, "select" | "insert" | "update" | "execute">;
 
-  const [live] = await db
-    .select()
-    .from(allocations)
-    .where(and(eq(allocations.timepieceId, application.timepieceId), eq(allocations.status, "live")))
-    .limit(1);
-  if (live) {
-    throw new Error("PIECE_ALREADY_ALLOCATED");
-  }
-
+async function buildSnapshot(
+  db: DbSession,
+  application: typeof applications.$inferSelect,
+): Promise<AgreementSnapshot> {
   const [customer] = await db
     .select()
     .from(customers)
@@ -156,8 +139,7 @@ export async function prepareAgreement(db: Database, actor: Actor, applicationId
     })
     .from(photoObjects)
     .where(eq(photoObjects.timepieceId, piece.id));
-
-  const snapshot: AgreementSnapshot = {
+  return {
     templateId: "mac-repo-v1",
     customer: { id: customer.id, email: customer.email, name: customer.name },
     timepiece: {
@@ -176,40 +158,143 @@ export async function prepareAgreement(db: Database, actor: Actor, applicationId
       delivery: application.delivery,
     },
   };
+}
 
-  const agreementId = randomUUID();
-  const versionId = randomUUID();
-  const [agreement] = await db
-    .insert(agreements)
-    .values({
-      id: agreementId,
-      customerId: customer.id,
-      applicationId: application.id,
-      timepieceId: piece.id,
-      agreementCode: `MAC-${agreementId.replaceAll("-", "").slice(-6).toUpperCase()}`,
-      status: "prepared",
-      currentVersionId: versionId,
-    })
-    .returning();
+async function finishPrepare(
+  tx: DbSession,
+  actor: Actor,
+  application: typeof applications.$inferSelect,
+  agreement: typeof agreements.$inferSelect,
+) {
+  const [version] = agreement.currentVersionId
+    ? await tx
+        .select()
+        .from(agreementVersions)
+        .where(eq(agreementVersions.id, agreement.currentVersionId))
+        .limit(1)
+    : [];
+  if (!version) {
+    const snapshot = await buildSnapshot(tx, application);
+    const versionId = agreement.currentVersionId ?? randomUUID();
+    await tx.insert(agreementVersions).values({
+      id: versionId,
+      agreementId: agreement.id,
+      versionNumber: 1,
+      executable: true,
+      snapshot,
+      preparedBy: actor.email,
+    });
+    if (!agreement.currentVersionId) {
+      await tx
+        .update(agreements)
+        .set({ currentVersionId: versionId, updatedAt: new Date() })
+        .where(eq(agreements.id, agreement.id));
+    }
+  }
 
-  await db.insert(agreementVersions).values({
-    id: versionId,
-    agreementId,
-    versionNumber: 1,
-    executable: true,
-    snapshot,
-    preparedBy: actor.email,
-  });
-  await db.insert(allocations).values({
-    id: randomUUID(),
-    timepieceId: piece.id,
-    agreementId,
-    status: "live",
-  });
-  await db
-    .update(applications)
-    .set({ status: "converted", updatedAt: new Date() })
-    .where(eq(applications.id, application.id));
+  const [allocation] = await tx
+    .select()
+    .from(allocations)
+    .where(eq(allocations.agreementId, agreement.id))
+    .limit(1);
+  if (!allocation) {
+    try {
+      await tx.insert(allocations).values({
+        id: randomUUID(),
+        timepieceId: application.timepieceId,
+        agreementId: agreement.id,
+        status: "live",
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new Error("PIECE_ALREADY_ALLOCATED");
+      }
+      throw error;
+    }
+  }
 
-  return agreement;
+  if (application.status !== "converted") {
+    await tx
+      .update(applications)
+      .set({ status: "converted", updatedAt: new Date() })
+      .where(eq(applications.id, application.id));
+  }
+
+  const [fresh] = await tx.select().from(agreements).where(eq(agreements.id, agreement.id)).limit(1);
+  return fresh ?? agreement;
+}
+
+export async function prepareAgreement(db: Database, actor: Actor, applicationId: string) {
+  assertIsolation(canPrepareAgreement(actor), "PREPARE_REQUIRES_DESK");
+  try {
+    return await db.transaction(async (tx) => {
+      const [application] = await tx
+        .select()
+        .from(applications)
+        .where(eq(applications.id, applicationId))
+        .limit(1);
+      if (!application) {
+        throw new Error("APPLICATION_NOT_FOUND");
+      }
+
+      const [existing] = await tx
+        .select()
+        .from(agreements)
+        .where(eq(agreements.applicationId, application.id))
+        .limit(1);
+      if (existing) {
+        await tx.execute(sql`select id from agreements where id = ${existing.id} for update`);
+        return finishPrepare(tx, actor, application, existing);
+      }
+
+      const [live] = await tx
+        .select()
+        .from(allocations)
+        .where(and(eq(allocations.timepieceId, application.timepieceId), eq(allocations.status, "live")))
+        .limit(1);
+      if (live) {
+        throw new Error("PIECE_ALREADY_ALLOCATED");
+      }
+
+      const snapshot = await buildSnapshot(tx, application);
+      const agreementId = randomUUID();
+      const versionId = randomUUID();
+      const [agreement] = await tx
+        .insert(agreements)
+        .values({
+          id: agreementId,
+          customerId: application.customerId,
+          applicationId: application.id,
+          timepieceId: application.timepieceId,
+          agreementCode: `MAC-${agreementId.replaceAll("-", "").slice(-6).toUpperCase()}`,
+          status: "prepared",
+          currentVersionId: versionId,
+        })
+        .returning();
+      await tx.insert(agreementVersions).values({
+        id: versionId,
+        agreementId,
+        versionNumber: 1,
+        executable: true,
+        snapshot,
+        preparedBy: actor.email,
+      });
+      await tx.insert(allocations).values({
+        id: randomUUID(),
+        timepieceId: application.timepieceId,
+        agreementId,
+        status: "live",
+      });
+      await tx
+        .update(applications)
+        .set({ status: "converted", updatedAt: new Date() })
+        .where(eq(applications.id, application.id));
+      return agreement;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new Error("PIECE_ALREADY_ALLOCATED");
+    }
+    throw error;
+  }
 }

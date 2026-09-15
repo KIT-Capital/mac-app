@@ -25,9 +25,9 @@ app/                 routes
 app/api/mail         outbound mail
 app/api/desk-session desk cookie
 components/          shells + shadcn
-lib/                 auth, store, mail, theme, env mapping, Drizzle schema and Stage 2 records
+lib/                 auth, store, mail, theme, env mapping, Drizzle schema and repositories
 instrumentation.ts   Neon mapping guard on Node server start
-drizzle/             Stage 1 probe migration (development only)
+drizzle/             development-only migrations (probe through report snapshots)
 e2e/                 Playwright
 neon.ts              Neon config-as-code (Auth off)
 tools/harness/       structural check, neon-ping, drizzle migrate/ping, start wrapper
@@ -37,10 +37,10 @@ tools/harness/       structural check, neon-ping, drizzle migrate/ping, start wr
 
 Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port $PORT`. Intended public host is `mechart.app`. Mail and demo identities stay on `@mechartcap.com`. See `hosting.md`. The mapping guard runs before `next start`. **Do not deploy from this audit.**
 
-## Proposed platform (not implemented)
+## Proposed platform (partially implemented)
 
-Shared server-side services with validation, authorization, and audit. Neon + Drizzle for structured records. Cloudflare R2 for original files. WorkOS for identity. Railway web + worker. Resend stays for mail. External accounting systems stay an integration boundary only — no QuickBooks/Xero selection. See `docs/plans/2026-09-15-production-persistence.md`.
+Neon + Drizzle repositories exist on the `development` branch. The live collector/desk UI still reads `localStorage`. Cloudflare R2, WorkOS, a Railway worker, and ledger posting are not wired. External accounting systems stay an integration boundary only — no QuickBooks/Xero selection. See `docs/plans/2026-09-15-production-persistence.md`.
 
 ## Out of scope for Phase 1 Kit equip
 
-Framework rewrite, tRPC/MCP product surface, R2, Sentry, and enabling Neon Auth remain out of the Kit equip change. Persistence is a later approved project tracked in the plan above.
+Framework rewrite, tRPC/MCP product surface, R2, Sentry, and enabling Neon Auth remain out of the Kit equip change. Dual-write and UI cutover stay behind an explicit flag.

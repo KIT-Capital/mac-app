@@ -97,11 +97,13 @@ tools/harness/    read-only structural check + neon-ping
 - Keep desk-credential and cookie-secret changes as a separate approved security plan; do not change production auth behavior during Kit or equip work.
 - Do not create another Neon project; keep using the existing MAC App project.
 - Treat Neon/Railway environment separation as blocking: development, staging, and PR previews must never use or fall back to production database credentials.
+- Keep `DATABASE_URL_UNPOOLED` in Doppler for migrate-only use; do not put it on the Railway app service.
+- Use `info@mechartcap.com` as the outbound From address; keep mail on `@mechartcap.com`.
 
 ## Learned Workspace Facts
 
 - This checkout’s product remote is `github` → `https://github.com/KIT-Capital/mac-app.git`; Cursor `origin` is a second remote.
-- The Neon project for this app is MAC App (`withered-lake-05570428`); local development targets a development branch, not production.
+- The Neon project for this app is MAC App (`withered-lake-05570428`). Map Doppler `dev` / Railway Development / local to Neon development; Doppler `stg` / Railway staging to Neon staging; Doppler `prd` / Railway production to Neon production.
 - The Cloudflare R2 bucket for this app is named `mac-app`.
 - Doppler workplace **KIT Capital** / project `mac-app` is the secret store (`dev`, `stg`, `prd`). The leftover Norfolk AI project `mechanical-art-capital` was deleted; do not recreate it. Do not delete the Norfolk AI workplace (it still holds Product OS and other projects).
-- Public hostname is `mechart.app` on the Norfolk AI Cloudflare zone. Railway production attached the custom domain and, after Cloudflare login, wrote the apex CNAME and `_railway-verify` TXT. `www.mechart.app` is a proxied CNAME to the apex. Do not add MX/SPF on this zone; mail stays on `@mechartcap.com`. When adding Railway custom domains, expect Railway to apply Cloudflare DNS after authorization instead of assuming copy-paste.
+- Public hostname is `mechart.app` on the Norfolk AI Cloudflare zone. Railway production attached the custom domain and, after Cloudflare login, wrote the apex CNAME and `_railway-verify` TXT. `www.mechart.app` is a proxied CNAME to the apex and 301s to `https://mechart.app`. Do not add MX/SPF on this zone; mail stays on `@mechartcap.com`. When adding Railway custom domains, expect Railway to apply Cloudflare DNS after authorization instead of assuming copy-paste.

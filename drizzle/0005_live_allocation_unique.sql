@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "allocations_live_timepiece_uidx" ON "allocations" USING btree ("timepiece_id") WHERE "allocations"."status" = 'live';
