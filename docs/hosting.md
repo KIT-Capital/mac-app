@@ -67,7 +67,7 @@ Add the DKIM / SPF / MX records Resend shows after you verify `mechartcap.com`. 
 
 Private originals bucket: `mac-app` on the Norfolk AI account (location `WNAM`, public `r2.dev` off).
 
-Config names live in Doppler (`dev` / `stg` / `prd`) and Railway (`production` / `Development` / `staging`): `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Never commit those values. `lib/storage/r2-object-store.mjs` can put originals when those names are set. The collector UI still stores preview data URLs in the browser. Do not add a server file proxy.
+Doppler (`dev` / `stg` / `prd`) and Railway (`production` / `Development` / `staging`) hold `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY`. Never commit those values. `lib/storage/r2-object-store.mjs` can put originals when bucket, keys, and either endpoint or account id are set. `npm run r2:ping` is the live put/HEAD/delete probe under `dev-probes/`. The collector UI still stores preview data URLs in the browser. Do not add a server file proxy.
 
 ## Environment separation
 

@@ -161,7 +161,7 @@ That is Milestone A. It is not “database user exists.”
 0. **Foundation (this pass, verified)** — one Neon project, `development` vs `production`, Doppler `dev`/`prd`, local commands through Doppler, Neon Auth off, browser store untouched.
 1. **Compatibility spike (verified 2026-09-15)** — Drizzle against `development` only; `mac_schema_probe` + `npm run db:migrate` / `db:drizzle-ping`; no product tables in `production` or `staging`.
 2. **Identity + customer + timepiece (verified 2026-09-15)** — `customers` and `timepieces` on `development` only; actor stub in `lib/db/isolation.mjs`; WorkOS subject column stays null; `npm run test:db` proves collector A cannot read B.
-3. **Original photos (verified 2026-09-15)** — `photo_objects` on `development`; checksum must match before save; retry of the same digest is a no-op; collector isolation covers photos. Object store is an adapter (in-memory in tests; R2 when Doppler/Railway R2 names are set). Preview data URLs stay in the UI. No server file proxy.
+3. **Original photos (verified 2026-09-15)** — `photo_objects` on `development`; checksum must match before save; retry of the same digest is a no-op; collector isolation covers photos. Object store is an adapter (in-memory in tests; R2 when bucket, keys, and endpoint or account id are set). Preview data URLs stay in the UI. No server file proxy. `npm run r2:ping` is the development put probe.
 4. **Prepare contract + snapshots (verified 2026-09-15; hardened)** — collector application stays `submitted` until desk prepare; prepare is one transaction; a torn row is resumed; live allocations are unique per timepiece.
 5. **Sign + archive PDF (verified 2026-09-15)** — mock adapter; sign-complete and archive-success are different states; duplicate webhook is a no-op; archive retry does not duplicate the PDF; nobody may replace an archived PDF.
 6. **Ledger + snapshots (blocked)** — integer cents; owner/accountant must name the first accounts before any journal is posted. Do not invent buyback or book-value formulas.
@@ -179,6 +179,7 @@ Stage 1 is the smallest **technical** increment after this pass. Milestone A is 
 | `npm run db:migrate` | Doppler `dev` | `development` only; refuses staging/production |
 | `npm run db:drizzle-ping` | Doppler `dev` | `development` |
 | `npm run test:db` | Doppler `dev` | Stage 2 isolation against `development` |
+| `npm run r2:ping` | Doppler `dev` | Put/HEAD/delete a `dev-probes/` object; refuses production |
 | `npm run dev:plain` | none | no Neon env |
 | `npm run start` | Railway (later) | must not use `dev` secrets |
 
