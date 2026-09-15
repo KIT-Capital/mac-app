@@ -21,7 +21,7 @@ Key **names** only. Values belong in Doppler or Railway variables. See `.env.exa
 | PR / ephemeral Railway envs | none observed | No PR preview environments |
 | Doppler workplace | KIT Capital | Project `mac-app` |
 | Doppler configs | `dev`, `prd`, `stg`, `dev_personal` | None inherit; `stg` has staging Neon URLs |
-| Local Doppler | `doppler.yaml` → `dev` | `npm run dev`, `db:ping`, `db:guard`, `db:migrate`, `db:drizzle-ping` |
+| Local Doppler | `doppler.yaml` → `dev` | `npm run dev`, `db:ping`, `db:guard`, `db:migrate`, `db:drizzle-ping`, `r2:ping` |
 | Neon org | KIT Capital / `org-snowy-silence-89826884` | Do not create another project |
 | Neon project | MAC App / `withered-lake-05570428` | `aws-us-east-2` · Postgres 18 · database `neondb` |
 | Neon `development` | `br-summer-truth-a52brhnv` | Schema-only · endpoint `ep-red-union-a5fze04l` |
@@ -83,13 +83,13 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | `DATABASE_URL` | Neon pooled URL | Verified | Must be the `-pooler` host for the `APP_ENV` endpoint |
 | `DATABASE_URL_UNPOOLED` | Neon direct URL | Verified | Same endpoint as pooled; migrate process only (later) |
 | `NEON_BRANCH` | Branch label | Verified | Must match `APP_ENV` for development/production |
-| `R2_ACCOUNT_ID` | R2 S3 account | Verified in Doppler | Norfolk AI Cloudflare account |
-| `R2_BUCKET` | R2 bucket name | Verified | `mac-app`; private (no r2.dev) |
-| `R2_S3_ENDPOINT` | R2 S3 API host | Verified in Doppler | `https://<account>.r2.cloudflarestorage.com` |
-| `R2_REGION` | R2 S3 region | Verified in Doppler | `auto` |
-| `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified in Doppler | Also on Railway; never print |
-| `R2_SECRET_ACCESS_KEY` | R2 S3 secret | Verified in Doppler | Same; never print or commit |
+| `R2_ACCOUNT_ID` | R2 S3 account | Verified | Norfolk AI Cloudflare account; Doppler + Railway |
+| `R2_BUCKET` | R2 bucket name | Verified | `mac-app`; private (no r2.dev); Doppler + Railway |
+| `R2_S3_ENDPOINT` | R2 S3 API host | Verified | `https://<account>.r2.cloudflarestorage.com`; adapter can also derive this from `R2_ACCOUNT_ID` |
+| `R2_REGION` | R2 S3 region | Verified | `auto`; Doppler + Railway |
+| `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified | Doppler + Railway; never print |
+| `R2_SECRET_ACCESS_KEY` | R2 S3 secret | Verified | Doppler + Railway; never print or commit |
 
-Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. GitHub `quality` runs `lint`, `test:unit`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
+Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. `npm run r2:ping` puts, HEADs, and deletes a `dev-probes/` object; it runs only when `APP_ENV` is `development` and prints no secrets. GitHub `quality` runs `lint`, `test:unit`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
 
 Do not move mail or demo logins to `@mechart.app`.

@@ -99,6 +99,8 @@ tools/harness/    read-only structural check + neon-ping
 - Treat Neon/Railway environment separation as blocking: development, staging, and PR previews must never use or fall back to production database credentials.
 - Keep `DATABASE_URL_UNPOOLED` in Doppler for migrate-only use; do not put it on the Railway app service.
 - Use `info@mechartcap.com` as the outbound From address; keep mail on `@mechartcap.com`.
+- Merge PRs to `KIT-Capital/mac-app` on green only when the user has authorized the loop.
+- Do not invent ledger accounts, dual-write, or enable Neon Auth/WorkOS; Stage 6 waits on accountant-named accounts; keep the UI on `localStorage` until an explicit cutover flag.
 
 ## Learned Workspace Facts
 
@@ -107,3 +109,4 @@ tools/harness/    read-only structural check + neon-ping
 - The Cloudflare R2 bucket for this app is named `mac-app`.
 - Doppler workplace **KIT Capital** / project `mac-app` is the secret store (`dev`, `stg`, `prd`). The leftover Norfolk AI project `mechanical-art-capital` was deleted; do not recreate it. Do not delete the Norfolk AI workplace (it still holds Product OS and other projects).
 - Public hostname is `mechart.app` on the Norfolk AI Cloudflare zone. Railway production attached the custom domain and, after Cloudflare login, wrote the apex CNAME and `_railway-verify` TXT. `www.mechart.app` is a proxied CNAME to the apex and 301s to `https://mechart.app`. Do not add MX/SPF on this zone; mail stays on `@mechartcap.com`. When adding Railway custom domains, expect Railway to apply Cloudflare DNS after authorization instead of assuming copy-paste.
+- Greptile reviews for `mac-app` use the Norfolk Group Greptile workspace; GitHub access is via Greptile Apps on KIT-Capital. Do not create a separate KIT-Capital Greptile org.
