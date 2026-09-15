@@ -99,3 +99,143 @@ export const photoObjects = pgTable(
     uniqueIndex("photo_objects_timepiece_checksum_uidx").on(table.timepieceId, table.originalChecksum),
   ],
 );
+
+/** Collector interest. Never executable. Desk prepare creates the agreement version. */
+export const applications = pgTable(
+  "applications",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    timepieceId: text("timepiece_id")
+      .notNull()
+      .references(() => timepieces.id),
+    amountCents: integer("amount_cents").notNull(),
+    termMonths: integer("term_months").notNull(),
+    delivery: text("delivery").notNull().default(""),
+    status: text("status").notNull().default("submitted"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("applications_customer_id_idx").on(table.customerId)],
+);
+
+export const agreements = pgTable(
+  "agreements",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    applicationId: text("application_id")
+      .notNull()
+      .references(() => applications.id),
+    timepieceId: text("timepiece_id")
+      .notNull()
+      .references(() => timepieces.id),
+    agreementCode: text("agreement_code").notNull(),
+    status: text("status").notNull().default("draft"),
+    currentVersionId: text("current_version_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agreements_application_id_uidx").on(table.applicationId),
+    index("agreements_customer_id_idx").on(table.customerId),
+  ],
+);
+
+export const agreementVersions = pgTable(
+  "agreement_versions",
+  {
+    id: text("id").primaryKey(),
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => agreements.id),
+    versionNumber: integer("version_number").notNull(),
+    executable: boolean("executable").notNull().default(false),
+    snapshot: jsonb("snapshot").notNull(),
+    preparedBy: text("prepared_by").notNull(),
+    preparedAt: timestamp("prepared_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agreement_versions_agreement_version_uidx").on(table.agreementId, table.versionNumber),
+    index("agreement_versions_agreement_id_idx").on(table.agreementId),
+  ],
+);
+
+/** One live allocation per timepiece. Released rows stay for history. */
+export const allocations = pgTable(
+  "allocations",
+  {
+    id: text("id").primaryKey(),
+    timepieceId: text("timepiece_id")
+      .notNull()
+      .references(() => timepieces.id),
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => agreements.id),
+    status: text("status").notNull().default("live"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [    index("allocations_timepiece_id_idx").on(table.timepieceId)],
+);
+
+/** Signing adapter envelope. Sign-complete and archive-success are different states. */
+export const signatureEnvelopes = pgTable(
+  "signature_envelopes",
+  {
+    id: text("id").primaryKey(),
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => agreements.id),
+    agreementVersionId: text("agreement_version_id")
+      .notNull()
+      .references(() => agreementVersions.id),
+    provider: text("provider").notNull().default("mock"),
+    externalId: text("external_id").notNull(),
+    status: text("status").notNull().default("sent"),
+    collectorSignedAt: timestamp("collector_signed_at", { withTimezone: true }),
+    macSignedAt: timestamp("mac_signed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("signature_envelopes_external_id_uidx").on(table.externalId),
+    uniqueIndex("signature_envelopes_version_id_uidx").on(table.agreementVersionId),
+  ],
+);
+
+export const archivedDocuments = pgTable(
+  "archived_documents",
+  {
+    id: text("id").primaryKey(),
+    envelopeId: text("envelope_id")
+      .notNull()
+      .references(() => signatureEnvelopes.id),
+    objectKey: text("object_key").notNull(),
+    checksum: text("checksum").notNull(),
+    bytes: integer("bytes").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("archived_documents_envelope_id_uidx").on(table.envelopeId)],
+);
+
+/** Frozen report. Never rewrites an archived signed PDF. */
+export const reportSnapshots = pgTable(
+  "report_snapshots",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(),
+    agreementId: text("agreement_id").references(() => agreements.id),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    payload: jsonb("payload").notNull(),
+    archiveChecksum: text("archive_checksum"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("report_snapshots_agreement_id_idx").on(table.agreementId)],
+);

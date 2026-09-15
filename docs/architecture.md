@@ -14,7 +14,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
 - **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** Moving the secret is a separate security plan.
-- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–3 tables (`mac_schema_probe`, `customers`, `timepieces`, `photo_objects`) exist on `development` only. The collector/desk UI still uses the browser store. Decision `0002`.
+- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables yet. The collector/desk UI still uses the browser store. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
 
