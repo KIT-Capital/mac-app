@@ -12,9 +12,9 @@ export function Field({
   className?: string;
 }) {
   return (
-    <div
+    <label
       className={cn(
-        "rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50",
+        "block rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50",
         className,
       )}
     >
@@ -22,7 +22,7 @@ export function Field({
         {label}
       </span>
       <div className="mt-1">{children}</div>
-    </div>
+    </label>
   );
 }
 
@@ -38,7 +38,7 @@ export function LineField({
   className?: string;
 }) {
   return (
-    <div className={cn("border-b border-mac-line py-2.5", className)}>
+    <label className={cn("block border-b border-mac-line py-2.5", className)}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[12px] text-mac-faint">{label}</span>
         {onClear ? (
@@ -53,7 +53,7 @@ export function LineField({
         ) : null}
       </div>
       <div className="mt-1">{children}</div>
-    </div>
+    </label>
   );
 }
 

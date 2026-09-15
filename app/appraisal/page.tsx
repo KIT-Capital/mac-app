@@ -6,10 +6,12 @@ import { ScreenHeader } from "@/components/screen-header";
 import { COMPANY, money } from "@/lib/catalog";
 import { MacLogoMark } from "@/components/mac-logo";
 import { WatchPhoto } from "@/components/watch-photo";
+import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function AppraisalPage() {
-  const { timepieces, user } = useStore();
+  const { user } = useStore();
+  const { timepieces } = useOwnedAssets();
   const appraised = timepieces.filter((w) => w.status === "appraised");
 
   return (

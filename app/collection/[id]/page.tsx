@@ -6,13 +6,15 @@ import { Check, Clock, HelpCircle, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchPhoto } from "@/components/watch-photo";
 import { moneyRange } from "@/lib/catalog";
+import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function WatchDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { timepieces, updateTimepiece, removeTimepiece, settings, user } = useStore();
+  const { updateTimepiece, removeTimepiece, settings, user } = useStore();
+  const { timepieces } = useOwnedAssets();
   const watch = timepieces.find((w) => w.id === params.id);
 
   if (!watch) {

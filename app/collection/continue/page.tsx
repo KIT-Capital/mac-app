@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
+import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function CollectionContinuePage() {
   const router = useRouter();
-  const { timepieces, completeOnboarding } = useStore();
+  const { completeOnboarding } = useStore();
+  const { timepieces } = useOwnedAssets();
   const last = timepieces[0];
 
   return (

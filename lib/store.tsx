@@ -15,7 +15,7 @@ import {
   DEMO_USERS,
   photosFromWatches,
 } from "@/lib/admin-seed";
-import { deskRoleForEmail } from "@/lib/auth";
+import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
 import { mergePreferences } from "@/lib/preferences";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import type {
@@ -72,6 +72,7 @@ function emptyState(): AppState {
     shells: DEMO_SHELLS,
     photos: [],
     settings: DEMO_SETTINGS,
+    profiles: {},
   };
 }
 
@@ -86,6 +87,7 @@ function demoState(): AppState {
     shells: DEMO_SHELLS,
     photos: photosFromWatches(DEMO_TIMEPIECES),
     settings: DEMO_SETTINGS,
+    profiles: seedProfiles(DEMO_PROFILE),
   };
 }
 
@@ -139,7 +141,42 @@ function normalizeUser(
   };
 }
 
+function profileKey(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function seedProfiles(current?: Profile | null): Record<string, Profile> {
+  const profiles: Record<string, Profile> = {
+    [profileKey(DEMO_PROFILE.email)]: DEMO_PROFILE,
+    [profileKey(ADMIN_PROFILE.email)]: ADMIN_PROFILE,
+    [profileKey(STAFF_PROFILE.email)]: STAFF_PROFILE,
+  };
+  if (current) profiles[profileKey(current.email)] = current;
+  return profiles;
+}
+
+function asManagedUser(user: Profile): ManagedUser {
+  return {
+    id: `usr-${profileKey(user.email).replace(/[^a-z0-9]/g, "")}`,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: "active",
+    member: user.member,
+    lastActive: new Date().toISOString().slice(0, 10),
+  };
+}
+
+function rememberUser(users: ManagedUser[], user: Profile) {
+  const key = profileKey(user.email);
+  if (users.some((item) => profileKey(item.email) === key)) return users;
+  return [asManagedUser(user), ...users];
+}
+
 function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): AppState {
+  const profiles = { ...seedProfiles(state.user), ...state.profiles };
+  if (state.user) profiles[profileKey(state.user.email)] = state.user;
   return {
     hydrated: true,
     user: state.user ?? null,
@@ -154,6 +191,7 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
       ...state.settings,
       appearance: state.settings?.appearance ?? DEMO_SETTINGS.appearance,
     },
+    profiles,
   };
 }
 
@@ -192,82 +230,133 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       signIn: (profile) =>
         setState((prev) => {
           const email = (profile?.email ?? prev.user?.email ?? DEMO_PROFILE.email).trim();
-          const lower = email.toLowerCase();
-          const switching = Boolean(prev.user?.email && prev.user.email.toLowerCase() !== lower);
+          const key = profileKey(email);
+          const saved = prev.profiles[key];
+          const base = saved ?? profileForEmail(email, profile);
+          const user = normalizeUser(
+            {
+              ...base,
+              ...profile,
+              email,
+              role: assignedRole(email, profile?.role ?? base.role),
+              preferences: mergePreferences({ ...base.preferences, ...profile?.preferences }),
+            },
+            prev.timepieces.length,
+            prev.agreements.length,
+          );
 
-          if (lower === DEMO_PROFILE.email.toLowerCase() && (switching || !prev.timepieces.length)) {
-            return { ...demoState(), user: { ...DEMO_PROFILE, ...profile, email: DEMO_PROFILE.email } };
-          }
-
-          if (switching || !prev.user) {
-            const user = profileForEmail(email, profile);
-            const keepDesk =
-              prev.users.length || prev.catalog.length
-                ? prev
-                : withDeskDefaults({}, []);
-            return {
-              ...keepDesk,
-              hydrated: true,
-              user,
-              timepieces: user.role === "collector" ? [] : prev.timepieces,
-              agreements: user.role === "collector" ? [] : prev.agreements,
-            };
+          let timepieces = prev.timepieces;
+          let agreements = prev.agreements;
+          let photos = prev.photos;
+          if (key === profileKey(DEMO_PROFILE.email)) {
+            const haleOwns = timepieces.some(
+              (watch) => profileKey(watch.ownerEmail || DEMO_PROFILE.email) === key,
+            );
+            if (!haleOwns) {
+              timepieces = [...DEMO_TIMEPIECES, ...timepieces];
+              photos = [...photosFromWatches(DEMO_TIMEPIECES), ...photos];
+            }
+            if (!agreements.some((item) => profileKey(item.email) === key)) {
+              agreements = [...DEMO_AGREEMENTS, ...agreements];
+            }
           }
 
           return {
             ...prev,
-            user: normalizeUser(
-              {
-                ...prev.user,
-                ...profile,
-                email,
-                role: assignedRole(email, profile?.role ?? prev.user.role),
-                preferences: mergePreferences({ ...prev.user.preferences, ...profile?.preferences }),
-              },
-              prev.timepieces.length,
-              prev.agreements.length,
-            ),
+            hydrated: true,
+            user,
+            timepieces,
+            agreements,
+            photos,
+            users: rememberUser(prev.users, user),
+            profiles: { ...prev.profiles, [key]: user },
           };
         }),
       signUp: (profile) =>
-        setState((prev) => ({
-          ...prev,
-          hydrated: true,
-          user: profileForEmail(profile.email, { ...profile, role: "collector", onboardingComplete: false }),
-          timepieces: [],
-          agreements: [],
-        })),
+        setState((prev) => {
+          const user = profileForEmail(profile.email, {
+            ...profile,
+            role: "collector",
+            onboardingComplete: false,
+          });
+          const key = profileKey(user.email);
+          return {
+            ...prev,
+            hydrated: true,
+            user,
+            users: rememberUser(prev.users, user),
+            profiles: { ...prev.profiles, [key]: user },
+          };
+        }),
       signOut: () =>
         setState((prev) => ({
           ...prev,
           user: null,
         })),
       updateProfile: (patch) =>
-        setState((prev) =>
-          prev.user
-            ? {
-                ...prev,
-                user: {
-                  ...prev.user,
-                  ...patch,
-                  preferences: mergePreferences({ ...prev.user.preferences, ...patch.preferences }),
-                },
-              }
-            : prev,
-        ),
+        setState((prev) => {
+          if (!prev.user) return prev;
+          const nextEmail = (patch.email ?? prev.user.email).trim();
+          if (prev.user.role === "collector" && isReservedDeskEmail(nextEmail)) {
+            return prev;
+          }
+          const nextUser = {
+            ...prev.user,
+            ...patch,
+            email: nextEmail,
+            preferences: mergePreferences({ ...prev.user.preferences, ...patch.preferences }),
+          };
+          const oldKey = profileKey(prev.user.email);
+          const newKey = profileKey(nextEmail);
+          const profiles = { ...prev.profiles };
+          if (oldKey !== newKey) delete profiles[oldKey];
+          profiles[newKey] = nextUser;
+          return {
+            ...prev,
+            user: nextUser,
+            profiles,
+            timepieces:
+              oldKey === newKey
+                ? prev.timepieces
+                : prev.timepieces.map((watch) =>
+                    profileKey(watch.ownerEmail || "") === oldKey
+                      ? { ...watch, ownerEmail: nextEmail }
+                      : watch,
+                  ),
+            agreements:
+              oldKey === newKey
+                ? prev.agreements
+                : prev.agreements.map((item) =>
+                    profileKey(item.email) === oldKey ? { ...item, email: nextEmail } : item,
+                  ),
+            users: prev.users.map((item) =>
+              profileKey(item.email) === oldKey
+                ? { ...item, name: nextUser.name, email: nextEmail, phone: nextUser.phone, member: nextUser.member }
+                : item,
+            ),
+          };
+        }),
       updatePreferences: (patch) =>
         setState((prev) => {
           const nextPrefs = mergePreferences({ ...prev.user?.preferences, ...patch });
+          const user = prev.user ? { ...prev.user, preferences: nextPrefs } : prev.user;
           return {
             ...prev,
             settings: patch.appearance ? { ...prev.settings, appearance: patch.appearance } : prev.settings,
-            user: prev.user ? { ...prev.user, preferences: nextPrefs } : prev.user,
+            user,
+            profiles: user ? { ...prev.profiles, [profileKey(user.email)]: user } : prev.profiles,
           };
         }),
       completeOnboarding: () =>
-        setState((prev) =>
-          prev.user ? { ...prev, user: { ...prev.user, onboardingComplete: true } } : prev
-        ),
+        setState((prev) => {
+          if (!prev.user) return prev;
+          const user = { ...prev.user, onboardingComplete: true };
+          return {
+            ...prev,
+            user,
+            profiles: { ...prev.profiles, [profileKey(user.email)]: user },
+          };
+        }),
       addTimepiece: (watch) =>
         setState((prev) => ({
           ...prev,
@@ -307,11 +396,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
         };
-        setState((prev) => ({
-          ...prev,
-          agreements: [agreement, ...prev.agreements],
-          user: prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user,
-        }));
+        setState((prev) => {
+          const user = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;
+          return {
+            ...prev,
+            agreements: [agreement, ...prev.agreements],
+            user,
+            profiles: user ? { ...prev.profiles, [profileKey(user.email)]: user } : prev.profiles,
+          };
+        });
         return agreement;
       },
       updateAgreement: (id, patch) =>

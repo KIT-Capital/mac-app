@@ -8,13 +8,15 @@ import { LineField, NativeSelect } from "@/components/field";
 import { ScreenHeader } from "@/components/screen-header";
 import { DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
 import { WatchPhoto } from "@/components/watch-photo";
+import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export function ApplicationForm({ backHref = "/collection" }: { backHref?: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const { timepieces, user, createAgreement, settings, agreements, shells } = useStore();
+  const { user, createAgreement, settings, shells } = useStore();
+  const { timepieces, agreements } = useOwnedAssets();
   const eligible = timepieces.filter((w) => w.status === "appraised" && w.financeable);
   const initialId = params.get("watch") || eligible[0]?.id || "";
   const openShell = shells.find((s) => s.status === "open");

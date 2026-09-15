@@ -6,6 +6,7 @@ import { AppearanceToggle } from "@/components/appearance-toggle";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
+import { isReservedDeskEmail } from "@/lib/auth";
 import { readImageFile } from "@/lib/image";
 import { useStore } from "@/lib/store";
 
@@ -15,11 +16,18 @@ export default function SettingsPage() {
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
   const [portraitError, setPortraitError] = useState("");
 
   function onSave(e: FormEvent) {
     e.preventDefault();
+    if (user?.role === "collector" && isReservedDeskEmail(email)) {
+      setError("That address is reserved.");
+      setSaved(false);
+      return;
+    }
     updateProfile({ name, email, phone });
+    setError("");
     setSaved(true);
   }
 
@@ -87,6 +95,11 @@ export default function SettingsPage() {
           </Link>
           .
         </p>
+        {error ? (
+          <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-center text-xs text-red-300">
+            {error}
+          </p>
+        ) : null}
         {saved ? (
           <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-xs text-emerald-300">
             Profile successfully updated.

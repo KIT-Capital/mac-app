@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
 import { money } from "@/lib/catalog";
-import { useStore } from "@/lib/store";
+import { useOwnedAssets } from "@/lib/ownership";
 
 export default function AgreementsPage() {
-  const { agreements } = useStore();
+  const { agreements } = useOwnedAssets();
 
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">

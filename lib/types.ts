@@ -142,4 +142,5 @@ export type AppState = {
   shells: AgreementShell[];
   photos: PhotoRecord[];
   settings: AppSettings;
+  profiles: Record<string, Profile>;
 };

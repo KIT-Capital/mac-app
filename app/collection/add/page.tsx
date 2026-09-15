@@ -17,9 +17,12 @@ import {
   MODELS_BY_BRAND,
   STRAP_MATERIALS,
   TIER_ONE_BRANDS,
+  isDesk,
 } from "@/lib/catalog";
 import { readImageFile } from "@/lib/image";
+import { ownerKey } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
+import { DEMO_PROFILE } from "@/lib/seed";
 import { useStore } from "@/lib/store";
 import type { Timepiece } from "@/lib/types";
 
@@ -32,7 +35,11 @@ function AddForm() {
   const { addTimepiece, updateTimepiece, catalog, user, settings, timepieces } = useStore();
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
   const editingId = params.get("id");
-  const existing = timepieces.find((w) => w.id === editingId);
+  const existing = timepieces.find((w) => {
+    if (w.id !== editingId) return false;
+    if (isDesk(user)) return true;
+    return ownerKey(w.ownerEmail || DEMO_PROFILE.email) === ownerKey(user?.email);
+  });
   const [images, setImages] = useState<string[]>(["", "", "", ""]);
   const [videoName, setVideoName] = useState("");
   const [brand, setBrand] = useState("Audemars Piguet");

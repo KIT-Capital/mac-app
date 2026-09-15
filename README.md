@@ -6,7 +6,7 @@ The original mobile source was lost. This web app follows that deck’s informat
 
 ## What you can do
 
-Collector app (Vladimir look):
+Collector app:
 
 - Splash, sign in, and create account (18+ and privacy consent) — welcome email via Resend
 - Empty vault for new members, then add pieces one by one
@@ -41,10 +41,17 @@ Then add the CNAME / TXT records Railway prints in the Cloudware portal.
 
 ```bash
 npm install
+npx playwright install chromium
 npm run dev -- --port 43173
 ```
 
 Open [http://localhost:43173](http://localhost:43173).
+
+```bash
+npm test
+```
+
+Playwright covers splash, collector signup/collection/appraisal/repurchase/account, and the desk (appraise, mail, catalog). The suite reuses a server already running on port 43173.
 
 On a phone the app is full-bleed. On a notebook it stays a 430px iPhone on a slate stage (`#5C6570`) so the page behind the device always contrasts with both the black screens and the white appraisal certificate.
 

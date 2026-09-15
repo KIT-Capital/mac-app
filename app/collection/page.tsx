@@ -5,10 +5,12 @@ import { FileDown, Plus } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchCard } from "@/components/watch-card";
 import { WatchPhoto } from "@/components/watch-photo";
+import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function CollectionPage() {
-  const { timepieces, user } = useStore();
+  const { user } = useStore();
+  const { timepieces } = useOwnedAssets();
   const empty = timepieces.length === 0;
 
   return (

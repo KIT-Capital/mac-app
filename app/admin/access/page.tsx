@@ -55,7 +55,7 @@ export default function AdminAccessPage() {
   return (
     <AdminChrome title="Access management">
       <p className="mb-4 max-w-2xl text-sm text-white/55">
-        Invite collectors, desk staff, and administrators. Roles control whether someone sees the Vladimir
+        Invite collectors, desk staff, and administrators. Roles control whether someone sees the
         collector app or this admin desk.
       </p>
       <form onSubmit={onSubmit} className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

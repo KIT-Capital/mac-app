@@ -6,11 +6,13 @@ import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { buybackPrice, COMPANY, hasApplication, money } from "@/lib/catalog";
+import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function AgreementDetailPage() {
   const params = useParams<{ id: string }>();
-  const { agreements, timepieces, signAgreement, user, settings } = useStore();
+  const { signAgreement, user, settings } = useStore();
+  const { agreements, timepieces } = useOwnedAssets();
   const agreement = agreements.find((a) => a.id === params.id);
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
   const [started, setStarted] = useState(false);
