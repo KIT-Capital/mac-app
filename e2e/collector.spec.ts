@@ -18,8 +18,7 @@ test.describe("collector app", () => {
     await expect(page.getByText("Nautilus")).toBeVisible();
     await expect(page.getByText("Royal Oak Selfwinding")).toBeVisible();
     await expect(page.getByText("Logical One")).toBeVisible();
-    const photos = page.locator("img").filter({ hasNot: page.locator("[alt='']") });
-    await expect(photos.first()).toBeVisible();
+    await expect(page.getByRole("img", { name: /Richard Mille|Nautilus|Royal Oak|Logical One/ }).first()).toBeVisible();
   });
 
   test("requesting appraisal sends the piece to reviewing", async ({ page }) => {
