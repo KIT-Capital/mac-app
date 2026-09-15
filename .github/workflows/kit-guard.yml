@@ -1,0 +1,70 @@
+name: kit-guard
+
+# Installed by the equip verb into every equipped repo. Blocks merge when a
+# kit/tidy PR crosses a brand boundary, writes kit-managed paths the manifest
+# does not claim, or contains deletions. See tools/kit-guard/check.mjs for why
+# this is machine-enforced rather than review-enforced.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+
+      - name: Run kit-guard
+        id: guard
+        # set -o pipefail is load-bearing. GitHub's default shell is `bash -e`,
+        # where a pipeline returns the LAST command's status — so `node ... |
+        # tee` reports tee's success and the job passes while the guard is
+        # screaming. Observed on norfolk-manual PR #1 (2026-07-31): four
+        # violations posted to the PR, run marked green, merge unblocked.
+        run: |
+          set -o pipefail
+          node tools/kit-guard/check.mjs \
+            --base "origin/${{ github.base_ref }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            | tee guard-output.md
+        continue-on-error: true
+
+      - name: Post result to the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('guard-output.md', 'utf8');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const mine = comments.find(c => c.body.startsWith('## kit-guard'));
+            if (mine) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: mine.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              });
+            }
+
+      - name: Fail if the guard failed
+        if: steps.guard.outcome == 'failure'
+        run: |
+          echo "kit-guard reported violations — see the PR comment."
+          exit 1

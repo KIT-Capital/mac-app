@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "neon": {
+      "type": "http",
+      "url": "https://mcp.neon.tech/mcp"
+    },
+    "workos": {
+      "type": "http",
+      "url": "https://mcp.workos.com/mcp"
+    },
+    "railway": {
+      "command": "npx",
+      "args": ["-y", "@railway/cli", "mcp"]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$comment": "Sensitivity map for EVERY path in the kit. Consumed by the equip skill (payload filtering) and by kit-guard (CI enforcement). Folder position is never the boundary — this file is. Add a path => add its marker in the same commit; unmatched paths are treated as norfolk-only (fail closed). Addresses SpecFlow finding C4.",
+  "$sensitivities": {
+    "client-safe": "May be copied into any repo, any org.",
+    "norfolk-only": "May be copied into Norfolk-Group repos only.",
+    "client:<id>": "May be copied into that client's repos only.",
+    "kit-only": "NEVER copied anywhere. Lives in the kit and is READ by the Manual app, not distributed. No org allows it, so the existing filter handles it with no extra machinery — this is the kit's own working material (its plans, its decision records, its Owner's Guide), and copying it into a repo would fork the kit, which is the exact failure the Manual exists to prevent."
+  },
+  "$kitLocal": {
+    "$comment": "The kit's OWN working material. Never shipped, and — critically — NOT listed in `markers` below. Anything in `markers` is a path the guard polices in every equipped repo, so listing `README.md` or `docs/plans/**` there would forbid every repo from having its own README or its own plans. These paths are kit-local instead: equip never ships them (they fall to unmatchedDefault = kit-only), and the guard ignores identically-named files in target repos because those belong to the repo, not the kit. The Manual app reads these from the kit at render time. Found 2026-07-31, when the first equipped repo could not have been given a README.",
+    "paths": [
+      "README.md",
+      "docs/README.md",
+      "docs/OWNERS-GUIDE.md",
+      "docs/consolidation.md",
+      "docs/decisions/**",
+      "docs/brainstorms/**",
+      "docs/plans/**",
+      "docs/artifacts/**"
+    ]
+  },
+  "$excludeFromPayload": {
+    "$comment": "Paths with a legitimate sensitivity that equip nevertheless does NOT ship, for reasons unrelated to sensitivity. Kept separate from `markers` on purpose: a marker answers 'who may hold this', an exclusion answers 'is this worth shipping'. kit-guard still enforces the marker if one of these ever turns up in a repo, so an exclusion is never a security control — only a payload decision.",
+    "brand/**": "180MB, overwhelmingly Illustrator masters and social banners. Shipping it would put 180MB in every repo. Curated web sets (SVG/PNG at web sizes) are a Phase 4 task; until they exist, no brand ships anywhere. Sensitivity markers below stay accurate so the guard keeps working.",
+    "src/**": "46 files of animation components: 19 specimens plus _replit-export/, the Replit-authored variants — kept deliberately, Ricardo rates them. Excluded from the DEFAULT payload only: most repos need no animation library, and installing one nobody asked for is the kitchen-sink antipattern. A repo that wants them asks by name. (Ricardo, 2026-07-31: 'do not stuff too much graphics and junk in the repo.')"
+  },
+  "version": 3,
+  "$unmatchedDefaultRationale": "kit-only, not norfolk-only. `norfolk-only` LOOKS fail-closed but is not: Norfolk-Group allows that sensitivity, so an unmarked file ships silently into every Norfolk repo. Found on 2026-07-31 when `git ls-files` quoted a path containing an accent (OBRA PÍA), the quoted form matched no pattern, and a KIT Capital client asset was about to be copied into a Norfolk repo. `kit-only` is allowed by no org, so an unmarked file ships nowhere and someone notices the absence.",
+  "unmatchedDefault": "kit-only",
+  "markers": {
+    "tools/owner-guide/**": "kit-only",
+    "AGENTS.md": "client-safe",
+    "CLAUDE.md": "client-safe",
+    ".gitattributes": "client-safe",
+    ".mcp.json": "client-safe",
+    ".env.example": "client-safe",
+    "doppler.yaml": "client-safe",
+    ".claude/**": "client-safe",
+    ".cursor/**": "client-safe",
+    ".devcontainer/**": "client-safe",
+    ".github/**": "client-safe",
+    ".kit/**": "client-safe",
+    "tools/**": "client-safe",
+    "src/components/animations/**": "client-safe",
+    "src/hooks/**": "client-safe",
+    "src/lib/**": "client-safe",
+    "src/reporting/**": "client-safe",
+    "docs/SYSTEM-GOVERNANCE-RULE.md": "client-safe",
+    "docs/setup/**": "client-safe",
+    "docs/design/**": "client-safe",
+    "docs/design-system.md": "client-safe",
+    "docs/export-output-contract.md": "client-safe",
+    "docs/admin-catalog-contract.md": "client-safe",
+    "docs/agent-naming.md": "client-safe",
+    "docs/harness.md": "client-safe",
+    "docs/decisions/0020-figma-claude-design-roundtrip.md": "client-safe",
+    "docs/decisions/0021-bot-ui-handoff.md": "client-safe",
+    "docs/outputs/**": "client-safe",
+    "docs/architecture.md": "client-safe",
+    "docs/api.md": "client-safe",
+    "docs/business-logic.md": "client-safe",
+    "docs/security.md": "client-safe",
+    "docs/config-and-env-map.md": "client-safe",
+    "docs/product-os-adoption.md": "client-safe",
+    "product-os.lock.json": "client-safe",
+    "brand/README.md": "client-safe",
+    "brand/norfolk/**": "norfolk-only",
+    "brand/clients/kit-capital/**": "client:kit-capital"
+  }
+}

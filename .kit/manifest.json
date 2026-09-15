@@ -1,0 +1,121 @@
+{
+  "kitRepo": "Norfolk-Group/norfolk-kit",
+  "kitSha": "bf25a84ca761379ecfc8656793fec1f377f4b28a",
+  "equippedAt": "2026-09-15",
+  "org": "KIT-Capital",
+  "payloadClass": "client",
+  "files": {
+    ".claude/settings.json": {
+      "sha256": "79ef285ca1fb61006a26c0df1f378eadbe9deacac30fbda409dde843897b8b60",
+      "sensitivity": "client-safe"
+    },
+    ".claude/skills/equip/SKILL.md": {
+      "sha256": "17e9eea40595fb3c83cb236a36e690d306f246386d4824aef53d7280fcd4b944",
+      "sensitivity": "client-safe"
+    },
+    ".cursor/mcp.json": {
+      "sha256": "43ae29413ebc6bc563554e195e800c7a02e5c5f31f2b465f0427b5edbcb24e1a",
+      "sensitivity": "client-safe"
+    },
+    ".gitattributes": {
+      "sha256": "9266d0091e80af3c2eb21250888b452694241f2caa43490dd61a2712a1ef0cbe",
+      "sensitivity": "client-safe"
+    },
+    ".github/workflows/kit-guard.yml": {
+      "sha256": "e5d5cc7b25bcecc2446490ee83a031172c034a095f2ab3da4c6a6744cb79b701",
+      "sensitivity": "client-safe"
+    },
+    ".kit/markers.json": {
+      "sha256": "e789688040189fb505aa6717951a0e7a8fc37c427590c1ac2b37da1459aa3b23",
+      "sensitivity": "client-safe"
+    },
+    ".kit/payloads.json": {
+      "sha256": "68cc82ca710dc18734177a7d04eeaeaf695981bbc2a63b14f03166b54d05b3a3",
+      "sensitivity": "client-safe"
+    },
+    ".mcp.json": {
+      "sha256": "b324a661d37ac168c50a6b835ce358826def4640fa4071ac413491cbc7367a91",
+      "sensitivity": "client-safe"
+    },
+    "AGENTS.md": {
+      "sha256": "f4f6ad3d0397cdd258f4032bccf446fcd6e9120c0e9ac165515b6e0b3f3da93d",
+      "sensitivity": "client-safe"
+    },
+    "docs/SYSTEM-GOVERNANCE-RULE.md": {
+      "sha256": "32f97bda7f21001c62e7bb784e173f4b17c535338330ff11b58978cb1c877736",
+      "sensitivity": "client-safe"
+    },
+    "docs/agent-naming.md": {
+      "sha256": "02b9de39c0e3f80086e1dca4ca40fe6f8daea1f4b4e08dd7c6199f111b04ecd2",
+      "sensitivity": "client-safe"
+    },
+    "docs/api.md": {
+      "sha256": "6678e14cb217d0bbeed1f5127bef24343c38d7925d096a15c62df0de7d23220e",
+      "sensitivity": "client-safe"
+    },
+    "docs/architecture.md": {
+      "sha256": "1e691eed2a7fe2333b58152925bfc44450852c4c8b02faf8ccef9f725759476d",
+      "sensitivity": "client-safe"
+    },
+    "docs/business-logic.md": {
+      "sha256": "bb6cbcbb4144b9c49e2e3a31f9e07c67d5737cd5ab636f7bc583258d101c059c",
+      "sensitivity": "client-safe"
+    },
+    "docs/config-and-env-map.md": {
+      "sha256": "e3608049858b243c32b7d21b79aff505b4613b56c8291308d6efd82fe05c8f8d",
+      "sensitivity": "client-safe"
+    },
+    "docs/design-system.md": {
+      "sha256": "c540c0a4d6f0817d70740491accbf279bb0a7a4d57acd5c94504240770b7c996",
+      "sensitivity": "client-safe"
+    },
+    "docs/harness.md": {
+      "sha256": "e2df5f5d2aee8511a9e7d2fa9335b1290833b379e877abc9c5c6903fa7e3b71d",
+      "sensitivity": "client-safe"
+    },
+    "docs/product-os-adoption.md": {
+      "sha256": "fbabb8f8c515247a75d4725c3411ef2e410512c6647c41982c942481a83583f8",
+      "sensitivity": "client-safe"
+    },
+    "docs/security.md": {
+      "sha256": "3a1c067de12d49f928055bb986c68fd3800643e67517a4c02312d889d6c0a93f",
+      "sensitivity": "client-safe"
+    },
+    "docs/setup/codespaces-kit-access.md": {
+      "sha256": "5c1ca0ad9e2e22fda306ae764f3fa18ab0402d79e24da32d388c7ce8dd140349",
+      "sensitivity": "client-safe"
+    },
+    "docs/setup/setup-claude-code-mac.md": {
+      "sha256": "83320188d365ceece2f86bd510752fe661f37918ff2733c1b9eaccfaabf89a0d",
+      "sensitivity": "client-safe"
+    },
+    "docs/setup/setup-claude-code-replit.md": {
+      "sha256": "ea4061683bc7b4837e36da76a460749a2b37f09a0b8d0a6ea083f8ed3ef56819",
+      "sensitivity": "client-safe"
+    },
+    "docs/setup/setup-claude-code-windows.md": {
+      "sha256": "15cf773acb1480ed06348629689e43ee138eeb3115a480dcfee01b9acdcca75c",
+      "sensitivity": "client-safe"
+    },
+    "doppler.yaml": {
+      "sha256": "40cfced1c2ae666dc1413c2928fa34be14c691f50289da53c70ffae205fcef55",
+      "sensitivity": "client-safe"
+    },
+    "product-os.lock.json": {
+      "sha256": "ca8037cbd83296c2ccee3ac0d20e684f6dd22412d4635ce97bdd29038eccb770",
+      "sensitivity": "client-safe"
+    },
+    "tools/harness/check.mjs": {
+      "sha256": "305b2395e7ec80f0ea0921822a9ae7a9def1d7869a88f992e68a6537e666f3ae",
+      "sensitivity": "client-safe"
+    },
+    "tools/kit-guard/check.mjs": {
+      "sha256": "e0b46fe28901920f5b4cb8f3425553d7e7514c9a5f17c3a2905ee1c73bff7b2d",
+      "sensitivity": "client-safe"
+    },
+    "tools/kit-guard/write-manifest.mjs": {
+      "sha256": "c0d4e13c9ec7ae901336cb62e6533dadf2fbbfc529528e873ca58581d15f18d2",
+      "sensitivity": "client-safe"
+    }
+  }
+}

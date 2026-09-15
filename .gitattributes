@@ -1,0 +1,26 @@
+# Normalise line endings to LF everywhere.
+#
+# Not cosmetic: .kit/manifest.json records a sha256 per file, and re-equip
+# compares those hashes to decide "unmodified, safe to update" vs "locally
+# edited, raise a conflict". Without this, the same file hashes differently on
+# Windows and Linux, so every file would look edited and every re-equip would
+# be one giant false conflict.
+* text=auto eol=lf
+
+# Binaries git must not touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.ai binary
+*.eps binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.mov binary

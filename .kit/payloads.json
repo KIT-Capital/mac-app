@@ -1,0 +1,27 @@
+{
+  "$comment": "Org -> payload class. The equip skill reads THIS to decide what a repo may receive; it never infers from folder names or who happens to have access. Any org not listed here falls to `default` (tooling only, zero brand) and the PR body must state why. Addresses SpecFlow findings C1/C2.",
+  "version": 1,
+  "payloads": {
+    "Norfolk-Group": {
+      "class": "norfolk",
+      "allowedSensitivities": ["client-safe", "norfolk-only"],
+      "label": "Norfolk's own org — full kit including internal docs and Norfolk brand."
+    },
+    "KIT-Capital": {
+      "class": "client",
+      "clientId": "kit-capital",
+      "allowedSensitivities": ["client-safe", "client:kit-capital"],
+      "label": "Client org. Tooling plus KIT Capital's own marks only. No Norfolk-internal material."
+    },
+    "ricardo-cidale-personal": {
+      "class": "personal",
+      "allowedSensitivities": ["client-safe"],
+      "label": "Personal account — tooling only, no brand of any kind."
+    }
+  },
+  "default": {
+    "class": "unknown",
+    "allowedSensitivities": ["client-safe"],
+    "label": "Org not in the mapping (fork, no remote, multiple remotes, or a new org). Tooling only, zero brand, and the PR says so. Add the org here deliberately to grant more."
+  }
+}
