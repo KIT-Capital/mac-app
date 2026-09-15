@@ -28,14 +28,14 @@ Collection state lives in the browser. Outbound mail goes through the Next.js `/
 
 ## Hosting
 
-Railway runs the production app. Cloudware Hosting holds `mechartcap.com` and DNS. See `docs/hosting.md`.
+Railway runs the production app. The public hostname is **mechart.app** (Cloudflare DNS). Mail and demo logins stay on **@mechartcap.com**. See `docs/hosting.md`.
 
 ```bash
 railway up -y -m "MAC collector app"
-railway domain mechartcap.com
+railway domain mechart.app
 ```
 
-Then add the CNAME / TXT records Railway prints in the Cloudware portal.
+Then add the CNAME / TXT records Railway prints in the Cloudflare DNS editor for `mechart.app`.
 
 ## Run locally
 

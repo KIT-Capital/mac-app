@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { AppFrame } from "@/components/app-frame";
+import { SITE_URL } from "@/lib/site";
 import { StoreProvider } from "@/lib/store";
 import "./globals.css";
 
@@ -10,6 +11,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Mechanical Art Capital",
   description:
     "Confidential appraisals and sale-and-repurchase of high-end timepieces. Not a loan.",
