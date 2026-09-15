@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Clock, Mail, Plus, UserRound } from "lucide-react";
-import { MacWordmark } from "@/components/mac-logo";
+import { MacLogoMark } from "@/components/mac-logo";
 import { cn } from "@/lib/utils";
 
 const COLLECTOR = [
@@ -19,7 +19,7 @@ export function SideNav() {
   return (
     <aside className="hidden w-[240px] shrink-0 flex-col border-r border-white/10 bg-black xl:flex">
       <div className="border-b border-white/10 px-5 py-6">
-        <MacWordmark onDark className="w-[196px]" />
+        <MacLogoMark onDark className="w-16" />
       </div>
       <nav className="flex flex-1 flex-col px-3 py-4">
         {COLLECTOR.map((item) => {

@@ -15,7 +15,7 @@ import {
   Smartphone,
   Users2,
 } from "lucide-react";
-import { MacLogoMark, MacWordmark } from "@/components/mac-logo";
+import { MacLogoMark } from "@/components/mac-logo";
 import { endClientSession } from "@/lib/session-client";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -51,13 +51,10 @@ export function AdminChrome({
     <div className="flex h-full min-h-0 w-full">
       <aside className="flex w-[200px] shrink-0 flex-col border-r border-white/10 bg-[#0E2A44] xl:w-[220px]">
         <div className="flex items-center gap-2 px-4 pt-5 pb-4">
-          <span className="flex h-8 w-8 items-center justify-center">
+          <span className="flex h-10 w-10 items-center justify-center">
             <MacLogoMark onDark />
           </span>
-          <div className="min-w-0">
-            <MacWordmark onDark className="w-[118px]" />
-            <p className="mt-1 text-[10px] tracking-[0.16em] text-[#FCB040] uppercase">Admin desk</p>
-          </div>
+          <p className="text-[10px] tracking-[0.16em] text-[#FCB040] uppercase">Admin desk</p>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2" aria-label="Desk">
           {LINKS.map((link) => {

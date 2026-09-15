@@ -11,10 +11,10 @@ const WORDMARK_ON_DARK = "/brand/logo-ff-on-dark.svg";
 const MARK = "/brand/logo-ff-mark.png";
 const MARK_ON_DARK = "/brand/logo-ff-mark-on-dark.png";
 
-const LOCKUP_WIDTH = {
-  hero: "w-[min(304px,78%)]",
-  default: "w-[260px]",
-  compact: "w-[168px]",
+const MARK_WIDTH = {
+  hero: "w-[min(168px,46%)]",
+  default: "w-[132px]",
+  compact: "w-[72px]",
 } as const;
 
 export function MacWordmark({
@@ -57,14 +57,14 @@ export function MacLogoMark({
 }
 
 export function MacDarkLogo({ className }: { className?: string }) {
-  return <MacWordmark onDark className={className} />;
+  return <MacLogoMark onDark className={className} />;
 }
 
 export function MacMark({ className }: { className?: string }) {
   return <MacLogoMark className={className} />;
 }
 
-/** Full official lockup — splash, sign-in, and chrome. */
+/** Official gear only — no MECHANICAL ART CAPITAL wordmark. */
 export function MacLockup({
   onDark = false,
   className,
@@ -72,11 +72,11 @@ export function MacLockup({
 }: {
   onDark?: boolean;
   className?: string;
-  size?: keyof typeof LOCKUP_WIDTH;
+  size?: keyof typeof MARK_WIDTH;
 }) {
   return (
     <div className={cn("flex w-full justify-center", className)}>
-      <MacWordmark onDark={onDark} className={LOCKUP_WIDTH[size]} />
+      <MacLogoMark onDark={onDark} className={MARK_WIDTH[size]} />
     </div>
   );
 }

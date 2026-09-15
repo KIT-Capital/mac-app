@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { BurgerButton } from "@/components/burger-menu";
 import { CollectorNav } from "@/components/collector-nav";
-import { MacWordmark } from "@/components/mac-logo";
+import { MacLogoMark } from "@/components/mac-logo";
 import { cn } from "@/lib/utils";
 
 export function ScreenHeader({
@@ -43,7 +43,7 @@ export function ScreenHeader({
           )}
         </div>
         <Link href="/collection" className="hidden shrink-0 md:block" aria-label="Mechanical Art Capital">
-          <MacWordmark onDark className="w-[140px]" />
+          <MacLogoMark onDark className="h-9 w-9" />
         </Link>
         {menu ? <CollectorNav /> : null}
       </div>

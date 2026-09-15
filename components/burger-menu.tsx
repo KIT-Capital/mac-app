@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { LayoutDashboard, Menu, X } from "lucide-react";
 import { CollectorNav } from "@/components/collector-nav";
-import { MacWordmark } from "@/components/mac-logo";
+import { MacLogoMark } from "@/components/mac-logo";
 import { isDesk } from "@/lib/catalog";
 import { endClientSession } from "@/lib/session-client";
 import { useStore } from "@/lib/store";
@@ -57,7 +57,7 @@ function BurgerDrawer({ onClose }: { onClose: () => void }) {
       <nav className="relative z-10 flex h-full w-[78%] max-w-[300px] flex-col bg-[#0E2A44] text-white shadow-2xl">
         <div className="flex items-center justify-between px-4 pt-10 pb-4">
           <div className="min-w-0">
-            <MacWordmark onDark className="w-[148px]" />
+            <MacLogoMark onDark className="w-14" />
             <p className="mt-2 text-[13px] font-medium text-white/80">{user?.name || "Collector"}</p>
           </div>
           <button type="button" aria-label="Close menu" onClick={onClose} className="mac-tap flex items-center justify-center">
