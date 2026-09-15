@@ -14,7 +14,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
 - **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** Moving the secret is a separate security plan.
-- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. **Incomplete** for persistence: the app does not read or write tables yet. Decision `0002`.
+- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–3 tables (`mac_schema_probe`, `customers`, `timepieces`, `photo_objects`) exist on `development` only. The collector/desk UI still uses the browser store. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
 
@@ -25,11 +25,12 @@ app/                 routes
 app/api/mail         outbound mail
 app/api/desk-session desk cookie
 components/          shells + shadcn
-lib/                 auth, store, mail, theme, env mapping
+lib/                 auth, store, mail, theme, env mapping, Drizzle schema and Stage 2 records
 instrumentation.ts   Neon mapping guard on Node server start
+drizzle/             Stage 1 probe migration (development only)
 e2e/                 Playwright
 neon.ts              Neon config-as-code (Auth off)
-tools/harness/       structural check, neon-ping, start wrapper
+tools/harness/       structural check, neon-ping, drizzle migrate/ping, start wrapper
 ```
 
 ## Hosting
