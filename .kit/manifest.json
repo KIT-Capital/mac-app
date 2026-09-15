@@ -25,6 +25,10 @@
       "sha256": "e5d5cc7b25bcecc2446490ee83a031172c034a095f2ab3da4c6a6744cb79b701",
       "sensitivity": "client-safe"
     },
+    ".github/workflows/quality.yml": {
+      "sha256": "c9e4b99728c53a062f9e505dee147314b8bebea3076e6d98c27037da9fc99ac7",
+      "sensitivity": "client-safe"
+    },
     ".kit/markers.json": {
       "sha256": "e789688040189fb505aa6717951a0e7a8fc37c427590c1ac2b37da1459aa3b23",
       "sensitivity": "client-safe"
@@ -38,7 +42,7 @@
       "sensitivity": "client-safe"
     },
     "AGENTS.md": {
-      "sha256": "ae4dcc321119a4d74bd42ee345a998458e638f289c3bd400dd602060cf525c01",
+      "sha256": "a12d30ed635c1c08dc125ef28f600c838804c273d41f8ac1545947464b577dfc",
       "sensitivity": "client-safe"
     },
     "docs/SYSTEM-GOVERNANCE-RULE.md": {
@@ -50,19 +54,19 @@
       "sensitivity": "client-safe"
     },
     "docs/api.md": {
-      "sha256": "2e9302d4d8f74f09fa16a569e0f2d3895bd823f020abf3f8c87a56928bbedcf5",
+      "sha256": "610aba5b6f5287216a0d86851df1e3eb6f76ca804991fb4f752749c652f04151",
       "sensitivity": "client-safe"
     },
     "docs/architecture.md": {
-      "sha256": "f576ccf35d5ca79ac35a8e5539c6ee1654216538fec57054183e8466c0c057dd",
+      "sha256": "6fc1878f77750fa14a209ad7b22efdf5437705adaf6afcc81357c9ca3ea30f02",
       "sensitivity": "client-safe"
     },
     "docs/business-logic.md": {
-      "sha256": "935721186a4dbd9f30872708d955be01b9e6df00d2d0a8e162c8e2494f3722ab",
+      "sha256": "757aed61f8ce15ff1a8fad4c91b2180f7056341b67d58fcad17088806521c674",
       "sensitivity": "client-safe"
     },
     "docs/config-and-env-map.md": {
-      "sha256": "3d215cce454e425035dbcf6bd0ff031d56a1100b1a2552a3204e7d1acd004d95",
+      "sha256": "5433c74f4ee90a63f448c8b7472afa9607beb130400d04a583b9f3cc46221a48",
       "sensitivity": "client-safe"
     },
     "docs/design-system.md": {
@@ -78,7 +82,7 @@
       "sensitivity": "client-safe"
     },
     "docs/security.md": {
-      "sha256": "589681b94992640255650fb846c34d91d9fafb9fb6bf2532bdea5d3521ef2439",
+      "sha256": "8a851eeca80b49fbf512db4017c9f44615997675ce2f96cf06f7fdab17fbf4ca",
       "sensitivity": "client-safe"
     },
     "docs/setup/codespaces-kit-access.md": {

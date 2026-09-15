@@ -27,9 +27,9 @@ Collectors must be 18+ and accept privacy consent at signup.
 
 Purchase caps, typical term, membership price, and vault copy live in desk settings / `DEFAULT_SETTINGS`. Changing money math needs owner approval and the full review required by `AGENTS.md`. `lib/catalog.ts` helpers (`maxPurchaseAmount`, `buybackPrice`) are **prototype UI math**, not approved accounting policy.
 
-## Production records (proposed)
+## Production records
 
-Required for a production repo desk. Not implemented. Browser demo data is not production evidence.
+Required for a production repo desk. Server libraries and tables exist on Neon `development` only. The live UI still uses browser demo data. That browser data is not production evidence. Ledger posting is blocked until the accountant names accounts.
 
 1. **Customers and collections** — durable server records; identity, serial/reference, provenance, condition, valuation history, ownership, custody, contract links; snapshots used in signed agreements; collectors see only their rows; staff see what their role allows.
 2. **Photos and documents** — exact original bytes in private MAC storage; thumbnails separate; checksum, uploader, server receipt time; existing JPEG data URLs are **previews only**.

@@ -16,7 +16,7 @@ Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
 ## Data
 
-Collection state and photos still live in the browser. Neon `development` now has synthetic `customers` and `timepieces` rows for Stage 2 isolation tests. The UI does not read them. Mail payloads go to Resend or the in-memory outbox. Do not log secrets or cookie tokens.
+Collection state and photos still live in the browser. Neon `development` has synthetic customer, timepiece, photo, agreement, and archive rows for repository tests. The UI does not read them. Mail payloads go to Resend or the in-memory outbox. Do not log secrets or cookie tokens.
 
 ## Authorization
 

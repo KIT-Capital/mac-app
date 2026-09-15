@@ -180,7 +180,12 @@ export const allocations = pgTable(
     status: text("status").notNull().default("live"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [    index("allocations_timepiece_id_idx").on(table.timepieceId)],
+  (table) => [
+    index("allocations_timepiece_id_idx").on(table.timepieceId),
+    uniqueIndex("allocations_live_timepiece_uidx")
+      .on(table.timepieceId)
+      .where(sql`${table.status} = 'live'`),
+  ],
 );
 
 /** Signing adapter envelope. Sign-complete and archive-success are different states. */

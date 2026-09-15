@@ -5,7 +5,6 @@ import {
   getAgreement,
   getApplication,
   getCurrentVersion,
-  isApplicationExecutable,
   isVersionExecutable,
   prepareAgreement,
   submitApplication,
@@ -58,7 +57,6 @@ describe("Stage 4 prepare + snapshots", { skip }, () => {
       termMonths: 12,
       delivery: "vault",
     });
-    assert.equal(isApplicationExecutable(), false);
     assert.equal(application.status, "submitted");
 
     await assert.rejects(() => prepareAgreement(db, actor, application.id), {
@@ -106,5 +104,43 @@ describe("Stage 4 prepare + snapshots", { skip }, () => {
       termMonths: 12,
     });
     await assert.rejects(() => prepareAgreement(db, desk, second.id), { message: "PIECE_ALREADY_ALLOCATED" });
+  });
+
+  it("resumes a torn prepare instead of returning an incomplete agreement", async () => {
+    const customer = await registerCollector(db, {
+      email: `collector-app-resume.${suffix}@mac.test`,
+      name: "Resume Collector",
+    });
+    createdCustomerIds.push(customer.id);
+    const actor = toCollectorActor(customer);
+    const piece = await createTimepiece(db, actor, customer.id, {
+      brand: "Jaeger-LeCoultre",
+      model: "Reverso",
+    });
+    const application = await submitApplication(db, actor, {
+      timepieceId: piece.id,
+      amount: 55000,
+      termMonths: 12,
+    });
+    const tornId = crypto.randomUUID();
+    const tornVersionId = crypto.randomUUID();
+    await db.insert(agreements).values({
+      id: tornId,
+      customerId: customer.id,
+      applicationId: application.id,
+      timepieceId: piece.id,
+      agreementCode: "MAC-TORN1",
+      status: "prepared",
+      currentVersionId: tornVersionId,
+    });
+
+    const resumed = await prepareAgreement(db, desk, application.id);
+    assert.equal(resumed.id, tornId);
+    const version = await getCurrentVersion(db, actor, tornId);
+    assert.equal(isVersionExecutable(version), true);
+    const [allocation] = await db.select().from(allocations).where(inArray(allocations.agreementId, [tornId]));
+    assert.equal(allocation?.status, "live");
+    const converted = await getApplication(db, actor, application.id);
+    assert.equal(converted?.status, "converted");
   });
 });

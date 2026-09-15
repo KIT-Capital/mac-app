@@ -1,0 +1,29 @@
+name: quality
+
+# Product gates from AGENTS.md. No database URL and no Doppler secrets.
+# kit-guard stays a separate workflow. Playwright and test:db stay local.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.13.0"
+          cache: npm
+
+      - run: npm ci
+      # lint is still red on pre-existing collector react-hooks findings
+      # (contact, burger-menu, watch-photo, store hydrate). Do not add it
+      # as a merge gate until those files are fixed in their own PR.
+      - run: npm run test:unit
+      - run: npm run build

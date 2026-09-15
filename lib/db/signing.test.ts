@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { inArray } from "drizzle-orm";
-import { memoryObjectStore } from "../storage/object-store.mjs";
+import { memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
 import { prepareAgreement, submitApplication } from "./agreements";
 import { createDb } from "./client";
 import { createTimepiece, deskActor, registerCollector, toCollectorActor } from "./records";
@@ -18,7 +18,6 @@ import {
 import {
   applySignatureWebhook,
   archiveSignedPdf,
-  assertCannotReplaceArchive,
   getArchivedDocument,
   sendForSignature,
 } from "./signing";
@@ -104,11 +103,12 @@ describe("Stage 5 sign + archive", { skip }, () => {
     assert.equal(duplicate.status, "complete");
 
     const first = await archiveSignedPdf(db, store, desk, envelope.id, pdf);
-    const retry = await archiveSignedPdf(db, store, desk, envelope.id, pdf);
+    const other = new TextEncoder().encode(`other-pdf-${suffix}`);
+    const retry = await archiveSignedPdf(db, store, desk, envelope.id, other);
     assert.equal(first.id, retry.id);
+    assert.equal(retry.checksum, first.checksum);
+    assert.notEqual(sha256Hex(other), first.checksum);
     assert.equal(store.objects.size, 1);
     assert.ok(await getArchivedDocument(db, actor, envelope.id));
-    assert.throws(() => assertCannotReplaceArchive(actor, customer.id), { message: "ARCHIVE_IMMUTABLE" });
-    assert.throws(() => assertCannotReplaceArchive(desk, customer.id), { message: "ARCHIVE_IMMUTABLE" });
   });
 });
