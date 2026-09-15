@@ -33,7 +33,7 @@ MAC must hold customer, timepiece, contract, photo, and ledger records on server
 | `npm run db:ping` | Verified | `neondb` / Postgres 18.6 |
 | Drizzle Stage 1 | Verified | `mac_schema_probe` on `development` only; production and staging have no tables |
 | Neon Auth | Disabled | Keep off |
-| WorkOS, R2, ledger, signing | Proposed | R2 bucket `mac-app` exists; app does not read it yet |
+| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; UI still browser; ledger blocked; mock signing |
 | Drizzle `customers` / `timepieces` | Verified | `development` only; UI still uses `localStorage` |
 | Drizzle applications / agreements / archives / reports | Verified | `development` only; mock signing adapter; no ledger |
 | Desk-credential security PR | Proposed | Separate approval boundary |

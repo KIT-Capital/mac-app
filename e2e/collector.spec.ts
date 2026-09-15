@@ -140,9 +140,10 @@ test.describe("collector app", () => {
 
   test("collectors cannot open the desk", async ({ page }) => {
     await signIn(page, HALE, "collection");
-    await page.goto("/admin");
-    await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
+    const response = await page.goto("/admin");
+    expect(response?.status()).toBe(403);
     await expect(page.getByText("Desk overview")).toHaveCount(0);
+    await expect(page.getByText("Desk session required.")).toBeVisible();
   });
 
   test("signing out and back in as Hale keeps a newly added piece", async ({ page }) => {

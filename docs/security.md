@@ -20,7 +20,7 @@ Collection state and photos still live in the browser. Neon `development` has sy
 
 ## Authorization
 
-Desk-only mail kinds and outbox `GET` require the desk cookie. Collector routes are gated in `components/app-frame.tsx` by client role. Record access uses an explicit actor stub in `lib/db/isolation.mjs`: a collector may only read their own customer, timepieces, photos, applications, and agreements; only staff/admin may prepare a contract or archive a signed PDF. WorkOS is not wired.
+Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; the client redirect in `components/app-frame.tsx` is not the gate. Collector routes stay client-gated. Record access uses an explicit actor stub in `lib/db/isolation.mjs`: a collector may only read their own customer, timepieces, photos, applications, and agreements; only staff/admin may prepare a contract or archive a signed PDF. WorkOS is not wired. Do not rotate `DESK_SESSION_SECRET` here.
 
 ## Secrets
 

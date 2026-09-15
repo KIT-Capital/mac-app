@@ -8,7 +8,7 @@ There is no tRPC router. Server surface is two App Router handlers. Everything e
 
 - `POST` sends or previews mail (`lib/mail.ts`). Kinds: inquiry, welcome, invite, appraisal, repurchase, financing, membership, test.
 - `invite` and `test` require a valid desk session cookie.
-- `GET` lists the process-local outbox; desk session required.
+- `GET` lists the process-local outbox; desk session required. Missing or invalid session is **403**.
 - Rate-limited per client IP.
 
 ## `POST` / `DELETE` `/api/desk-session`
@@ -24,4 +24,4 @@ Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces,
 
 ## Errors
 
-Handlers return JSON `{ error: string }` with 401 / 429 / 4xx as appropriate. Do not add a second undocumented mail or session path.
+Handlers return JSON `{ error: string }` with 401 / 403 / 429 / 4xx as appropriate. Desk-required mail and `/admin` pages return 403 without a staff session. Failed desk login remains 401. Do not add a second undocumented mail or session path.

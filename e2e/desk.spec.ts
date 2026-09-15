@@ -8,7 +8,29 @@ test.describe("desk", () => {
 
   test("mail outbox requires a desk session", async ({ request }) => {
     const response = await request.get("/api/mail");
-    expect(response.status()).toBe(401);
+    expect(response.status()).toBe(403);
+  });
+
+  test("desk pages require a desk session", async ({ request }) => {
+    const response = await request.get("/admin");
+    expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Desk session required." });
+  });
+
+  test("desk-only mail kinds require a desk session", async ({ request }) => {
+    const response = await request.post("/api/mail", {
+      data: { kind: "invite", name: "Guest", email: "guest@mac.test" },
+    });
+    expect(response.status()).toBe(403);
+  });
+
+  test("a forged desk cookie does not open the desk or the outbox", async ({ request }) => {
+    const headers = { Cookie: "mac_desk=not-a-signed-session" };
+    const admin = await request.get("/admin/mail", { headers });
+    expect(admin.status()).toBe(403);
+    const outbox = await request.get("/api/mail", { headers });
+    expect(outbox.status()).toBe(403);
+    await expect(outbox.json()).resolves.toEqual({ error: "Desk session required." });
   });
 
   test("desk login opens overview and client assets", async ({ page }) => {

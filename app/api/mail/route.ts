@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { allowMailRequest, dispatchMail, listOutbox, mailConfigured, mailFrom, parseMailRequest } from "@/lib/mail";
+import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
 
 const DESK_ONLY = new Set(["invite", "test"]);
@@ -16,8 +17,9 @@ async function deskSession() {
 }
 
 export async function GET() {
-  if (!(await deskSession())) {
-    return Response.json({ error: "Desk session required." }, { status: 401 });
+  const status = deskApiStatus(await deskSession());
+  if (status !== 200) {
+    return Response.json({ error: "Desk session required." }, { status });
   }
   return Response.json({
     configured: mailConfigured(),
@@ -34,8 +36,11 @@ export async function POST(request: Request) {
     }
 
     const payload = parseMailRequest(await request.json());
-    if (DESK_ONLY.has(payload.kind) && !(await deskSession())) {
-      return Response.json({ error: "Desk session required." }, { status: 401 });
+    if (DESK_ONLY.has(payload.kind)) {
+      const status = deskApiStatus(await deskSession());
+      if (status !== 200) {
+        return Response.json({ error: "Desk session required." }, { status });
+      }
     }
 
     const result = await dispatchMail(payload);
