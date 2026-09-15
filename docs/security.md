@@ -1,6 +1,6 @@
 # Security
 
-**Tier: CONTRACT** · Last verified: 2026-09-14
+**Tier: CONTRACT** · Last verified: 2026-09-15
 
 ## Authentication (current)
 
@@ -24,4 +24,8 @@ Desk-only mail kinds and outbox `GET` require the desk cookie. Collector routes 
 
 ## Secrets
 
-Key names only in `docs/config-and-env-map.md` and `.env.example`. Values belong in Doppler (planned) or Railway variables. Never commit `.env.local`.
+Key names only in `docs/config-and-env-map.md` and `.env.example`. Neon connection values for `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and `NEON_BRANCH` live in Doppler (`mac-app` / `dev`, `stg`, and `prd`). Desk password and `DESK_SESSION_SECRET` remain on the **separate desk-security plan** — do not fold them into this Neon setup. Never commit `.env.local`. Never print connection strings.
+
+## Identity (proposed)
+
+WorkOS AuthKit is the proposed production identity, staff roles, and MFA path. Neon Auth stays disabled. Do not enable it in `neon.ts`.

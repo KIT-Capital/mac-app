@@ -1,6 +1,6 @@
 # API
 
-**Tier: CONTRACT** · Last verified: 2026-09-14
+**Tier: CONTRACT** · Last verified: 2026-09-15
 
 There is no tRPC router. Server surface is two App Router handlers. Everything else is client state.
 
@@ -18,7 +18,7 @@ There is no tRPC router. Server surface is two App Router handlers. Everything e
 
 ## Client store
 
-`lib/store.tsx` is the collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. It is not a server capability. Agents that need to change collection state today must drive the UI or the same client module — there is no authorized server procedure yet.
+`lib/store.tsx` is the collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. It is not a server capability. Agents that need to change collection state today must drive the UI or the same client module — there is no authorized server procedure yet. Neon is connected for development ping only; do not add product tables or tRPC until `docs/plans/2026-09-15-production-persistence.md` Stage 1.
 
 ## Errors
 

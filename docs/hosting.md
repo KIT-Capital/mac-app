@@ -9,7 +9,7 @@ Desk and collector mail stay on **@mechartcap.com**. Do not move `info@`, `finan
 Production start command:
 
 ```bash
-npx next start --hostname 0.0.0.0 --port $PORT
+node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port $PORT
 ```
 
 Railway injects `PORT`. Config lives in `railway.json`.
@@ -63,6 +63,16 @@ Send-from stays **@mechartcap.com**, not @mechart.app.
 
 Add the DKIM / SPF / MX records Resend shows after you verify `mechartcap.com`. Until then, `onboarding@resend.dev` only delivers to the Resend account owner.
 
+## Cloudflare R2
+
+Private originals bucket: `mac-app` on the Norfolk AI account (location `WNAM`, public `r2.dev` off).
+
+Config names live in Doppler (`dev` / `prd`) and Railway (`production` / `Development`): `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Never commit those values. The app does not read R2 yet.
+
+## Environment separation
+
+`APP_ENV` is the database selector. `NODE_ENV` is not. Verified mapping: `docs/config-and-env-map.md`. Railway production now has `APP_ENV=production` (set with skip-deploys; not yet deployed). Startup runs `tools/harness/start-mac-app.mjs` and `instrumentation.ts` before the server accepts requests.
+
 ## What this stack does not add
 
-No database. Collection state is in the browser. No mailbox product is required on mechart.app for the app to run.
+The running Railway app still has no application database connection. Collector state remains in the browser. A Neon project exists (MAC App) and is used only for local/verified connectivity so far — see `architecture.md` and decision `0002`. No mailbox product is required on mechart.app for the app to run. Do not deploy or attach production `DATABASE_URL` until persistence is implemented and approved. The app does not read R2 yet.

@@ -21,4 +21,4 @@ Delete branch `equip/bf25a84`. No production data or DNS was changed.
 
 ## Out of scope
 
-WorkOS, Neon, tRPC, R2, Superpowers activation, Doppler provisioning, hardcoded desk-credential removal (separate security plan after Phase 1).
+WorkOS, tRPC, R2, Superpowers activation, and hardcoded desk-credential removal (separate security plan). Neon project **MAC App** and Doppler `mechanical-art-capital` are now provisioned for connectivity only — persistence is `docs/plans/2026-09-15-production-persistence.md`, not this equip change.

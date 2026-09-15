@@ -45,7 +45,7 @@ Kit requires every user-facing capability to share one authorized path for human
 
 ## 4. Media (current exception)
 
-Kit prefers presigned direct upload to object storage. This prototype stores collector photos as resized JPEG data URLs in `localStorage`. Do not introduce a server file proxy. Changing storage is a separate approved project.
+Kit prefers presigned direct upload to object storage. This prototype stores collector photos as resized JPEG data URLs in `localStorage`. Do not introduce a server file proxy. Neon **MAC App** is linked for development; the app still uses the browser store. Persistence is `docs/plans/2026-09-15-production-persistence.md`. Do not auto-migrate `localStorage`.
 
 ## 5. Design system is a contract
 
@@ -78,10 +78,11 @@ app/              Next.js App Router (collector + /admin desk)
 app/api/          mail + desk-session only
 components/       collector/desk UI + shadcn primitives
 lib/              auth, store, mail, theme, types
+neon.ts           Neon config (Auth off)
 docs/             project contract — see docs/README.md
 e2e/              Playwright
 tools/kit-guard/  payload boundary check
-tools/harness/    read-only structural check
+tools/harness/    read-only structural check + neon-ping
 ```
 
 ## Code review
@@ -89,3 +90,17 @@ tools/harness/    read-only structural check
 1. Self-review the final diff.
 2. Every installed PR review-bot comment is addressed or dismissed with a reason.
 3. Heavy multi-persona review runs only on explicit instruction, except auth, money, migrations, or CI.
+
+## Learned User Preferences
+
+- Treat GitHub `KIT-Capital/mac-app` as the product remote; do not push to or treat the Cursor-hosted `origin` as the canonical repo unless asked.
+- Keep desk-credential and cookie-secret changes as a separate approved security plan; do not change production auth behavior during Kit or equip work.
+- Do not create another Neon project; keep using the existing MAC App project.
+- Treat Neon/Railway environment separation as blocking: development, staging, and PR previews must never use or fall back to production database credentials.
+
+## Learned Workspace Facts
+
+- This checkout’s product remote is `github` → `https://github.com/KIT-Capital/mac-app.git`; Cursor `origin` is a second remote.
+- The Neon project for this app is MAC App (`withered-lake-05570428`); local development targets a development branch, not production.
+- The Cloudflare R2 bucket for this app is named `mac-app`.
+- Doppler workplace **KIT Capital** / project `mac-app` is the secret store (`dev`, `stg`, `prd`). Norfolk AI `mechanical-art-capital` is leftover and is not this app's source of truth.

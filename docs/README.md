@@ -1,6 +1,6 @@
 # Docs index
 
-**Tier: CONTRACT** · Last verified: 2026-09-14
+**Tier: CONTRACT** · Last verified: 2026-09-15
 
 This is a **router, not a summary**. Mechanical Art Capital is a Next.js collector/desk app. Norfolk Kit client-safe tooling is equipped at `bf25a84ca761379ecfc8656793fec1f377f4b28a`. `product-os.lock.json` is **proposed**, not signed or adopted.
 
@@ -17,6 +17,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | Auth, sessions, desk cookie | `security.md` · `architecture.md` |
 | Repo desk, repurchase, appraisal language | `business-logic.md` · `design-reference.md` |
 | Secrets, env key names | `config-and-env-map.md` |
+| Neon, Doppler, server persistence | `architecture.md` · `config-and-env-map.md` · `plans/2026-09-15-production-persistence.md` · `plans/2026-09-15-neon-railway-env-separation.md` · `decisions/0002-neon-mac-app-project.md` |
 | Anything that contradicts a decision | `decisions/` — surface the conflict |
 
 ## Files
@@ -38,7 +39,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | `kit-equip-record.md` | REFERENCE | Installed Kit files and source SHA |
 | `setup/` | REFERENCE | Editor operator setup |
 | `decisions/` | CONTRACT | One record per decision |
-| `plans/` | REFERENCE | Living plans |
+| `plans/` | REFERENCE | Living plans, including production persistence |
 
 ## Tiers
 

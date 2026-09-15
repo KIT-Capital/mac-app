@@ -1,4 +1,4 @@
 setup:
   # Name only — this file does not create a Doppler project or bill anything.
-  project: mechanical-art-capital
+  project: mac-app
   config: dev
