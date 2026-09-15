@@ -20,12 +20,14 @@ export default function ProfilePage() {
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <div className="relative h-[148px] overflow-hidden bg-[#0E2A44]">
-        <WatchPhoto
-          src="/watches/richard-mille.jpg"
-          watch={{ brand: "Richard Mille", caseType: "Tonneau" }}
-          alt=""
-          className="object-cover opacity-25"
-        />
+        <div className="absolute inset-0">
+          <WatchPhoto
+            src="/watches/richard-mille.jpg"
+            watch={{ brand: "Richard Mille", caseType: "Tonneau" }}
+            alt=""
+            className="opacity-25"
+          />
+        </div>
         <div className="relative flex items-start justify-between px-5 pt-14">
           <div className="flex items-start gap-3">
             <BurgerButton className="-ml-1 min-h-11 min-w-11" />

@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Star,
   UserRound,
+  UsersRound,
   X,
 } from "lucide-react";
 import { MacWordmark } from "@/components/mac-logo";
@@ -29,6 +30,7 @@ const COLLECTOR_LINKS = [
   { href: "/profile", label: "Account", icon: UserRound },
   { href: "/profile/preferences", label: "Preferences", icon: SlidersHorizontal },
   { href: "/profile/membership", label: "Membership", icon: Star },
+  { href: "/profile/partners", label: "Partners", icon: UsersRound },
   { href: "/profile/settings", label: "Settings", icon: Settings },
 ];
 

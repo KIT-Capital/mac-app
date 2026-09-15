@@ -135,3 +135,29 @@ export function roleFromEmail(email: string) {
 export function isDesk(user: { role?: string } | null) {
   return user?.role === "admin" || user?.role === "staff";
 }
+
+export function catalogMatch(
+  watch: { brand: string; model: string; reference?: string },
+  catalog: { brand: string; model: string; reference: string; typicalLow: number; typicalHigh: number }[],
+) {
+  const ref = (watch.reference || "").toLowerCase();
+  return (
+    catalog.find((c) => ref && c.reference.toLowerCase() === ref) ||
+    catalog.find(
+      (c) =>
+        c.brand.toLowerCase() === watch.brand.toLowerCase() &&
+        c.model.toLowerCase() === watch.model.toLowerCase(),
+    )
+  );
+}
+
+export function catalogValuation(
+  watch: { brand: string; model: string; reference?: string; valueLow?: number; valueHigh?: number },
+  catalog: { brand: string; model: string; reference: string; typicalLow: number; typicalHigh: number }[],
+) {
+  const match = catalogMatch(watch, catalog);
+  return {
+    valueLow: watch.valueLow ?? match?.typicalLow ?? 40000,
+    valueHigh: watch.valueHigh ?? match?.typicalHigh ?? 55000,
+  };
+}

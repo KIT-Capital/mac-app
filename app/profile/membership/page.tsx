@@ -72,7 +72,9 @@ export default function MembershipPage() {
                 You are currently an active Premium Member.
               </p>
               <p className="mt-1 text-[11px] text-mac-muted">
-                Next automatic mark-to-market certificate generates in 18 days.
+                {user.promoCode === "HOUSE65"
+                  ? "HOUSE65 is on file. Next membership month is complimentary."
+                  : "Next automatic mark-to-market certificate generates in 18 days."}
               </p>
             </div>
             <PillButton variant="ghost" onClick={() => updateProfile({ member: false })}>

@@ -189,16 +189,7 @@ function AddForm() {
       setError(`Add ${missing.join(" and ")}.`);
       return;
     }
-    const watch: Timepiece = { ...draft, status: "reviewing" };
-    persist(watch, true);
-    window.setTimeout(() => {
-      updateTimepiece(watch.id, {
-        status: "appraised",
-        evaluatedAt: new Date().toISOString().slice(0, 10),
-        valueLow: 42000,
-        valueHigh: 56000,
-      });
-    }, 1200);
+    persist({ ...draft, status: "reviewing" }, true);
   }
 
   return (

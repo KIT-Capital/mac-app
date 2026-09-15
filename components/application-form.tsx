@@ -14,11 +14,12 @@ import { useStore } from "@/lib/store";
 export function ApplicationForm({ backHref = "/collection" }: { backHref?: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const { timepieces, user, createAgreement, settings, agreements } = useStore();
+  const { timepieces, user, createAgreement, settings, agreements, shells } = useStore();
   const eligible = timepieces.filter((w) => w.status === "appraised" && w.financeable);
   const initialId = params.get("watch") || eligible[0]?.id || "";
+  const openShell = shells.find((s) => s.status === "open");
   const [watchId, setWatchId] = useState(initialId);
-  const [term, setTerm] = useState(8);
+  const [term, setTerm] = useState(openShell?.termMonths || settings.typicalTerm || 8);
   const [amount, setAmount] = useState("");
   const [delivery, setDelivery] = useState(DELIVERY_METHODS[0]);
   const [email, setEmail] = useState(user?.email || "");
@@ -28,7 +29,8 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
   const [busy, setBusy] = useState(false);
 
   const watch = timepieces.find((w) => w.id === watchId) ?? eligible[0];
-  const maxPurchase = watch ? estimateAdvance(watch.valueLow, watch.valueHigh, settings.maxLtv) : 0;
+  const purchaseShare = openShell?.ltv || settings.maxLtv;
+  const maxPurchase = watch ? estimateAdvance(watch.valueLow, watch.valueHigh, purchaseShare) : 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

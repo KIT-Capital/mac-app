@@ -1,11 +1,11 @@
 "use client";
 
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
-import { moneyRange } from "@/lib/catalog";
+import { catalogValuation, moneyRange } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function AdminAssetsPage() {
-  const { timepieces, updateTimepiece, removeTimepiece } = useStore();
+  const { timepieces, catalog, updateTimepiece, removeTimepiece } = useStore();
 
   return (
     <AdminChrome title="Asset database">
@@ -27,14 +27,15 @@ export default function AdminAssetsPage() {
             </button>
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const range = catalogValuation(w, catalog);
                 updateTimepiece(w.id, {
                   status: "appraised",
                   evaluatedAt: new Date().toISOString().slice(0, 10),
-                  valueLow: w.valueLow ?? 40000,
-                  valueHigh: w.valueHigh ?? 55000,
-                })
-              }
+                  valueLow: range.valueLow,
+                  valueHigh: range.valueHigh,
+                });
+              }}
             >
               Appraise
             </button>

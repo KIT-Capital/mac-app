@@ -6,12 +6,13 @@ import { Check, Clock, HelpCircle, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchPhoto } from "@/components/watch-photo";
 import { moneyRange } from "@/lib/catalog";
+import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
 export default function WatchDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { timepieces, updateTimepiece, removeTimepiece, settings } = useStore();
+  const { timepieces, updateTimepiece, removeTimepiece, settings, user } = useStore();
   const watch = timepieces.find((w) => w.id === params.id);
 
   if (!watch) {
@@ -133,14 +134,16 @@ export default function WatchDetailPage() {
               type="button"
               onClick={() => {
                 updateTimepiece(watch.id, { status: "reviewing" });
-                window.setTimeout(() => {
-                  updateTimepiece(watch.id, {
-                    status: "appraised",
-                    evaluatedAt: new Date().toISOString().slice(0, 10),
-                    valueLow: watch.valueLow ?? 42000,
-                    valueHigh: watch.valueHigh ?? 58000,
+                if (user) {
+                  void sendAppEmail({
+                    kind: "appraisal",
+                    name: user.name,
+                    email: user.email,
+                    phone: user.phone,
+                    watch: `${watch.brand} ${watch.model}`,
+                    deskEmail: settings.financingEmail,
                   });
-                }, 900);
+                }
               }}
               className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59]"
             >
