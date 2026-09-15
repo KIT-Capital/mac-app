@@ -16,7 +16,7 @@ export default function AgreementDetailPage() {
   const agreement = agreements.find((a) => a.id === params.id);
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
   const [started, setStarted] = useState(false);
-  const applied = hasApplication(user, agreements.length);
+  const applied = hasApplication(user, agreements);
   const repurchase = agreement
     ? buybackPrice(agreement.amount, agreement.termMonths, settings.startingRate)
     : 0;

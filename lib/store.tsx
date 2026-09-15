@@ -122,6 +122,8 @@ function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
   };
 }
 
+function normalizeUser(user: Profile, timepieceCount: number, agreementCount?: number): Profile;
+function normalizeUser(user: Profile | null, timepieceCount: number, agreementCount?: number): Profile | null;
 function normalizeUser(
   user: Profile | null,
   timepieceCount: number,
@@ -216,7 +218,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* start empty */
     }
-    setState(demoState());
+    setState({ ...demoState(), user: null });
   }, []);
 
   useEffect(() => {

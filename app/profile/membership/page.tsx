@@ -9,7 +9,7 @@ import { useStore } from "@/lib/store";
 
 export default function MembershipPage() {
   const { user, updateProfile, settings, agreements } = useStore();
-  const applied = hasApplication(user, agreements.length);
+  const applied = hasApplication(user, agreements);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

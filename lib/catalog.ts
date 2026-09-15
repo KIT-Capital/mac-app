@@ -121,11 +121,15 @@ export function buybackPrice(saleAmount: number, termMonths: number, annualScale
 }
 
 export function hasApplication(
-  user: { applicationSubmitted?: boolean; role?: string } | null,
-  agreementCount = 0,
+  user: { applicationSubmitted?: boolean; role?: string; email?: string } | null,
+  agreements: { email?: string }[] | number = [],
 ) {
-  if (user?.role === "admin" || user?.role === "staff") return true;
-  return Boolean(user?.applicationSubmitted) || agreementCount > 0;
+  if (!user) return false;
+  if (user.role === "admin" || user.role === "staff") return true;
+  if (user.applicationSubmitted) return true;
+  if (typeof agreements === "number") return agreements > 0;
+  const key = user.email?.trim().toLowerCase();
+  return agreements.some((item) => (item.email || "").trim().toLowerCase() === key);
 }
 
 export function roleFromEmail(email: string) {

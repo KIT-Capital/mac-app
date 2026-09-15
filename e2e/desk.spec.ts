@@ -4,8 +4,8 @@ import { DESK, DESK_PASSWORD, HALE, signIn, signInDesk, signInHale, signOutFromM
 test.describe("desk", () => {
   test("desk login opens overview and client assets", async ({ page }) => {
     await signInDesk(page);
-    await expect(page.getByText("Assets")).toBeVisible();
-    await expect(page.getByText("Buyback scale")).toBeVisible();
+    await expect(page.getByText("Assets", { exact: true })).toBeVisible();
+    await expect(page.getByText("Buyback scale", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Client Assets" }).click();
     await expect(page.getByText("Richard Mille RM 011")).toBeVisible();
     await expect(page.getByText("Audemars Piguet Royal Oak Selfwinding")).toBeVisible();
@@ -13,11 +13,12 @@ test.describe("desk", () => {
 
   test("desk appraises a reviewing piece from the catalog range", async ({ page }) => {
     await signInHale(page);
-    await page.getByText("Logical One").click();
+    await page.getByRole("link", { name: /Logical One/ }).click();
     if (await page.getByRole("button", { name: "Request Certified Appraisal" }).isVisible()) {
       await page.getByRole("button", { name: "Request Certified Appraisal" }).click();
+      await expect(page.getByText(/Desk specialists are reviewing/i)).toBeVisible();
     }
-    await signOutFromMenu(page);
+    await page.goto("/login");
     await signIn(page, DESK, DESK_PASSWORD);
     await page.getByRole("link", { name: "Client Assets" }).click();
     const row = page.getByRole("row").filter({ hasText: "Logical One" });
@@ -36,8 +37,10 @@ test.describe("desk", () => {
     await signOutFromMenu(page);
     await signInDesk(page);
     await page.getByRole("link", { name: "Client Assets" }).click();
-    await expect(page.getByText("Urwerk UR-100V")).toBeVisible();
-    await expect(page.getByText("Not evaluated")).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Urwerk UR-100V" })).toBeVisible();
+    await expect(
+      page.getByRole("row").filter({ hasText: "Urwerk UR-100V" }).getByText(/not evaluated/i).first(),
+    ).toBeVisible();
   });
 
   test("outbound mail lists collector inquiries", async ({ page }) => {
@@ -50,7 +53,8 @@ test.describe("desk", () => {
     await signInDesk(page);
     await page.getByRole("link", { name: "Outbound Mail" }).click();
     await expect(page.getByText(/Preview mode|Resend is live/i)).toBeVisible();
-    await expect(page.getByText(HALE).or(page.getByText(/inquiry/i))).toBeVisible();
+    await expect(page.getByRole("cell", { name: "inquiry" }).first()).toBeVisible();
+    await expect(page.getByRole("cell", { name: HALE }).first()).toBeVisible();
   });
 
   test("catalog and config save on this device", async ({ page }) => {

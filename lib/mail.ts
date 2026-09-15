@@ -45,12 +45,13 @@ export function listOutbox() {
 
 export function allowMailRequest(ip: string) {
   const now = Date.now();
+  const limit = mailConfigured() ? 8 : 80;
   const slot = hits.get(ip);
   if (!slot || now > slot.reset) {
     hits.set(ip, { n: 1, reset: now + 60_000 });
     return true;
   }
-  if (slot.n >= 8) return false;
+  if (slot.n >= limit) return false;
   slot.n += 1;
   return true;
 }

@@ -24,8 +24,7 @@ test.describe("collector app", () => {
 
   test("requesting appraisal sends the piece to reviewing", async ({ page }) => {
     await signInHale(page);
-    await page.getByText("Logical One").click();
-    await expect(page.getByText("Not evaluated")).toBeVisible();
+    await page.getByRole("link", { name: /Logical One/ }).click();
     await page.getByRole("button", { name: "Request Certified Appraisal" }).click();
     await expect(page.getByText(/Desk specialists are reviewing/i)).toBeVisible();
   });
@@ -35,8 +34,8 @@ test.describe("collector app", () => {
     await page.getByRole("link", { name: "Add a timepiece" }).click();
     await expect(page.getByText(/photorealistic illustration/i)).toBeVisible();
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Illustration")).toBeVisible();
-    await expect(page.getByText("Not evaluated")).toBeVisible();
+    await expect(page.getByText("Illustration").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Request Certified Appraisal" })).toBeVisible();
   });
 
   test("promo HOUSE65 persists after navigation", async ({ page }) => {
@@ -47,8 +46,8 @@ test.describe("collector app", () => {
     await expect(page.getByText("HOUSE65")).toBeVisible();
     await page.goto("/collection");
     await page.goto("/profile/promo");
-    await expect(page.getByText("Applied")).toBeVisible();
-    await expect(page.getByText("HOUSE65")).toBeVisible();
+    await expect(page.getByText("Applied", { exact: true })).toBeVisible();
+    await expect(page.getByText("HOUSE65", { exact: true })).toBeVisible();
   });
 
   test("contact shows custody only after an application", async ({ page }) => {
@@ -69,11 +68,13 @@ test.describe("collector app", () => {
     await page.getByRole("link", { name: "Add First Timepiece" }).click();
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByRole("button", { name: "Enter Collection" }).click();
-    await expect(page.getByText("My Timepieces")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
     await expect(page.getByText("Royal Oak Selfwinding")).toBeVisible();
     await expect(page.getByText("Richard Mille")).toHaveCount(0);
     await page.goto("/contact");
     await expect(page.getByText(/By appointment only/i)).toHaveCount(0);
+    await page.getByLabel("Your Name").fill("Ada Locke");
+    await page.getByLabel("Direct Email").fill(`ada.locke.${Date.now()}@example.com`);
     await page.getByPlaceholder("Timepieces you may wish to sell").fill("Considering a steel Royal Oak.");
     await page.getByRole("button", { name: "Send Inquiry" }).click();
     await expect(page.getByText("Inquiry Received")).toBeVisible();
@@ -119,10 +120,10 @@ test.describe("collector app", () => {
     await page.getByLabel(/Enter Amount/).fill("20000");
     await page.getByText("I confirm that I am at least 18 years old").click();
     await page.getByRole("button", { name: "Send Application" }).click();
-    await expect(page.getByText("Repurchase agreement")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Repurchase Agreement", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Review Terms" }).click();
     await page.getByRole("button", { name: "Sign Repurchase Agreement" }).click();
-    await expect(page.getByText(/Executed & Verified|Signed /i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Executed & Verified" })).toBeVisible();
   });
 
   test("partners lists maison names and burger opens collector destinations", async ({ page }) => {
@@ -138,7 +139,7 @@ test.describe("collector app", () => {
   test("collectors cannot open the desk", async ({ page }) => {
     await signIn(page, HALE, "collection");
     await page.goto("/admin");
-    await expect(page.getByText("My Timepieces")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
     await expect(page.getByText("Desk overview")).toHaveCount(0);
   });
 

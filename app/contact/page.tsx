@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Mail, MapPin, Phone, Send } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
@@ -17,6 +17,12 @@ export default function ContactPage() {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!user) return;
+    setName((current) => current || user.name);
+    setEmail((current) => current || user.email);
+  }, [user]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -76,7 +82,7 @@ export default function ContactPage() {
               </span>
               <span>{settings.financingEmail}</span>
             </a>
-            {hasApplication(user, agreements.length) ? (
+            {hasApplication(user, agreements) ? (
               <div className="flex items-center gap-3 text-mac-muted">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-[#FCB040]">
                   <MapPin className="h-3.5 w-3.5" />

@@ -7,18 +7,19 @@ export const DESK_PASSWORD = "MAC-Desk-2022";
 export async function signIn(page: Page, email: string, password: string) {
   await page.goto("/login");
   await page.getByLabel("Email Address").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await page.locator("#login-password").fill(password);
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
 }
 
 export async function signInHale(page: Page) {
   await signIn(page, HALE, "collection");
-  await expect(page.getByText("My Timepieces")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
 }
 
 export async function signInDesk(page: Page) {
   await signIn(page, DESK, DESK_PASSWORD);
-  await expect(page.getByText("Desk overview").or(page.getByText("Desk ·"))).toBeVisible();
+  await expect(page).toHaveURL(/\/admin/);
+  await expect(page.getByText(/Desk ·/)).toBeVisible();
 }
 
 export async function openMenu(page: Page) {
