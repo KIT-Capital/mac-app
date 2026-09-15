@@ -67,11 +67,11 @@ Add the DKIM / SPF / MX records Resend shows after you verify `mechartcap.com`. 
 
 Private originals bucket: `mac-app` on the Norfolk AI account (location `WNAM`, public `r2.dev` off).
 
-Config names live in Doppler (`dev` / `prd`) and Railway (`production` / `Development`): `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Never commit those values. The app does not read R2 yet.
+Config names live in Doppler (`dev` / `stg` / `prd`) and Railway (`production` / `Development` / `staging`): `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Never commit those values. The app does not read R2 yet.
 
 ## Environment separation
 
-`APP_ENV` is the database selector. `NODE_ENV` is not. Verified mapping: `docs/config-and-env-map.md`. Railway production now has `APP_ENV=production` (set with skip-deploys; not yet deployed). Startup runs `tools/harness/start-mac-app.mjs` and `instrumentation.ts` before the server accepts requests.
+`APP_ENV` is the database selector. `NODE_ENV` is not. Verified mapping: `docs/config-and-env-map.md`. Production, Development, and staging each map to their Neon branch. Startup runs `tools/harness/start-mac-app.mjs` and `instrumentation.ts` before the server accepts requests.
 
 ## What this stack does not add
 

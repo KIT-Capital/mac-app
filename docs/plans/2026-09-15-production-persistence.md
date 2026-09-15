@@ -8,7 +8,7 @@ origin: owner brief 2026-09-15 (production repo desk)
 
 # Production persistence
 
-**Status:** active · planning and connectivity only · no app persistence yet
+**Status:** active · Stage 1 Drizzle probe on Neon `development` only · browser store still live · no production migration
 
 Keep Next.js, React, TypeScript, Tailwind, and shadcn. Do not rewrite the framework. Do not run production migrations or deploy from this plan.
 
@@ -30,9 +30,11 @@ MAC must hold customer, timepiece, contract, photo, and ledger records on server
 | Branch `development` | Verified | Schema-only `br-summer-truth-a52brhnv` |
 | Branch `production` | Verified | Default; local must not target it |
 | Doppler `dev` / `prd` | Verified | Plus `APP_ENV`; see env-separation plan |
-| `npm run db:ping` | Verified | `neondb` / Postgres 18.6; no tables |
+| `npm run db:ping` | Verified | `neondb` / Postgres 18.6 |
+| Drizzle Stage 1 | Verified | `mac_schema_probe` on `development` only; production and staging have no tables |
 | Neon Auth | Disabled | Keep off |
-| WorkOS, Drizzle schema, R2, ledger, signing | Proposed | R2 bucket `mac-app` exists; app does not read it yet |
+| WorkOS, R2, ledger, signing | Proposed | R2 bucket `mac-app` exists; app does not read it yet |
+| Drizzle `customers` / `timepieces` | Verified | `development` only; UI still uses `localStorage` |
 | Desk-credential security PR | Proposed | Separate approval boundary |
 | Browser → server migration | Incomplete | No path yet; preserve local data |
 
@@ -156,9 +158,9 @@ That is Milestone A. It is not “database user exists.”
 ## Stages in plain language
 
 0. **Foundation (this pass, verified)** — one Neon project, `development` vs `production`, Doppler `dev`/`prd`, local commands through Doppler, Neon Auth off, browser store untouched.
-1. **Compatibility spike** — Drizzle against `development` only; one ping table or health query; no product tables in `production`.
-2. **Identity + customer + timepiece** — server records; WorkOS can wait behind a local session stub if not purchased; row-level isolation tests.
-3. **Original photos** — R2 (or approved equivalent) + checksum + thumbnails. Keep preview data URLs in the UI until then.
+1. **Compatibility spike (verified 2026-09-15)** — Drizzle against `development` only; `mac_schema_probe` + `npm run db:migrate` / `db:drizzle-ping`; no product tables in `production` or `staging`.
+2. **Identity + customer + timepiece (verified 2026-09-15)** — `customers` and `timepieces` on `development` only; actor stub in `lib/db/isolation.mjs`; WorkOS subject column stays null; `npm run test:db` proves collector A cannot read B.
+3. **Original photos (verified 2026-09-15)** — `photo_objects` on `development`; checksum must match before save; retry of the same digest is a no-op; collector isolation covers photos. Object store is an adapter (in-memory in tests). Preview data URLs stay in the UI. No server file proxy.
 4. **Prepare contract + snapshots** — desk prepares; collector application is not the executable.
 5. **Sign + archive PDF** — adapter; sign-complete and archive-success are different states.
 6. **Ledger + snapshots** — integer cents; owner/accountant names the first accounts; no vendor.
@@ -173,6 +175,9 @@ Stage 1 is the smallest **technical** increment after this pass. Milestone A is 
 |---|---|---|
 | `npm run dev` | Doppler `dev` | `development` |
 | `npm run db:ping` | Doppler `dev` | `development` |
+| `npm run db:migrate` | Doppler `dev` | `development` only; refuses staging/production |
+| `npm run db:drizzle-ping` | Doppler `dev` | `development` |
+| `npm run test:db` | Doppler `dev` | Stage 2 isolation against `development` |
 | `npm run dev:plain` | none | no Neon env |
 | `npm run start` | Railway (later) | must not use `dev` secrets |
 
@@ -186,7 +191,7 @@ Stage 1 is the smallest **technical** increment after this pass. Milestone A is 
 | `@neon/env` | dependency of `@neon/config`; unused by app | Keep installed; do not import in app code |
 | `@neondatabase/serverless` | HTTP driver used by `tools/harness/neon-ping.mjs` | Keep; planned Drizzle driver |
 | Neon Auth libraries | none | Do not add |
-| Drizzle | not installed | Add only in Stage 1 on `development` |
+| Drizzle | installed | Stage 1 probe on `development`; migrate via `DATABASE_URL_UNPOOLED` |
 
 Conflict: `neon checkout` can pull `DATABASE_URL` into `.env.local` and fight Doppler. Use `--no-env-pull`. Do not put Neon URLs back in `.env.local`.
 
@@ -216,9 +221,10 @@ Conflict: `neon checkout` can pull `DATABASE_URL` into `.env.local` and fight Do
 
 ## Verification of this pass
 
-- Branches: `production` (default), `development` (schema-only, empty `public` except Neon helper).
+- Branches: `production` (default, empty public), `development` (`mac_schema_probe` + Drizzle log only), `staging` (empty public).
 - `.neon` branch: `development`.
 - Doppler `dev` injects `NEON_BRANCH=development`; `prd` injects `production`.
-- `npm run db:ping` connected to `neondb` / Postgres 18.6 without printing URLs.
-- `.env.local` no longer holds migrated Neon secrets.
-- No production migration. No deploy. Browser store unchanged.
+- `npm run db:ping` and `npm run db:drizzle-ping` connected to `neondb` / development without printing URLs.
+- `npm run db:migrate` refused staging/production in unit tests and applied the probe only on `development`.
+- Playwright e2e strips `RESEND_API_KEY` so inquiries stay in the preview outbox.
+- No production migration. Browser store unchanged.

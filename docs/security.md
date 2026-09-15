@@ -16,11 +16,11 @@ Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
 ## Data
 
-Collection state and photos live in the browser. The server does not persist collector vaults. Mail payloads go to Resend or the in-memory outbox. Do not log secrets or cookie tokens.
+Collection state and photos still live in the browser. Neon `development` now has synthetic `customers` and `timepieces` rows for Stage 2 isolation tests. The UI does not read them. Mail payloads go to Resend or the in-memory outbox. Do not log secrets or cookie tokens.
 
 ## Authorization
 
-Desk-only mail kinds and outbox `GET` require the desk cookie. Collector routes are gated in `components/app-frame.tsx` by client role.
+Desk-only mail kinds and outbox `GET` require the desk cookie. Collector routes are gated in `components/app-frame.tsx` by client role. Stage 2 record access uses an explicit actor stub in `lib/db/isolation.mjs`: a collector may only read their own customer and timepieces; staff and admin may read all. WorkOS is not wired.
 
 ## Secrets
 

@@ -18,14 +18,13 @@ Recorded in `docs/config-and-env-map.md`. Host allowlists are the control: `neon
 
 ## Findings that stay open until approved
 
-1. Railway production `APP_ENV=production` is set but not deployed.
-2. `DATABASE_URL_UNPOOLED` is on the app service in both Railway environments. Migration credentials should move to a migrate-only process later; do not remove them from production in this pass.
-3. There is no staging Railway environment. Doppler `stg` has `APP_ENV=staging` and no database URLs.
-4. No Railway PR/ephemeral environments exist. The local Railway CLI cannot query `prDeploys`.
-5. Railway Development and production both deploy `KIT-Capital/mac-app@main`.
-6. The running Next.js process does not open a database connection. Live checks used the service/Doppler URLs, not the live Node process.
-7. Railway Development has extra names not in Doppler (`DESK_SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO`). Production now has `RESEND_API_KEY` and leftover `RESEND_API`. Development still has only `RESEND_API`.
-8. Neon production branch is not protected. Endpoint `passwordless_access` is on. Recommend later; do not change production now.
+1. Railway staging (`584887ff-73b2-4afc-b681-a296ff5d309a`) now has Doppler `stg` mapping: `APP_ENV=staging`, Neon `ep-plain-dream-a5n3yxex`. Restarted 2026-09-15; `DATABASE_URL_UNPOOLED` stayed off the app.
+2. `DATABASE_URL_UNPOOLED` is off the Railway app service in all three environments. Keep it in Doppler for a migrate-only process.
+3. No Railway PR/ephemeral environments exist.
+4. All three Railway environments deploy `KIT-Capital/mac-app@main` @ `076823e`.
+5. The running Next.js process does not open a database connection. Live checks used the stored URLs, not the live Node process.
+6. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler and all three Railway environments. Staging `NEXT_PUBLIC_SITE_URL` is the Railway staging host. Production and Development keep `https://mechart.app`.
+7. Neon production branch is protected.
 
 ## Delivery method (one path)
 

@@ -5,9 +5,13 @@
   "scripts": {
     "dev": "doppler run -- node tools/harness/start-mac-app.mjs dev --port 43173",
     "dev:plain": "node tools/harness/start-mac-app.mjs dev --port 43173",
+    "dev:e2e": "doppler run -- node tools/harness/start-e2e.mjs dev --port 43173",
     "db:ping": "doppler run -- node tools/harness/neon-ping.mjs",
     "db:guard": "doppler run -- node tools/harness/neon-env-guard.mjs",
-    "test:unit": "node --test lib/env/database-mapping.test.mjs tools/harness/neon-env-guard.test.mjs",
+    "db:migrate": "doppler run -- node tools/harness/drizzle-migrate.mjs",
+    "db:drizzle-ping": "doppler run -- node tools/harness/drizzle-ping.mjs",
+    "test:unit": "node --test lib/env/database-mapping.test.mjs lib/env/development-migration.test.mjs lib/db/isolation.test.mjs lib/db/money.test.mjs lib/storage/object-store.test.mjs tools/harness/neon-env-guard.test.mjs tools/harness/drizzle-migrate.test.mjs",
+    "test:db": "doppler run -- npx tsx --test lib/db/records.test.ts lib/db/photos.test.ts",
     "build": "next build",
     "start": "node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port ${PORT:-3000}",
     "lint": "eslint",
@@ -21,6 +25,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.0",
+    "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.45.0",
     "next": "16.3.5",
     "react": "19.2.8",
@@ -36,9 +41,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

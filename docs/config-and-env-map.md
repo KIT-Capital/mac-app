@@ -13,14 +13,15 @@ Key **names** only. Values belong in Doppler or Railway variables. See `.env.exa
 | Railway workspace | Norfolk AI | Project created 2026-09-15 |
 | Railway project | `virtuous-elegance` / `4389b792-b15b-49e7-ad8c-02a7e7e4857e` | Only MAC Railway project |
 | Railway service | `mac-app` / `e9cae314-c86f-41cd-aa1e-9c1b78f66183` | No worker, volume, or Railway bucket |
-| Railway production | `296c612f-9b50-4725-9e3c-9e57370ec128` | Domain `mac-app-production-bc71.up.railway.app` |
+| Railway production | `296c612f-9b50-4725-9e3c-9e57370ec128` | Domain `mac-app-production-bc71.up.railway.app` · custom `mechart.app` |
 | Railway Development | `97a9b02d-5feb-413b-a4b1-982d54ad8fa4` | Domain `mac-app-development.up.railway.app` |
-| Deployed git | `KIT-Capital/mac-app@main` | Both Railway environments |
+| Railway staging | `584887ff-73b2-4afc-b681-a296ff5d309a` | Domain `mac-app-staging.up.railway.app` · Doppler `stg` mapping copied 2026-09-15 |
+| Deployed git | `KIT-Capital/mac-app@main` @ `076823e` | All three Railway environments |
 | Shared Railway variables | none | No service-to-service references |
-| PR / ephemeral Railway envs | none observed | Staging Railway env does not exist |
+| PR / ephemeral Railway envs | none observed | No PR preview environments |
 | Doppler workplace | KIT Capital | Project `mac-app` |
 | Doppler configs | `dev`, `prd`, `stg`, `dev_personal` | None inherit; `stg` has staging Neon URLs |
-| Local Doppler | `doppler.yaml` → `dev` | `npm run dev`, `db:ping`, `db:guard` |
+| Local Doppler | `doppler.yaml` → `dev` | `npm run dev`, `db:ping`, `db:guard`, `db:migrate`, `db:drizzle-ping` |
 | Neon org | KIT Capital / `org-snowy-silence-89826884` | Do not create another project |
 | Neon project | MAC App / `withered-lake-05570428` | `aws-us-east-2` · Postgres 18 · database `neondb` |
 | Neon `development` | `br-summer-truth-a52brhnv` | Schema-only · endpoint `ep-red-union-a5fze04l` |
@@ -39,9 +40,10 @@ Live `SELECT current_database()` through each stored URL returned `neondb`. `neo
 | Doppler `prd` | `production` | `production` | `ep-wild-fire-a5a5m53v` | `neondb` |
 | Doppler `stg` | `staging` | `staging` | `ep-plain-dream-a5n3yxex` | `neondb` |
 | Railway Development | `development` | `development` | `ep-red-union-a5fze04l` | `neondb` |
+| Railway staging | `staging` | `staging` | `ep-plain-dream-a5n3yxex` | `neondb` |
 | Railway production | `production` | `production` | `ep-wild-fire-a5a5m53v` | `neondb` |
 
-Railway production `APP_ENV=production` was set with skip-deploys. It is not live on the current deployment until an approved redeploy.
+Railway staging now matches Doppler `stg`. `DATABASE_URL_UNPOOLED` was not copied onto the app service.
 
 The Next.js runtime still does not open a database connection. The live checks used the stored URLs, not the running Node process.
 
@@ -51,30 +53,30 @@ The Next.js runtime still does not open a database connection. The live checks u
 |---|---|---|
 | App / startup | pooled + unpooled if they match | `start-mac-app.mjs` and `instrumentation.ts`. Unpooled on the app service is a follow-up |
 | Guard / ping | pooled + unpooled if they match | `npm run db:guard` · `npm run db:ping` |
-| Migrate | `DATABASE_URL_UNPOOLED` only | No migrate command yet; production migrate is rejected unless explicitly allowed |
+| Migrate | `DATABASE_URL_UNPOOLED` only | `npm run db:migrate` · development only · production and staging rejected |
 
-`DATABASE_URL_UNPOOLED` is still attached to the Railway app service. That is a recorded gap. Do not remove it from production in this pass.
+`DATABASE_URL_UNPOOLED` is in Doppler only. It is not on the Railway `mac-app` service in Development, staging, or production.
 
 ## Delivery method
 
 Doppler is authoritative. One path only:
 
-1. Change the name in Doppler (`dev` ↔ Railway Development / local; `prd` ↔ Railway production).
+1. Change the name in Doppler (`dev` ↔ Railway Development / local; `stg` ↔ Railway staging; `prd` ↔ Railway production).
 2. Copy that name to Railway with skip-deploys.
 3. Local processes use `doppler run`. Railway `start` reads Railway variables, not Doppler.
 4. Do not put connection strings in `.env.local`. Use `neon checkout --no-env-pull`.
 
-Railway production now has `RESEND_API_KEY` (app-facing name) and still has leftover `RESEND_API`. Railway Development still has only `RESEND_API`. Neither Resend name is in Doppler. Development also has `DESK_SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO` that Doppler does not.
+Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover `RESEND_API` is gone. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler (`dev` / `stg` / `prd` / `dev_personal`) and all three Railway environments. `NEXT_PUBLIC_SITE_URL` is `https://mac-app-staging.up.railway.app` on Doppler `stg` / Railway staging, and `https://mechart.app` on Doppler `prd` / Railway production and Development. Production now also has `RESEND_REPLY_TO` from Doppler `prd`. Development still has `DESK_SESSION_SECRET`.
 
 ## Key catalog
 
 | Name | Where used | Status | Notes |
 |---|---|---|---|
 | `APP_ENV` | Mapping guard | Doppler + Railway production/Development | `development` · `staging` · `preview` · `production`. Required when any database URL is set |
-| `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Default `https://mechart.app` |
+| `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Production/Development `https://mechart.app` · staging Railway host |
 | `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default exists; separate security plan |
 | `RESEND_API_KEY` | `/api/mail` | Implemented | Present on Railway production; Development still has `RESEND_API` only |
-| `RESEND_FROM_EMAIL` | Outbound From | Implemented | Stay `@mechartcap.com` |
+| `RESEND_FROM_EMAIL` | Outbound From | Implemented | `info@mechartcap.com` · stay `@mechartcap.com` |
 | `RESEND_REPLY_TO` | Outbound Reply-To | Implemented | Default `financing@mechartcap.com` |
 | `PORT` | Railway / `next start` | Implemented | Injected by Railway |
 | `NODE_ENV` | Next.js | Implemented | Must not select the database |
@@ -88,6 +90,6 @@ Railway production now has `RESEND_API_KEY` (app-facing name) and still has left
 | `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified in Doppler | Also on Railway; never print |
 | `R2_SECRET_ACCESS_KEY` | R2 S3 secret | Verified in Doppler | Same; never print or commit |
 
-Build (`next build`) and Playwright do not select a database. Playwright starts `npm run dev`, which uses Doppler `dev`. Kit-guard CI has no database URL. There is no migrate script.
+Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–3 isolation against that branch. Kit-guard CI has no database URL.
 
 Do not move mail or demo logins to `@mechart.app`.
