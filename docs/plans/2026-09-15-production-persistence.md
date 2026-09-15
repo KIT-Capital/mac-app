@@ -179,7 +179,7 @@ Stage 1 is the smallest **technical** increment after this pass. Milestone A is 
 | `npm run db:migrate` | Doppler `dev` | `development` only; refuses staging/production |
 | `npm run db:drizzle-ping` | Doppler `dev` | `development` |
 | `npm run test:db` | Doppler `dev` | Stage 2 isolation against `development` |
-| `npm run r2:ping` | Doppler `dev` | Put/HEAD/delete a `dev-probes/` object; refuses production |
+| `npm run r2:ping` | Doppler `dev` | Put/HEAD/delete a `dev-probes/` object; development only |
 | `npm run dev:plain` | none | no Neon env |
 | `npm run start` | Railway (later) | must not use `dev` secrets |
 
