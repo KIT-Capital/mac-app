@@ -22,8 +22,6 @@ jobs:
           cache: npm
 
       - run: npm ci
-      # lint is still red on pre-existing collector react-hooks findings
-      # (contact, burger-menu, watch-photo, store hydrate). Do not add it
-      # as a merge gate until those files are fixed in their own PR.
+      - run: npm run lint
       - run: npm run test:unit
       - run: npm run build

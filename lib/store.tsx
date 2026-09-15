@@ -3,9 +3,8 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -76,6 +75,63 @@ function emptyState(): AppState {
     settings: DEMO_SETTINGS,
     profiles: {},
   };
+}
+
+const SERVER_STATE = emptyState();
+let snapshot: AppState = SERVER_STATE;
+const listeners = new Set<() => void>();
+let clientLoaded = false;
+
+function readPersistedState(): AppState {
+  try {
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ??
+      localStorage.getItem("mac-app-state-v2") ??
+      localStorage.getItem("mac-app-state-v1");
+    if (raw) {
+      const parsed = JSON.parse(raw) as AppState;
+      const timepieces = Array.isArray(parsed.timepieces) ? parsed.timepieces : [];
+      const agreements = Array.isArray(parsed.agreements) ? parsed.agreements : [];
+      const counts = ownedCounts(parsed.user?.email, timepieces, agreements);
+      return {
+        ...withDeskDefaults({ ...parsed, agreements }, timepieces),
+        user: normalizeUser(parsed.user, counts.pieces, counts.agreements),
+      };
+    }
+  } catch {
+    /* start empty */
+  }
+  return { ...demoState(), user: null };
+}
+
+function subscribeStore(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getStoreSnapshot() {
+  if (!clientLoaded) {
+    clientLoaded = true;
+    snapshot = readPersistedState();
+  }
+  return snapshot;
+}
+
+function getServerStoreSnapshot() {
+  return SERVER_STATE;
+}
+
+function updateStore(recipe: (prev: AppState) => AppState) {
+  const prev = getStoreSnapshot();
+  const next = recipe(prev);
+  if (next === prev) return;
+  snapshot = next;
+  if (next.hydrated) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  }
+  listeners.forEach((listener) => listener());
 }
 
 function demoState(): AppState {
@@ -200,41 +256,13 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(emptyState);
-
-  useEffect(() => {
-    try {
-      const raw =
-        localStorage.getItem(STORAGE_KEY) ??
-        localStorage.getItem("mac-app-state-v2") ??
-        localStorage.getItem("mac-app-state-v1");
-      if (raw) {
-        const parsed = JSON.parse(raw) as AppState;
-        const timepieces = Array.isArray(parsed.timepieces) ? parsed.timepieces : [];
-        const agreements = Array.isArray(parsed.agreements) ? parsed.agreements : [];
-        const counts = ownedCounts(parsed.user?.email, timepieces, agreements);
-        setState({
-          ...withDeskDefaults({ ...parsed, agreements }, timepieces),
-          user: normalizeUser(parsed.user, counts.pieces, counts.agreements),
-        });
-        return;
-      }
-    } catch {
-      /* start empty */
-    }
-    setState({ ...demoState(), user: null });
-  }, []);
-
-  useEffect(() => {
-    if (!state.hydrated) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+  const state = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerStoreSnapshot);
 
   const value = useMemo<Store>(
     () => ({
       ...state,
       signIn: (profile) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const email = (profile?.email ?? prev.user?.email ?? DEMO_PROFILE.email).trim();
           const key = profileKey(email);
           const saved = prev.profiles[key];
@@ -280,7 +308,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       signUp: (profile) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const user = profileForEmail(profile.email, {
             ...profile,
             role: "collector",
@@ -296,12 +324,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       signOut: () =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           user: null,
         })),
       updateProfile: (patch) =>
-        setState((prev) => {
+        updateStore((prev) => {
           if (!prev.user) return prev;
           const nextEmail = (patch.email ?? prev.user.email).trim();
           if (prev.user.role === "collector" && isReservedDeskEmail(nextEmail)) {
@@ -344,7 +372,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       updatePreferences: (patch) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const nextPrefs = mergePreferences({ ...prev.user?.preferences, ...patch });
           const user = prev.user ? { ...prev.user, preferences: nextPrefs } : prev.user;
           return {
@@ -355,7 +383,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       completeOnboarding: () =>
-        setState((prev) => {
+        updateStore((prev) => {
           if (!prev.user) return prev;
           const user = { ...prev.user, onboardingComplete: true };
           return {
@@ -365,7 +393,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       addTimepiece: (watch) =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           timepieces: [watch, ...prev.timepieces],
           photos: [
@@ -382,12 +410,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ],
         })),
       updateTimepiece: (id, patch) =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           timepieces: prev.timepieces.map((w) => (w.id === id ? { ...w, ...patch } : w)),
         })),
       removeTimepiece: (id) =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           timepieces: prev.timepieces.filter((w) => w.id !== id),
           photos: prev.photos.filter((p) => p.assetId !== id),
@@ -403,7 +431,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
         };
-        setState((prev) => {
+        updateStore((prev) => {
           const user = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;
           return {
             ...prev,
@@ -415,17 +443,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return agreement;
       },
       updateAgreement: (id, patch) =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((a) => (a.id === id ? { ...a, ...patch } : a)),
         })),
       removeAgreement: (id) =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.filter((a) => a.id !== id),
         })),
       signAgreement: (id) =>
-        setState((prev) => ({
+        updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((a) =>
             a.id === id
@@ -434,9 +462,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ),
         })),
       updateSettings: (patch) =>
-        setState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
+        updateStore((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
       upsertUser: (user) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const exists = prev.users.some((u) => u.id === user.id);
           return {
             ...prev,
@@ -444,9 +472,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       removeUser: (id) =>
-        setState((prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) })),
+        updateStore((prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) })),
       upsertCatalog: (entry) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const exists = prev.catalog.some((c) => c.id === entry.id);
           return {
             ...prev,
@@ -454,9 +482,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       removeCatalog: (id) =>
-        setState((prev) => ({ ...prev, catalog: prev.catalog.filter((c) => c.id !== id) })),
+        updateStore((prev) => ({ ...prev, catalog: prev.catalog.filter((c) => c.id !== id) })),
       upsertShell: (shell) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const exists = prev.shells.some((s) => s.id === shell.id);
           return {
             ...prev,
@@ -464,9 +492,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       removeShell: (id) =>
-        setState((prev) => ({ ...prev, shells: prev.shells.filter((s) => s.id !== id) })),
+        updateStore((prev) => ({ ...prev, shells: prev.shells.filter((s) => s.id !== id) })),
       upsertPhoto: (photo) =>
-        setState((prev) => {
+        updateStore((prev) => {
           const exists = prev.photos.some((p) => p.id === photo.id);
           return {
             ...prev,
@@ -474,12 +502,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }),
       removePhoto: (id) =>
-        setState((prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) })),
+        updateStore((prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) })),
       resetDemo: () => {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem("mac-app-state-v2");
         localStorage.removeItem("mac-app-state-v1");
-        setState(demoState());
+        updateStore(() => demoState());
       },
     }),
     [state]

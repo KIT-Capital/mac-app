@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { CheckCircle2, Mail, MapPin, Phone, Send } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
@@ -14,25 +14,21 @@ export default function ContactPage() {
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || "");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (!user) return;
-    setName((current) => current || user.name);
-    setEmail((current) => current || user.email);
-  }, [user]);
+  const resolvedName = name || user?.name || "";
+  const resolvedEmail = email || user?.email || "";
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!email.includes("@")) return;
+    if (!resolvedEmail.includes("@")) return;
     setBusy(true);
     setError("");
     const result = await sendAppEmail({
       kind: "inquiry",
-      name,
-      email,
+      name: resolvedName,
+      email: resolvedEmail,
       message,
       phone: user?.phone,
     });
@@ -115,7 +111,7 @@ export default function ContactPage() {
             <form onSubmit={onSubmit} className="mt-4 space-y-3.5">
               <Field label="Your Name">
                 <input
-                  value={name}
+                  value={resolvedName}
                   onChange={(e) => setName(e.target.value)}
                   required
                   placeholder="Jonathan Hale"
@@ -126,7 +122,7 @@ export default function ContactPage() {
               <Field label="Direct Email">
                 <input
                   type="email"
-                  value={email}
+                  value={resolvedEmail}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="collector@domain.com"

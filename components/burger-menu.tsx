@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { LayoutDashboard, Menu, X } from "lucide-react";
 import { CollectorNav } from "@/components/collector-nav";
@@ -35,11 +35,11 @@ function BurgerDrawer({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { user, signOut } = useStore();
   const desk = isDesk(user);
-  const [host, setHost] = useState<Element | null>(null);
-
-  useEffect(() => {
-    setHost(document.querySelector(".mac-app-screen"));
-  }, []);
+  const host = useSyncExternalStore(
+    () => () => {},
+    () => document.querySelector(".mac-app-screen"),
+    () => null,
+  );
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
