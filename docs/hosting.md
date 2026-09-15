@@ -1,6 +1,6 @@
 # Hosting
 
-The collector app runs on **Railway**. The public hostname is **[mechart.app](https://mechart.app)**, registered at **Cloudflare**.
+The collector app runs on **Railway**. The public hostname is **[mechart.app](https://mechart.app)**, registered at **Cloudflare**. Source repo: [github.com/KIT-Capital/mac-app](https://github.com/KIT-Capital/mac-app.git).
 
 Desk and collector mail stay on **@mechartcap.com**. Do not move `info@`, `financing@`, or demo logins to `@mechart.app`.
 

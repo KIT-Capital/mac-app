@@ -2,9 +2,11 @@
 
 Prototype of the Mechanical Art Capital collector app, rebuilt from the 14 November 2022 Limus Design presentation and the official MAC palette.
 
+Source: [github.com/KIT-Capital/mac-app](https://github.com/KIT-Capital/mac-app.git).
+
 Collectors get one plane of UI on **phone, iPad, and desktop** — full-bleed, no nested device frames. The **admin desk** is a separate 16:9 laptop console (`admin@mechartcap.com`).
 
-The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official Logo-FF wordmark (Final Logo 2 Gold). See `docs/design-reference.md`.
+The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official Logo-FF gear mark (no wordmark). See `docs/design-reference.md`.
 
 ## What you can do
 
@@ -42,6 +44,8 @@ Then add the CNAME / TXT records Railway prints in the Cloudflare DNS editor for
 ## Run locally
 
 ```bash
+git clone https://github.com/KIT-Capital/mac-app.git
+cd mac-app
 npm install
 npx playwright install chromium
 npm run dev -- --port 43173
