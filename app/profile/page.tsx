@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Asterisk, Camera, Mail, Pencil, Phone, Power, RefreshCw, Settings, SlidersHorizontal, Star } from "lucide-react";
 import { BurgerButton } from "@/components/burger-menu";
+import { WatchPhoto } from "@/components/watch-photo";
 import { useStore } from "@/lib/store";
 
 const TILES = [
@@ -20,13 +20,11 @@ export default function ProfilePage() {
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <div className="relative h-[148px] overflow-hidden bg-[#0E2A44]">
-        <Image
+        <WatchPhoto
           src="/watches/richard-mille.jpg"
+          watch={{ brand: "Richard Mille", caseType: "Tonneau" }}
           alt=""
-          fill
-          sizes="412px"
           className="object-cover opacity-25"
-          priority
         />
         <div className="relative flex items-start justify-between px-5 pt-14">
           <div className="flex items-start gap-3">
@@ -53,12 +51,10 @@ export default function ProfilePage() {
       <div className="-mt-11 flex flex-1 flex-col px-5 pb-4">
         <div className="relative mx-auto h-[88px] w-[88px]">
           <div className="h-full w-full overflow-hidden rounded-full border-[3px] border-mac-bg bg-mac-card">
-            <Image
+            <WatchPhoto
               src={avatar}
+              watch={{ band: "bracelet" }}
               alt={user?.name ? `${user.name} portrait` : "Account portrait"}
-              width={88}
-              height={88}
-              className="h-full w-full object-cover"
             />
           </div>
           <Link

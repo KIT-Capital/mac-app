@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
+import { WatchPhoto } from "@/components/watch-photo";
 import { buybackPrice, COMPANY, hasApplication, money } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
@@ -63,6 +64,15 @@ export default function AgreementDetailPage() {
             on MAC&apos;s preset scale for the selected term, provided title remains clear and the
             pieces remain in the described condition.
           </p>
+          {watches.length ? (
+            <div className="flex gap-2">
+              {watches.map((w) => (
+                <div key={w.id} className="h-16 w-16 overflow-hidden rounded-md bg-black/5">
+                  <WatchPhoto src={w.images[0]} watch={w} alt={`${w.brand} ${w.model}`} />
+                </div>
+              ))}
+            </div>
+          ) : null}
           <p>
             Description of timepieces:{" "}
             {watches.map((w) => `${w.brand} ${w.model} (${w.reference || w.id})`).join("; ") ||

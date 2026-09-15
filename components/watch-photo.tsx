@@ -21,13 +21,14 @@ export function WatchPhoto({
   showCaption?: boolean;
 }) {
   const fallback = illustrationFor(watch);
-  const [current, setCurrent] = useState(src || fallback);
-  const [illustrated, setIllustrated] = useState(!src);
+  const photo = src?.trim() || "";
+  const [current, setCurrent] = useState(photo || fallback);
+  const [illustrated, setIllustrated] = useState(!photo);
 
   useEffect(() => {
-    setCurrent(src || fallback);
-    setIllustrated(!src);
-  }, [src, fallback]);
+    setCurrent(photo || fallback);
+    setIllustrated(!photo);
+  }, [photo, fallback]);
 
   return (
     <span className="relative block h-full w-full">
