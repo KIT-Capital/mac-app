@@ -19,10 +19,10 @@ import {
   TIER_ONE_BRANDS,
   isDesk,
 } from "@/lib/catalog";
+import { nextId } from "@/lib/ids";
 import { readImageFile } from "@/lib/image";
 import { ownerKey } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
-import { DEMO_PROFILE } from "@/lib/seed";
 import { useStore } from "@/lib/store";
 import type { Timepiece } from "@/lib/types";
 
@@ -38,7 +38,7 @@ function AddForm() {
   const existing = timepieces.find((w) => {
     if (w.id !== editingId) return false;
     if (isDesk(user)) return true;
-    return ownerKey(w.ownerEmail || DEMO_PROFILE.email) === ownerKey(user?.email);
+    return ownerKey(w.ownerEmail) === ownerKey(user?.email);
   });
   const [images, setImages] = useState<string[]>(["", "", "", ""]);
   const [videoName, setVideoName] = useState("");
@@ -58,6 +58,7 @@ function AddForm() {
   const [complication, setComplication] = useState("I don't know");
   const [error, setError] = useState("");
   const [missingBrand, setMissingBrand] = useState(false);
+  const [draftId] = useState(() => nextId("tp"));
 
   useEffect(() => {
     if (!existing) return;
@@ -90,7 +91,7 @@ function AddForm() {
   const draft = useMemo(
     () =>
       ({
-        id: existing?.id ?? `tp-${Date.now()}`,
+        id: existing?.id ?? draftId,
         ownerEmail: user?.email,
         assetCode:
           existing?.assetCode ??
@@ -127,6 +128,7 @@ function AddForm() {
       caseType,
       condition,
       dialColor,
+      draftId,
       existing,
       complication,
       images,
@@ -162,7 +164,6 @@ function AddForm() {
         email: user.email,
         phone: user.phone,
         watch: `${watch.brand} ${watch.model}`,
-        deskEmail: settings.financingEmail,
       });
     }
     router.push(onboarding ? "/collection/continue" : `/collection/${watch.id}`);

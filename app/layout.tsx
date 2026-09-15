@@ -34,8 +34,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   themeColor: "#0E2A44",
   viewportFit: "cover",
 };
@@ -46,7 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geist.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full bg-[#DFE3E8] font-sans text-white">
+      <body className="min-h-full bg-[#0b0f16] font-sans text-white">
         <StoreProvider>
           <AppFrame>{children}</AppFrame>
         </StoreProvider>

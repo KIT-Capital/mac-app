@@ -19,7 +19,7 @@ const BLANK: ManagedUser = {
 };
 
 export default function AdminAccessPage() {
-  const { users, upsertUser, removeUser, settings } = useStore();
+  const { users, upsertUser, removeUser } = useStore();
   const [draft, setDraft] = useState<ManagedUser>(BLANK);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -38,7 +38,6 @@ export default function AdminAccessPage() {
         email: draft.email,
         role: draft.role,
         phone: draft.phone,
-        deskEmail: settings.financingEmail,
       });
       setBusy(false);
       if (!result.ok) {

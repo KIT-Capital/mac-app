@@ -71,6 +71,9 @@ test.describe("collector app", () => {
     await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
     await expect(page.getByText("Royal Oak Selfwinding")).toBeVisible();
     await expect(page.getByText("Richard Mille")).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
+    await expect(page.getByText("Richard Mille")).toHaveCount(0);
     await page.goto("/contact");
     await expect(page.getByText(/By appointment only/i)).toHaveCount(0);
     await page.getByLabel("Your Name").fill("Ada Locke");
@@ -154,5 +157,30 @@ test.describe("collector app", () => {
     await signOutFromMenu(page);
     await signInHale(page);
     await expect(page.getByText("DB28")).toBeVisible();
+  });
+
+  test("legacy financing routes open repurchase", async ({ page }) => {
+    await signInHale(page);
+    await page.goto("/financing");
+    await expect(page).toHaveURL(/\/repurchase/);
+    await expect(page.getByRole("heading", { name: "Sale & Repurchase" })).toBeVisible();
+  });
+});
+
+test.describe("collector layouts", () => {
+  test("desktop shows the collector bar and no device frame", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInHale(page);
+    await expect(page.getByRole("navigation", { name: "Collector" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0);
+    await expect(page.locator(".mac-desk-screen")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Timepieces" }).first()).toBeVisible();
+  });
+
+  test("iPad shows the collector bar and a wider vault", async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await signInHale(page);
+    await expect(page.getByRole("navigation", { name: "Collector" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add a timepiece" }).first()).toBeVisible();
   });
 });

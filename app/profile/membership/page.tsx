@@ -21,7 +21,6 @@ export default function MembershipPage() {
       kind: "membership",
       name: user.name,
       email: user.email,
-      deskEmail: settings.financingEmail,
     });
     setBusy(false);
     if (!result.ok) setError(result.error || "Membership is on, but the confirmation email failed.");

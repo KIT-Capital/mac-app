@@ -108,6 +108,7 @@
   --foreground: #ffffff;
 }
 
+.mac-app-screen[data-appearance="light"],
 .mac-phone-screen[data-appearance="light"] {
   --mac-bg: #ffffff;
   --mac-card: #f4f6f8;
@@ -130,7 +131,7 @@
   }
   body {
     @apply text-white;
-    background: #dfe3e8;
+    background: #0b0f16;
   }
   button,
   a,
@@ -153,13 +154,18 @@
 }
 
 @layer components {
+  .mac-app-screen input,
   .mac-phone-screen input,
+  .mac-app-screen select,
   .mac-phone-screen select,
+  .mac-app-screen textarea,
   .mac-phone-screen textarea {
     color: var(--mac-fg);
     caret-color: #fcb040;
   }
+  .mac-app-screen input::placeholder,
   .mac-phone-screen input::placeholder,
+  .mac-app-screen textarea::placeholder,
   .mac-phone-screen textarea::placeholder {
     color: var(--mac-faint);
   }

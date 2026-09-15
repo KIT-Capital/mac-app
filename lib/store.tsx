@@ -16,6 +16,8 @@ import {
   photosFromWatches,
 } from "@/lib/admin-seed";
 import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
+import { nextId } from "@/lib/ids";
+import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import type {
@@ -208,10 +210,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         localStorage.getItem("mac-app-state-v1");
       if (raw) {
         const parsed = JSON.parse(raw) as AppState;
-        const timepieces = parsed.timepieces && parsed.timepieces.length > 0 ? parsed.timepieces : DEMO_TIMEPIECES;
+        const timepieces = Array.isArray(parsed.timepieces) ? parsed.timepieces : [];
+        const agreements = Array.isArray(parsed.agreements) ? parsed.agreements : [];
+        const counts = ownedCounts(parsed.user?.email, timepieces, agreements);
         setState({
-          ...withDeskDefaults(parsed, timepieces),
-          user: normalizeUser(parsed.user, timepieces.length, parsed.agreements?.length ?? 0),
+          ...withDeskDefaults({ ...parsed, agreements }, timepieces),
+          user: normalizeUser(parsed.user, counts.pieces, counts.agreements),
         });
         return;
       }
@@ -235,6 +239,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const key = profileKey(email);
           const saved = prev.profiles[key];
           const base = saved ?? profileForEmail(email, profile);
+          const counts = ownedCounts(email, prev.timepieces, prev.agreements);
           const user = normalizeUser(
             {
               ...base,
@@ -243,8 +248,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               role: assignedRole(email, profile?.role ?? base.role),
               preferences: mergePreferences({ ...base.preferences, ...profile?.preferences }),
             },
-            prev.timepieces.length,
-            prev.agreements.length,
+            counts.pieces,
+            counts.agreements,
           );
 
           let timepieces = prev.timepieces;
@@ -365,7 +370,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           timepieces: [watch, ...prev.timepieces],
           photos: [
             ...watch.images.map((url, index) => ({
-              id: `ph-${watch.id}-${index}-${Date.now()}`,
+              id: nextId(`ph-${watch.id}-${index}`),
               url,
               kind: (["front", "back", "left", "more"] as const)[index] ?? "other",
               assetId: watch.id,
@@ -393,8 +398,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       createAgreement: (input) => {
         const agreement: Agreement = {
           ...input,
-          id: `agr-${Date.now().toString().slice(-6)}`,
-          agreementCode: `MAC-${Date.now().toString().slice(-5)}`,
+          id: nextId("agr"),
+          agreementCode: `MAC-${nextId("r").slice(-6).toUpperCase()}`,
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
         };
@@ -472,6 +477,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) })),
       resetDemo: () => {
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem("mac-app-state-v2");
         localStorage.removeItem("mac-app-state-v1");
         setState(demoState());
       },

@@ -1,12 +1,5 @@
-"use client";
-
-import { Suspense } from "react";
-import { ApplicationForm } from "@/components/application-form";
+import { redirect } from "next/navigation";
 
 export default function FinancingPage() {
-  return (
-    <Suspense fallback={<div className="flex flex-1 items-center justify-center text-mac-faint">Loading</div>}>
-      <ApplicationForm />
-    </Suspense>
-  );
+  redirect("/repurchase");
 }

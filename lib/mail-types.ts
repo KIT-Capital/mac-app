@@ -3,6 +3,7 @@ export const MAIL_KINDS = [
   "welcome",
   "invite",
   "appraisal",
+  "repurchase",
   "financing",
   "membership",
   "test",
@@ -21,7 +22,6 @@ export type MailRequest = {
   amount?: string;
   termMonths?: number;
   delivery?: string;
-  deskEmail?: string;
 };
 
 export type OutboxItem = {

@@ -35,7 +35,6 @@ export default function ContactPage() {
       email,
       message,
       phone: user?.phone,
-      deskEmail: settings.financingEmail,
     });
     setBusy(false);
     if (!result.ok) {

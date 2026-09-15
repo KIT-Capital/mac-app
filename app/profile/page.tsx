@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Asterisk, Camera, Mail, Pencil, Phone, Power, RefreshCw, Settings, SlidersHorizontal, Star } from "lucide-react";
 import { BurgerButton } from "@/components/burger-menu";
 import { WatchPhoto } from "@/components/watch-photo";
+import { endClientSession } from "@/lib/session-client";
 import { useStore } from "@/lib/store";
 
 const TILES = [
@@ -41,7 +42,7 @@ export default function ProfilePage() {
           </div>
           <button
             type="button"
-            onClick={signOut}
+            onClick={() => void endClientSession(signOut)}
             className="flex min-h-11 min-w-11 flex-col items-end gap-1 text-white"
           >
             <Power className="h-4 w-4" strokeWidth={1.5} />

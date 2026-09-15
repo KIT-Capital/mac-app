@@ -2,7 +2,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { PhoneShell } from "@/components/phone-shell";
+import { CollectorShell } from "@/components/collector-shell";
+import { DeskShell } from "@/components/desk-shell";
 import { isDesk } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
@@ -41,17 +42,21 @@ export function AppFrame({ children }: { children: ReactNode }) {
     }
   }, [desk, hydrated, isAdmin, isPublic, pathname, router, user]);
 
-  return (
-    <PhoneShell>
-      <div className="flex min-h-[min(100dvh-2rem,844px)] flex-1 flex-col md:min-h-[844px]">
-        {!hydrated ? (
-          <div className="flex flex-1 items-center justify-center text-[12px] tracking-[0.2em] text-mac-faint uppercase">
-            Loading collection
-          </div>
-        ) : (
-          children
-        )}
-      </div>
-    </PhoneShell>
+  const body = (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {!hydrated ? (
+        <div className="flex flex-1 items-center justify-center text-[12px] tracking-[0.2em] text-mac-faint uppercase">
+          Loading collection
+        </div>
+      ) : (
+        children
+      )}
+    </div>
   );
+
+  if (isAdmin) {
+    return <DeskShell>{body}</DeskShell>;
+  }
+
+  return <CollectorShell>{body}</CollectorShell>;
 }

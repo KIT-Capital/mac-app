@@ -1,6 +1,8 @@
 # Mechanical Art Capital
 
-Prototype of the Mechanical Art Capital collector app. The iPhone frame is the source of truth, rebuilt from the 14 November 2022 Limus Design presentation (Mechanical Art Capital app screens) and the official MAC palette.
+Prototype of the Mechanical Art Capital collector app, rebuilt from the 14 November 2022 Limus Design presentation and the official MAC palette.
+
+Collectors get one plane of UI on **phone, iPad, and desktop** — full-bleed, no nested device frames. The **admin desk** is a separate 16:9 laptop console (`admin@mechartcap.com`).
 
 The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official Logo-FF wordmark (Final Logo 2 Gold). See `docs/design-reference.md`.
 
@@ -10,13 +12,13 @@ Collector app:
 
 - Splash, sign in, and create account (18+ and privacy consent) — welcome email via Resend
 - Empty vault for new members, then add pieces one by one
-- 2-column collection with Appraised / Reviewing badges. Missing photos use a photorealistic illustration until a collector upload is on file.
+- Collection grid: 2 columns on phone, 3 on iPad, 4 on desktop. Missing photos use a photorealistic illustration until a collector upload is on file.
 - Add a timepiece: front / back / left photos, catalog dropdowns, Save or Appraise
 - Sale-and-repurchase application (MAC buys; collector may buy back — not a loan)
 - Collection appraisal certificate
 - $4.99/month membership
 
-Admin desk (`admin@mechartcap.com`):
+Admin desk (`admin@mechartcap.com`) — 16:9 laptop layout:
 
 - Overview with collection stats
 - Configure internal buyback scale, purchase caps, custody location, and contact copy
@@ -53,7 +55,7 @@ npm test
 
 Playwright covers splash, collector signup/collection/appraisal/repurchase/account, and the desk (appraise, mail, catalog). The suite reuses a server already running on port 43173.
 
-On a phone the app is full-bleed. On a notebook it stays a 430px iPhone on a slate stage (`#5C6570`) so the page behind the device always contrasts with both the black screens and the white appraisal certificate.
+The collector app is one plane on every device: phone (burger + 2-column vault), iPad (top nav + 3 columns), and desktop (top nav + 4 columns). The admin desk is a 16:9 laptop console, not the collector chrome.
 
 ### Demo accounts
 

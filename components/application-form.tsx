@@ -6,7 +6,7 @@ import { FormEvent, useState } from "react";
 import { FileText } from "lucide-react";
 import { LineField, NativeSelect } from "@/components/field";
 import { ScreenHeader } from "@/components/screen-header";
-import { DELIVERY_METHODS, TERMS, estimateAdvance, money } from "@/lib/catalog";
+import { DELIVERY_METHODS, TERMS, maxPurchaseAmount, money } from "@/lib/catalog";
 import { WatchPhoto } from "@/components/watch-photo";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
@@ -32,7 +32,7 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
 
   const watch = timepieces.find((w) => w.id === watchId) ?? eligible[0];
   const purchaseShare = openShell?.ltv || settings.maxLtv;
-  const maxPurchase = watch ? estimateAdvance(watch.valueLow, watch.valueHigh, purchaseShare) : 0;
+  const maxPurchase = watch ? maxPurchaseAmount(watch.valueLow, watch.valueHigh, purchaseShare) : 0;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -63,14 +63,13 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
       email,
     });
     await sendAppEmail({
-      kind: "financing",
+      kind: "repurchase",
       name,
       email,
       watch: `${watch.brand} ${watch.model}`,
       amount: String(n),
       termMonths: term,
       delivery,
-      deskEmail: settings.financingEmail,
     });
     setBusy(false);
     router.push(`/agreements/${agreement.id}`);

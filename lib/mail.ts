@@ -66,9 +66,6 @@ export function parseMailRequest(input: unknown): MailRequest {
   if (name.length < 1 || name.length > 120) throw new Error("Enter a name.");
   if (!isEmail(email)) throw new Error("Enter a valid email address.");
 
-  const deskEmail = String(body.deskEmail ?? DEFAULT_SETTINGS.financingEmail).trim().toLowerCase();
-  if (!isEmail(deskEmail)) throw new Error("Desk email is invalid.");
-
   const message = String(body.message ?? "").trim();
   if (message.length > 4000) throw new Error("Message is too long.");
   if (body.kind === "inquiry" && message.length < 4) throw new Error("Write a short message.");
@@ -90,7 +87,6 @@ export function parseMailRequest(input: unknown): MailRequest {
     watch,
     amount,
     delivery,
-    deskEmail,
     termMonths: Number.isFinite(termMonths) ? termMonths : 0,
   };
 }
@@ -110,7 +106,7 @@ export async function dispatchMail(request: MailRequest) {
 }
 
 function composeMail(request: MailRequest): ComposedMail[] {
-  const desk = request.deskEmail || DEFAULT_SETTINGS.financingEmail;
+  const desk = DEFAULT_SETTINGS.financingEmail;
   const greeting = request.name.split(" ")[0] || request.name;
 
   switch (request.kind) {
@@ -188,10 +184,11 @@ function composeMail(request: MailRequest): ComposedMail[] {
           ],
         }),
       ];
+    case "repurchase":
     case "financing":
       return [
         letter({
-          kind: "financing",
+          kind: request.kind === "financing" ? "financing" : "repurchase",
           to: [desk, request.email],
           replyTo: request.email,
           subject: `Sale-and-repurchase application: ${request.watch || "timepiece"}`,

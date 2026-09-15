@@ -143,7 +143,6 @@ export default function WatchDetailPage() {
                     email: user.email,
                     phone: user.phone,
                     watch: `${watch.brand} ${watch.model}`,
-                    deskEmail: settings.financingEmail,
                   });
                 }
               }}

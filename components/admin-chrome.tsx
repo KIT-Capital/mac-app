@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   BookOpen,
   Camera,
-  ChevronLeft,
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
+  LogOut,
   Mail,
   Sliders,
+  Smartphone,
   Users2,
 } from "lucide-react";
-import { MacLogoMark } from "@/components/mac-logo";
+import { MacLogoMark, MacWordmark } from "@/components/mac-logo";
+import { endClientSession } from "@/lib/session-client";
+import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -36,52 +39,74 @@ export function AdminChrome({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut, user } = useStore();
+
+  async function leaveDesk() {
+    await endClientSession(signOut);
+    router.replace("/login");
+  }
 
   return (
-    <div className="flex flex-1 flex-col bg-[#10141D]">
-      {/* Admin Top Navigation */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0E2A44] px-4">
-        <Link
-          href="/collection"
-          className="mac-tap flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-white/80 uppercase hover:text-white"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Collector App
-        </Link>
-        <span className="flex items-center gap-2 text-[12px] font-bold tracking-[0.2em] text-[#FCB040] uppercase">
+    <div className="flex h-full min-h-0 w-full">
+      <aside className="flex w-[200px] shrink-0 flex-col border-r border-white/10 bg-[#0E2A44] xl:w-[220px]">
+        <div className="flex items-center gap-2 px-4 pt-5 pb-4">
           <span className="flex h-8 w-8 items-center justify-center">
             <MacLogoMark onDark />
           </span>
-          Desk · {title}
-        </span>
-        <div className="w-16" />
-      </header>
+          <div className="min-w-0">
+            <MacWordmark onDark className="w-[118px]" />
+            <p className="mt-1 text-[10px] tracking-[0.16em] text-[#FCB040] uppercase">Admin desk</p>
+          </div>
+        </div>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2" aria-label="Desk">
+          {LINKS.map((link) => {
+            const active = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
+            const Icon = link.icon;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-2.5 py-2 text-[11px] font-semibold tracking-[0.08em] uppercase",
+                  active ? "bg-[#FCB040] text-[#0A0D14]" : "text-white/65 hover:bg-white/5 hover:text-white",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="border-t border-white/10 px-3 py-3">
+          <p className="truncate px-1 text-[11px] text-white/45">{user?.name || "Desk"}</p>
+          <Link
+            href="/collection"
+            className="mt-2 flex items-center gap-2 rounded-md px-2 py-2 text-[11px] tracking-[0.08em] text-white/60 uppercase hover:bg-white/5 hover:text-white"
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+            Collector app
+          </Link>
+          <button
+            type="button"
+            onClick={() => void leaveDesk()}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-[11px] tracking-[0.08em] text-white/50 uppercase hover:bg-white/5 hover:text-white"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Log out
+          </button>
+        </div>
+      </aside>
 
-      {/* Horizontal Tab Subnavigation */}
-      <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-[#161B24] px-2 py-1.5 no-scrollbar">
-        {LINKS.map((link) => {
-          const active = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wider whitespace-nowrap uppercase transition",
-                active
-                  ? "bg-[#FCB040] text-[#0A0D14] shadow-sm"
-                  : "text-white/60 hover:bg-white/5 hover:text-white",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-4">{children}</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#10141D]">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-6">
+          <span className="text-[12px] font-bold tracking-[0.2em] text-[#FCB040] uppercase">
+            Desk · {title}
+          </span>
+          <span className="text-[11px] tracking-[0.14em] text-white/35 uppercase">16:9 admin</span>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
+      </div>
     </div>
   );
 }

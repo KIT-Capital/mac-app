@@ -18,11 +18,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
 
-  function enter(nextEmail: string, nextPassword: string) {
+  async function enter(nextEmail: string, nextPassword: string) {
     const result = authenticate(nextEmail, nextPassword);
     if (!result.ok) {
       setError(result.error);
       return;
+    }
+    if (result.role !== "collector") {
+      const session = await fetch("/api/desk-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: nextEmail, password: nextPassword }),
+      });
+      if (!session.ok) {
+        setError("Desk session could not start.");
+        return;
+      }
     }
     signIn({ email: nextEmail.trim(), role: result.role });
     router.replace(result.role === "collector" ? "/collection" : "/admin");
@@ -30,7 +41,7 @@ export default function LoginPage() {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    enter(email, password);
+    void enter(email, password);
   }
 
   function onSocial() {
@@ -38,7 +49,11 @@ export default function LoginPage() {
       setError("Desk accounts must sign in with email and the preset password.");
       return;
     }
-    enter(email, password || "collection");
+    if (!password.trim()) {
+      setError("Enter your password, then continue with a social account.");
+      return;
+    }
+    void enter(email, password);
   }
 
   return (

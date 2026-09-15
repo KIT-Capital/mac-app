@@ -2,6 +2,15 @@ import { expect, test } from "@playwright/test";
 import { DESK, DESK_PASSWORD, HALE, signIn, signInDesk, signInHale, signOutFromMenu } from "./helpers";
 
 test.describe("desk", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 810 });
+  });
+
+  test("mail outbox requires a desk session", async ({ request }) => {
+    const response = await request.get("/api/mail");
+    expect(response.status()).toBe(401);
+  });
+
   test("desk login opens overview and client assets", async ({ page }) => {
     await signInDesk(page);
     await expect(page.getByText("Assets", { exact: true })).toBeVisible();

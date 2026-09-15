@@ -110,9 +110,9 @@ export function moneyRange(low?: number, high?: number) {
   return money(low || high || 0);
 }
 
-export function estimateAdvance(valueLow?: number, valueHigh?: number, ltv = COMPANY.ltv) {
+export function maxPurchaseAmount(valueLow?: number, valueHigh?: number, share = COMPANY.ltv) {
   const base = valueLow ?? (valueHigh ? valueHigh * 0.75 : 0);
-  return Math.round((base * ltv) / 500) * 500;
+  return Math.round((base * share) / 500) * 500;
 }
 
 /** Dollar buyback on the desk scale. Never display the scale as a rate or interest. */
