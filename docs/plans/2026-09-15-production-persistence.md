@@ -35,6 +35,7 @@ MAC must hold customer, timepiece, contract, photo, and ledger records on server
 | Neon Auth | Disabled | Keep off |
 | WorkOS, R2, ledger, signing | Proposed | R2 bucket `mac-app` exists; app does not read it yet |
 | Drizzle `customers` / `timepieces` | Verified | `development` only; UI still uses `localStorage` |
+| Drizzle applications / agreements / archives / reports | Verified | `development` only; mock signing adapter; no ledger |
 | Desk-credential security PR | Proposed | Separate approval boundary |
 | Browser → server migration | Incomplete | No path yet; preserve local data |
 
@@ -161,11 +162,11 @@ That is Milestone A. It is not “database user exists.”
 1. **Compatibility spike (verified 2026-09-15)** — Drizzle against `development` only; `mac_schema_probe` + `npm run db:migrate` / `db:drizzle-ping`; no product tables in `production` or `staging`.
 2. **Identity + customer + timepiece (verified 2026-09-15)** — `customers` and `timepieces` on `development` only; actor stub in `lib/db/isolation.mjs`; WorkOS subject column stays null; `npm run test:db` proves collector A cannot read B.
 3. **Original photos (verified 2026-09-15)** — `photo_objects` on `development`; checksum must match before save; retry of the same digest is a no-op; collector isolation covers photos. Object store is an adapter (in-memory in tests). Preview data URLs stay in the UI. No server file proxy.
-4. **Prepare contract + snapshots** — desk prepares; collector application is not the executable.
-5. **Sign + archive PDF** — adapter; sign-complete and archive-success are different states.
-6. **Ledger + snapshots** — integer cents; owner/accountant names the first accounts; no vendor.
-7. **Reports** — branded exports from snapshots; never mutate archived PDFs.
-8. **Recovery drill** — restore database + files + PDFs + ledger together on `development`.
+4. **Prepare contract + snapshots (verified 2026-09-15)** — collector application is never executable; only the desk freezes version 1; retry prepare is a no-op; one live allocation per piece.
+5. **Sign + archive PDF (verified 2026-09-15)** — mock adapter; sign-complete and archive-success are different states; duplicate webhook is a no-op; archive retry does not duplicate the PDF; nobody may replace an archived PDF.
+6. **Ledger + snapshots (blocked)** — integer cents; owner/accountant must name the first accounts before any journal is posted. Do not invent buyback or book-value formulas.
+7. **Reports (verified 2026-09-15 for contract statements)** — desk can freeze a contract statement from the prepared snapshot + archive checksum; regenerating a report does not mutate the archived PDF. Company trial balance waits on Stage 6.
+8. **Recovery drill** — restore database + files + PDFs + ledger together on `development`. Ledger restore waits on Stage 6.
 
 Stage 1 is the smallest **technical** increment after this pass. Milestone A is the smallest **complete** increment that satisfies the owner brief.
 

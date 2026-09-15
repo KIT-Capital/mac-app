@@ -20,7 +20,7 @@ There is no tRPC router. Server surface is two App Router handlers. Everything e
 
 `lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same client module.
 
-Stage 2–3 added `lib/db/records.ts` and `lib/db/photos.ts` for customer, timepiece, and original-photo rows on Neon `development`. There is no HTTP or tRPC procedure yet — that is a recorded exception to agent-native parity. Isolation is enforced in the repository and tested by `npm run test:db`. Do not dual-write the browser store until a cutover flag is approved. Do not add a server file proxy; originals go through the object-store adapter.
+Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces, original photos, applications, prepared agreement versions, mock signature envelopes, archived PDFs, and contract report snapshots on Neon `development`. There is no HTTP or tRPC procedure yet — that is a recorded exception to agent-native parity. Isolation is enforced in the repository and tested by `npm run test:db`. Do not dual-write the browser store until a cutover flag is approved. Do not add a server file proxy. Ledger posting is blocked until the accountant names accounts.
 
 ## Errors
 

@@ -11,7 +11,7 @@
     "db:migrate": "doppler run -- node tools/harness/drizzle-migrate.mjs",
     "db:drizzle-ping": "doppler run -- node tools/harness/drizzle-ping.mjs",
     "test:unit": "node --test lib/env/database-mapping.test.mjs lib/env/development-migration.test.mjs lib/db/isolation.test.mjs lib/db/money.test.mjs lib/storage/object-store.test.mjs tools/harness/neon-env-guard.test.mjs tools/harness/drizzle-migrate.test.mjs",
-    "test:db": "doppler run -- npx tsx --test lib/db/records.test.ts lib/db/photos.test.ts",
+    "test:db": "doppler run -- npx tsx --test lib/db/records.test.ts lib/db/photos.test.ts lib/db/agreements.test.ts lib/db/signing.test.ts lib/db/reports.test.ts",
     "build": "next build",
     "start": "node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port ${PORT:-3000}",
     "lint": "eslint",
