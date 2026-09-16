@@ -213,6 +213,7 @@ export default function AdminAgreementsPage() {
             >
               <Field label="End">
                 <NativeSelect
+                  aria-label="End"
                   value={endDraft.kind}
                   onChange={(e) => setEndDraft({ ...endDraft, kind: e.target.value as BookEndKind })}
                 >

@@ -1,7 +1,7 @@
 ---
 title: "feat: Add the repo operations book"
 type: feat
-status: active
+status: completed
 date: 2026-09-16
 origin: owner brief 2026-09-16 (desk is operations/analytics, not official books)
 ---
