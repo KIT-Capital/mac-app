@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
@@ -9,6 +9,15 @@ import { COMPANY, hasApplication, money } from "@/lib/catalog";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
+
+function moneyExact(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
 
 export default function AgreementDetailPage() {
   const params = useParams<{ id: string }>();
@@ -18,6 +27,11 @@ export default function AgreementDetailPage() {
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
   const [started, setStarted] = useState(false);
   const [pdfError, setPdfError] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const pageOpen = useRef(true);
+  useEffect(() => () => {
+    pageOpen.current = false;
+  }, []);
   const applied = hasApplication(user, agreements);
   const scale = agreement
     ? resolveScale(agreement.scale ?? settings, agreement.termMonths)
@@ -35,42 +49,51 @@ export default function AgreementDetailPage() {
     : 0;
 
   async function downloadPdf() {
-    if (!agreement) return;
+    if (!agreement || pdfBusy) return;
+    setPdfBusy(true);
     setPdfError("");
-    const response = await fetch("/api/contracts/pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sellerName: agreement.ownerName,
-        sellerEmail: agreement.email,
-        sellerPhone: user?.phone,
-        saleAmount: agreement.amount,
-        termMonths: agreement.termMonths,
-        startDate: agreement.createdAt,
-        delivery: agreement.delivery,
-        agreementCode: agreement.agreementCode || agreement.id,
-        scale,
-        timepieces: watches.map((watch) => ({
-          name: `${watch.brand} ${watch.model}`,
-          brand: watch.brand,
-          model: watch.model,
-          reference: watch.reference,
-          condition: watch.condition,
-        })),
-      }),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setPdfError(body?.error || "Could not create the contract PDF.");
-      return;
+    try {
+      const response = await fetch("/api/contracts/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerName: agreement.ownerName,
+          sellerEmail: agreement.email,
+          sellerPhone: user?.phone,
+          saleAmount: agreement.amount,
+          termMonths: agreement.termMonths,
+          startDate: agreement.createdAt,
+          delivery: agreement.delivery,
+          agreementCode: agreement.agreementCode || agreement.id,
+          scale,
+          timepieces: watches.map((watch) => ({
+            name: `${watch.brand} ${watch.model}`,
+            brand: watch.brand,
+            model: watch.model,
+            reference: watch.reference,
+            condition: watch.condition,
+          })),
+        }),
+      });
+      if (!pageOpen.current) return;
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setPdfError(body?.error || "Could not create the contract PDF.");
+        return;
+      }
+      const blob = await response.blob();
+      if (!pageOpen.current) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${agreement.agreementCode || "mac-repurchase-agreement"}.pdf`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      if (pageOpen.current) setPdfError("Could not create the contract PDF.");
+    } finally {
+      if (pageOpen.current) setPdfBusy(false);
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${agreement.agreementCode || "mac-repurchase-agreement"}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   if (!agreement) {
@@ -158,7 +181,7 @@ export default function AgreementDetailPage() {
                   {schedule.rows.map((row) => (
                     <tr key={row.month}>
                       <td>{row.date}</td>
-                      <td>{money(row.price || 0)}</td>
+                      <td>{moneyExact(row.price || 0)}</td>
                       <td>{row.note}</td>
                     </tr>
                   ))}
@@ -178,8 +201,8 @@ export default function AgreementDetailPage() {
       </div>
       <div className="border-t border-mac-line bg-mac-card p-4">
         {applied ? (
-          <PillButton variant="navy" className="mb-3" onClick={() => void downloadPdf()}>
-            Download contract PDF
+          <PillButton variant="navy" className="mb-3" disabled={pdfBusy} onClick={() => void downloadPdf()}>
+            {pdfBusy ? "Preparing PDF…" : "Download contract PDF"}
           </PillButton>
         ) : null}
         {pdfError ? <p className="mb-2 text-center text-[12px] text-red-300">{pdfError}</p> : null}

@@ -15,11 +15,17 @@ export function AdminScaleFields({
   onChange: (next: RepoScaleTerms) => void;
 }) {
   function setPercent(key: keyof RepoScaleTerms, raw: string) {
-    onChange({ ...value, [key]: Number(raw) / 100 });
+    if (!raw.trim()) return;
+    const next = Number(raw);
+    if (!Number.isFinite(next) || next < 0) return;
+    onChange({ ...value, [key]: next / 100 });
   }
 
   function setCount(key: keyof RepoScaleTerms, raw: string) {
-    onChange({ ...value, [key]: Number(raw) });
+    if (!raw.trim()) return;
+    const next = Number(raw);
+    if (!Number.isFinite(next) || next < 0) return;
+    onChange({ ...value, [key]: next });
   }
 
   return (

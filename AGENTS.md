@@ -75,7 +75,7 @@ Pushing to a shared branch, opening or merging a PR, running a non-dev migration
 
 ```
 app/              Next.js App Router (collector + /admin desk)
-app/api/          mail + desk-session only
+app/api/          mail + desk-session + contract PDF
 components/       collector/desk UI + shadcn primitives
 lib/              auth, store, mail, theme, types
 neon.ts           Neon config (Auth off)

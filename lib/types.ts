@@ -42,6 +42,28 @@ export type RepoScaleTerms = {
   earlyUntilMonth: number;
 };
 
+export type ContractPiece = {
+  name?: string;
+  brand?: string;
+  model?: string;
+  reference?: string;
+  serial?: string;
+  condition?: string;
+};
+
+export type ContractInput = {
+  sellerName: string;
+  sellerEmail?: string;
+  sellerPhone?: string;
+  saleAmount: number;
+  termMonths: number;
+  startDate: string;
+  delivery?: string;
+  agreementCode?: string;
+  scale?: RepoScaleTerms;
+  timepieces: ContractPiece[];
+};
+
 export type Agreement = {
   id: string;
   watchIds: string[];

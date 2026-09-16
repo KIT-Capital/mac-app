@@ -15,7 +15,7 @@ import {
   photosFromWatches,
 } from "@/lib/admin-seed";
 import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
-import { settingsToTerms } from "@/lib/contract/repo-scale.mjs";
+import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
 import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
@@ -433,9 +433,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           agreementCode: `MAC-${nextId("r").slice(-6).toUpperCase()}`,
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
-          scale:
-            input.scale ??
-            settingsToTerms({ ...current.settings, ...openShell }, input.termMonths),
+          scale: input.scale ?? agreementScaleFromDesk(current.settings, openShell, input.termMonths),
         };
         updateStore((prev) => {
           const user = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;

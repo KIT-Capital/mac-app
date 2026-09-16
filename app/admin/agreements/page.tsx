@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
@@ -43,11 +43,17 @@ export default function AdminAgreementsPage() {
     setDraft(blankShell(settings.typicalTerm));
   }
 
+  const scaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   function saveContractScale(agreement: Agreement, scale: ReturnType<typeof settingsToTerms>) {
-    updateAgreement(agreement.id, {
-      scale,
-      termMonths: agreement.termMonths,
-    });
+    if (agreement.status === "signed") return;
+    if (scaleSaveTimer.current) clearTimeout(scaleSaveTimer.current);
+    scaleSaveTimer.current = setTimeout(() => {
+      updateAgreement(agreement.id, {
+        scale,
+        termMonths: agreement.termMonths,
+      });
+    }, 400);
   }
 
   return (
