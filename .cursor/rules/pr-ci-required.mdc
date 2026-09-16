@@ -1,0 +1,14 @@
+---
+description: Every product change ships as a GitHub PR; merge only after CI is green and the owner says so.
+alwaysApply: true
+---
+
+# PR and CI before merge
+
+The owner is not the programmer. Do not ask them to run local test commands as the way work ships.
+
+- Do not push product changes to `main`. Do not merge locally around GitHub.
+- Put each change on its own PR branch and push to the `github` remote (`KIT-Capital/mac-app`).
+- Open the pull request so quality CI runs. If CI fails, fix it on that same PR and wait for green. A local pass is not a substitute for merge CI. Do not skip hooks.
+- Merge only when CI is green **and** the owner has authorized that merge.
+- Explain status in plain language: what the PR is, whether checks passed, and what you need from the owner (usually “approve merge” or nothing).
