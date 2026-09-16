@@ -38,10 +38,10 @@ export default function AgreementDetailPage() {
     : null;
   const schedule = agreement && scale
     ? repurchaseSchedule({
+        ...scale,
         saleAmount: agreement.amount,
         termMonths: agreement.termMonths,
         startDate: agreement.createdAt,
-        ...scale,
       })
     : null;
   const repurchase = agreement && scale
