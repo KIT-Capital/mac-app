@@ -15,6 +15,7 @@ import {
   photosFromWatches,
 } from "@/lib/admin-seed";
 import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
+import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
 import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
@@ -432,12 +433,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             .filter((a) => a.watchIds.length > 0),
         })),
       createAgreement: (input) => {
+        const current = getStoreSnapshot();
+        const openShell = current.shells.find((shell) => shell.status === "open");
         const agreement: Agreement = {
           ...input,
           id: nextId("agr"),
           agreementCode: `MAC-${nextId("r").slice(-6).toUpperCase()}`,
           createdAt: new Date().toISOString().slice(0, 10),
           status: "pending_signature",
+          scale: input.scale ?? agreementScaleFromDesk(current.settings, openShell, input.termMonths),
         };
         updateStore((prev) => {
           const user = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;

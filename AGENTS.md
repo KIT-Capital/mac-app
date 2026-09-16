@@ -75,7 +75,7 @@ Pushing to a shared branch, opening or merging a PR, running a non-dev migration
 
 ```
 app/              Next.js App Router (collector + /admin desk)
-app/api/          mail + desk-session only
+app/api/          mail + desk-session + contract PDF
 components/       collector/desk UI + shadcn primitives
 lib/              auth, store, mail, theme, types
 neon.ts           Neon config (Auth off)
@@ -100,7 +100,8 @@ tools/harness/    read-only structural check + neon-ping
 - Keep `DATABASE_URL_UNPOOLED` in Doppler for migrate-only use; do not put it on the Railway app service.
 - Use `info@mechartcap.com` as the outbound From address; keep mail on `@mechartcap.com`.
 - Merge PRs to `KIT-Capital/mac-app` on green only when the user has authorized the loop.
-- Do not invent ledger accounts, dual-write, or enable Neon Auth/WorkOS; Stage 6 waits on accountant-named accounts; keep the UI on `localStorage` until an explicit cutover flag.
+- Do not invent ledger accounts, dual-write, or enable Neon Auth/WorkOS; cash is ABC Bank and inventory is MAC Vault; remaining Stage 6 accounts wait on accountant-named names; keep the UI on `localStorage` until an explicit cutover flag.
+- Desk `/admin` owns default LTV and per-repo fees; price buybacks with the owner-named Scenario 60 scale (setup + monthly add + early amount), not invented interest formulas; collector copy stays sale-and-repurchase.
 
 ## Learned Workspace Facts
 
@@ -110,3 +111,4 @@ tools/harness/    read-only structural check + neon-ping
 - Doppler workplace **KIT Capital** / project `mac-app` is the secret store (`dev`, `stg`, `prd`). The leftover Norfolk AI project `mechanical-art-capital` was deleted; do not recreate it. Do not delete the Norfolk AI workplace (it still holds Product OS and other projects).
 - Public hostname is `mechart.app` on the Norfolk AI Cloudflare zone. Railway production attached the custom domain and, after Cloudflare login, wrote the apex CNAME and `_railway-verify` TXT. `www.mechart.app` is a proxied CNAME to the apex and 301s to `https://mechart.app`. Do not add MX/SPF on this zone; mail stays on `@mechartcap.com`. When adding Railway custom domains, expect Railway to apply Cloudflare DNS after authorization instead of assuming copy-paste.
 - Greptile reviews for `mac-app` use the Norfolk Group Greptile workspace; GitHub access is via Greptile Apps on KIT-Capital. Do not create a separate KIT-Capital Greptile org.
+- After MAC pays the sale amount it does not owe the seller a remaining balance; the seller may buy the pieces back at the scheduled dollar price for the month of repurchase.

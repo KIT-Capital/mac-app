@@ -40,6 +40,39 @@ export type AgreementEnd = {
   amount: number;
 };
 
+export type RepoScaleTerms = {
+  purchaseShare: number;
+  setupFee: number;
+  annualAdjustment: number;
+  earlyRepurchaseAmount: number;
+  brokerFee: number;
+  minMonths: number;
+  earlyStartMonth: number;
+  earlyUntilMonth: number;
+};
+
+export type ContractPiece = {
+  name?: string;
+  brand?: string;
+  model?: string;
+  reference?: string;
+  serial?: string;
+  condition?: string;
+};
+
+export type ContractInput = {
+  sellerName: string;
+  sellerEmail?: string;
+  sellerPhone?: string;
+  saleAmount: number;
+  termMonths: number;
+  startDate: string;
+  delivery?: string;
+  agreementCode?: string;
+  scale?: RepoScaleTerms;
+  timepieces: ContractPiece[];
+};
+
 export type Agreement = {
   id: string;
   watchIds: string[];
@@ -53,6 +86,7 @@ export type Agreement = {
   signedAt?: string;
   agreementCode?: string;
   bookEnd?: AgreementEnd;
+  scale?: RepoScaleTerms;
 };
 
 export type UserPreferences = {
@@ -108,6 +142,12 @@ export type AgreementShell = {
   termMonths: number;
   rate: number;
   ltv: number;
+  setupFee?: number;
+  earlyRepurchaseAmount?: number;
+  brokerFee?: number;
+  minMonths?: number;
+  earlyStartMonth?: number;
+  earlyUntilMonth?: number;
   status: "open" | "assigned" | "closed";
   createdAt: string;
 };
@@ -131,6 +171,12 @@ export type AppSettings = {
   startingRate: number;
   minAdvance: number;
   maxLtv: number;
+  setupFee: number;
+  earlyRepurchaseAmount: number;
+  brokerFee: number;
+  minMonths: number;
+  earlyStartMonth: number;
+  earlyUntilMonth: number;
   typicalTerm: number;
   membershipMonthly: number;
   minPieceValue: number;

@@ -2,7 +2,7 @@
 
 **Tier: CONTRACT** · Last verified: 2026-09-16
 
-There is no tRPC router. Server surface is two App Router handlers. Everything else is client state.
+There is no tRPC router. Server surface is App Router handlers. Everything else is client state.
 
 ## `POST` / `GET` `/api/mail`
 
@@ -10,6 +10,14 @@ There is no tRPC router. Server surface is two App Router handlers. Everything e
 - `invite` and `test` require a valid desk session cookie.
 - `GET` lists the process-local outbox; desk session required. Missing or invalid session is **403**.
 - Rate-limited per client IP.
+
+## `POST` `/api/contracts/pdf`
+
+- Accepts a JSON `ContractInput` (`lib/types.ts`): seller, sale amount, term, start date, optional delivery/code/scale, and timepieces.
+- Returns a branded sale-and-repurchase PDF. Copy is rejected if it uses loan/interest/lender language.
+- This handler does **not** read browser store state. Collectors assemble the payload in `/agreements/[id]` after application.
+- Unauthenticated by design so the collector download can call it with an explicit payload. Rate-limit and session policy are still open.
+- Validation errors are JSON `{ error, code, errors }` with 400. Render failures are 400 or 500 with `CONTRACT_PDF_FAILED`.
 
 ## `POST` / `DELETE` `/api/desk-session`
 
@@ -26,4 +34,4 @@ Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces,
 
 ## Errors
 
-Handlers return JSON `{ error: string }` with 401 / 403 / 429 / 4xx as appropriate. Desk-required mail and `/admin` pages return 403 without a staff session. Failed desk login remains 401. Do not add a second undocumented mail or session path.
+Handlers return JSON `{ error: string }` with 401 / 403 / 429 / 4xx as appropriate. The contract PDF handler also includes `code` and `errors`. Desk-required mail and `/admin` pages return 403 without a staff session. Failed desk login remains 401. Do not add a second undocumented mail or session path.
