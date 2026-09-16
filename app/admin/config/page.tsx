@@ -1,18 +1,31 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome } from "@/components/admin-chrome";
 import { Field, PillButton } from "@/components/field";
+import { settingsToTerms } from "@/lib/contract/repo-scale.mjs";
 import { useStore } from "@/lib/store";
 
 export default function AdminConfigPage() {
   const { settings, updateSettings } = useStore();
   const [form, setForm] = useState(settings);
   const [saved, setSaved] = useState(false);
+  const scale = settingsToTerms(form, form.typicalTerm);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    updateSettings(form);
+    updateSettings({
+      ...form,
+      maxLtv: scale.purchaseShare,
+      startingRate: scale.annualAdjustment,
+      setupFee: scale.setupFee,
+      earlyRepurchaseAmount: scale.earlyRepurchaseAmount,
+      brokerFee: scale.brokerFee,
+      minMonths: scale.minMonths,
+      earlyStartMonth: scale.earlyStartMonth,
+      earlyUntilMonth: scale.earlyUntilMonth,
+    });
     setSaved(true);
   }
 
@@ -41,25 +54,24 @@ export default function AdminConfigPage() {
             />
           </Field>
         ))}
+        <h2 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">Default repo scale</h2>
+        <AdminScaleFields
+          value={scale}
+          onChange={(next) =>
+            setForm({
+              ...form,
+              maxLtv: next.purchaseShare,
+              startingRate: next.annualAdjustment,
+              setupFee: next.setupFee,
+              earlyRepurchaseAmount: next.earlyRepurchaseAmount,
+              brokerFee: next.brokerFee,
+              minMonths: next.minMonths,
+              earlyStartMonth: next.earlyStartMonth,
+              earlyUntilMonth: next.earlyUntilMonth,
+            })
+          }
+        />
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Buyback scale (internal)">
-            <input
-              type="number"
-              step="0.01"
-              value={form.startingRate}
-              onChange={(e) => setForm({ ...form, startingRate: Number(e.target.value) })}
-              className="w-full bg-transparent py-1 text-[16px] outline-none"
-            />
-          </Field>
-          <Field label="Max purchase vs appraisal">
-            <input
-              type="number"
-              step="0.01"
-              value={form.maxLtv}
-              onChange={(e) => setForm({ ...form, maxLtv: Number(e.target.value) })}
-              className="w-full bg-transparent py-1 text-[16px] outline-none"
-            />
-          </Field>
           <Field label="Min purchase">
             <input
               type="number"
