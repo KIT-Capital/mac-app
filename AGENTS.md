@@ -99,7 +99,8 @@ tools/harness/    read-only structural check + neon-ping
 - Treat Neon/Railway environment separation as blocking: development, staging, and PR previews must never use or fall back to production database credentials.
 - Keep `DATABASE_URL_UNPOOLED` in Doppler for migrate-only use; do not put it on the Railway app service.
 - Use `info@mechartcap.com` as the outbound From address; keep mail on `@mechartcap.com`.
-- Merge PRs to `KIT-Capital/mac-app` on green only when the user has authorized the loop.
+- Ship every product change as its own GitHub PR on `KIT-Capital/mac-app`. Do not push to `main` or merge around CI. If quality CI fails, fix that same PR until it is green. Merge on green is standing authorization — do not wait for a per-PR yes. Do not merge if any required check is red.
+- The owner is not a programmer. Explain in plain language, teach one Cursor idea at a time, and do the technical work. Do not treat local test commands as the ship path or dump menus of options.
 - Do not invent ledger accounts, dual-write, or enable Neon Auth/WorkOS; cash is ABC Bank and inventory is MAC Vault; remaining Stage 6 accounts wait on accountant-named names; keep the UI on `localStorage` until an explicit cutover flag.
 - Desk `/admin` owns default LTV and per-repo fees; price buybacks with the owner-named Scenario 60 scale (setup + monthly add + early amount), not invented interest formulas; collector copy stays sale-and-repurchase.
 
