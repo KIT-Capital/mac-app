@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import {
   BookOpen,
   Camera,
@@ -129,17 +129,23 @@ export function StatCard({
 export function AdminTable({
   headers,
   rows,
+  expandedRows,
+  selectedRow,
+  onRowSelect,
 }: {
   headers: string[];
   rows: ReactNode[][];
+  expandedRows?: Array<ReactNode | null>;
+  selectedRow?: number | null;
+  onRowSelect?: (index: number) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#161B24]">
       <table className="w-full min-w-[540px] text-left text-[13px]">
         <thead className="border-b border-white/10 bg-[#0E2A44] text-[10px] font-bold tracking-[0.16em] text-white/70 uppercase">
           <tr>
-            {headers.map((h) => (
-              <th key={h} className="px-3.5 py-3">
+            {headers.map((h, i) => (
+              <th key={`${h}-${i}`} className="px-3.5 py-3">
                 {h}
               </th>
             ))}
@@ -147,13 +153,29 @@ export function AdminTable({
         </thead>
         <tbody className="divide-y divide-white/5">
           {rows.map((row, i) => (
-            <tr key={i} className="transition hover:bg-white/[0.02]">
-              {row.map((cell, j) => (
-                <td key={j} className="px-3.5 py-3 align-middle text-white/80">
-                  {cell}
-                </td>
-              ))}
-            </tr>
+            <Fragment key={i}>
+              <tr
+                className={cn(
+                  "transition hover:bg-white/[0.02]",
+                  selectedRow === i ? "bg-white/[0.04]" : "",
+                  onRowSelect ? "cursor-pointer" : "",
+                )}
+                onClick={onRowSelect ? () => onRowSelect(i) : undefined}
+              >
+                {row.map((cell, j) => (
+                  <td key={j} className="px-3.5 py-3 align-middle text-white/80">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+              {expandedRows?.[i] ? (
+                <tr>
+                  <td colSpan={headers.length} className="px-3.5 py-4">
+                    {expandedRows[i]}
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
           ))}
         </tbody>
       </table>

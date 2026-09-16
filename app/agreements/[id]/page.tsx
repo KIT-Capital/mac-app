@@ -6,6 +6,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { buybackPrice, COMPANY, hasApplication, money } from "@/lib/catalog";
+import { bookLabel } from "@/lib/contract/repo-book.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
@@ -33,7 +34,7 @@ export default function AgreementDetailPage() {
       <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-relaxed text-mac-muted">
         <div className="mb-4 flex items-center justify-between rounded-xl border border-mac-line bg-mac-card p-3">
           <div>
-            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Status: {agreement.status.replace("_", " ")}</span>
+            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Book: {bookLabel(agreement)}</span>
             <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
           </div>
           {agreement.status !== "signed" ? (
