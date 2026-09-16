@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { DESK, DESK_PASSWORD, HALE, signIn, signInDesk, signInHale, signOutFromMenu } from "./helpers";
+import {
+  DESK,
+  DESK_PASSWORD,
+  HALE,
+  openCollectorAgreements,
+  openDeskAgreements,
+  signIn,
+  signInDesk,
+  signInHale,
+  signOutFromMenu,
+} from "./helpers";
 
 test.describe("desk", () => {
   test.beforeEach(async ({ page }) => {
@@ -86,6 +96,67 @@ test.describe("desk", () => {
     await expect(page.getByText(/Preview mode|Resend is live/i)).toBeVisible();
     await expect(page.getByRole("cell", { name: "inquiry" }).first()).toBeVisible();
     await expect(page.getByRole("cell", { name: HALE }).first()).toBeVisible();
+  });
+
+  test("Hale live row is past due and Mark signed does not change the book", async ({ page }) => {
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
+    await expect(haleRow.getByText("past due")).toBeVisible();
+    await expect(haleRow.getByRole("button", { name: "Mark signed" })).toBeVisible();
+    const openShell = page.getByRole("row").filter({ hasText: "MAC-OPEN-12" });
+    await expect(openShell.getByText("Open", { exact: true })).toBeVisible();
+    await expect(openShell.getByText("past due")).toHaveCount(0);
+    await haleRow.getByRole("button", { name: "Mark signed" }).click();
+    await expect(haleRow.getByText("signed", { exact: true })).toBeVisible();
+    await expect(haleRow.getByText("past due")).toBeVisible();
+  });
+
+  test("desk records bought back and the collector chip matches", async ({ page }) => {
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
+    await haleRow.click();
+    await page.getByLabel("End date").fill("2022-03-14");
+    await page.getByLabel("Amount").fill("245000");
+    await page.getByRole("button", { name: "Record end" }).click();
+    await expect(haleRow.getByText("bought back")).toBeVisible();
+    await page.getByRole("button", { name: "Log out" }).click();
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await expect(page.getByRole("link", { name: /MAC-31419/ }).getByText("bought back")).toBeVisible();
+    await page.getByRole("link", { name: /MAC-31419/ }).click();
+    await expect(page.getByText(/Book:\s*bought back/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Record end" })).toHaveCount(0);
+  });
+
+  test("desk rejects an empty end and can overwrite then clear Hale", async ({ page }) => {
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
+    await haleRow.click();
+    await page.getByLabel("Amount").fill("");
+    await page.getByRole("button", { name: "Record end" }).click();
+    await expect(page.getByText("Enter a dollar amount of zero or more.")).toBeVisible();
+    await expect(page.getByText(/loan|paid off|vesting/i)).toHaveCount(0);
+    await expect(haleRow.getByText("past due")).toBeVisible();
+    await page.getByLabel("End").selectOption("bought_back");
+    await page.getByLabel("End date").fill("2022-03-14");
+    await page.getByLabel("Amount").fill("245000");
+    await page.getByRole("button", { name: "Record end" }).click();
+    await expect(haleRow.getByText("bought back")).toBeVisible();
+    await page.getByLabel("End").selectOption("in_liquidation");
+    await page.getByLabel("End date").fill("2023-01-02");
+    await page.getByLabel("Amount").fill("180000");
+    await page.getByRole("button", { name: "Overwrite end" }).click();
+    await expect(haleRow.getByText("in liquidation")).toBeVisible();
+    await page.getByLabel("End").selectOption("liquidated");
+    await page.getByLabel("End date").fill("2023-06-01");
+    await page.getByLabel("Amount").fill("150000");
+    await page.getByRole("button", { name: "Overwrite end" }).click();
+    await expect(haleRow.getByText("liquidated")).toBeVisible();
+    await page.getByRole("button", { name: "Clear end" }).click();
+    await expect(haleRow.getByText("past due")).toBeVisible();
   });
 
   test("catalog and config save on this device", async ({ page }) => {
