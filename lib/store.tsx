@@ -18,9 +18,15 @@ import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
 import { nextId } from "@/lib/ids";
 import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
+import {
+  applyAgreementEnd,
+  clearAgreementEnd as stripAgreementEnd,
+  utcToday,
+} from "@/lib/contract/repo-book.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import type {
   Agreement,
+  AgreementEnd,
   AgreementShell,
   AppSettings,
   AppState,
@@ -48,6 +54,8 @@ type Store = AppState & {
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
   removeAgreement: (id: string) => void;
   signAgreement: (id: string) => void;
+  recordAgreementEnd: (id: string, end: AgreementEnd) => boolean;
+  clearAgreementEnd: (id: string) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   upsertUser: (user: ManagedUser) => void;
   removeUser: (id: string) => void;
@@ -460,6 +468,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? { ...a, status: "signed", signedAt: new Date().toISOString().slice(0, 10) }
               : a
           ),
+        })),
+      recordAgreementEnd: (id, end) => {
+        let persisted = false;
+        updateStore((prev) => {
+          const current = prev.agreements.find((a) => a.id === id);
+          if (!current) return prev;
+          const result = applyAgreementEnd(current, end, utcToday());
+          if (!result.ok) return prev;
+          persisted = true;
+          return {
+            ...prev,
+            agreements: prev.agreements.map((a) => (a.id === id ? result.agreement : a)),
+          };
+        });
+        return persisted;
+      },
+      clearAgreementEnd: (id) =>
+        updateStore((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((a) => (a.id === id ? stripAgreementEnd(a) : a)),
         })),
       updateSettings: (patch) =>
         updateStore((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
