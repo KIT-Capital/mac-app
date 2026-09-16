@@ -14,7 +14,9 @@ Keep Next.js, React, TypeScript, Tailwind, and shadcn. Do not rewrite the framew
 
 ## Summary
 
-MAC must hold customer, timepiece, contract, photo, and ledger records on servers it controls. Today those records live in one browser `localStorage` blob. Neon **MAC App** and Doppler are connected for development. The app still reads and writes the browser store. Browser data stays until an explicit, tested migration path exists.
+MAC must hold customer, timepiece, contract, and photo records on servers it controls. Today those records live in one browser `localStorage` blob. Neon **MAC App** and Doppler are connected for development. The app still reads and writes the browser store. Browser data stays until an explicit, tested migration path exists.
+
+This app is the **repo operations book / analytics**. Official cash is QuickBooks. Official inventory is a third-party inventory book. Stage 6 (a MAC ledger) stays **deferred** and is **not this product’s books**. Do not treat a journal as the next UI stage.
 
 ## Capability status
 
@@ -33,7 +35,7 @@ MAC must hold customer, timepiece, contract, photo, and ledger records on server
 | `npm run db:ping` | Verified | `neondb` / Postgres 18.6 |
 | Drizzle Stage 1 | Verified | `mac_schema_probe` on `development` only; production and staging have no tables |
 | Neon Auth | Disabled | Keep off |
-| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; UI still browser; ledger blocked; mock signing |
+| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; UI still browser; Stage 6 deferred / not this product’s books; mock signing |
 | Drizzle `customers` / `timepieces` | Verified | `development` only; UI still uses `localStorage` |
 | Drizzle applications / agreements / archives / reports | Verified | `development` only; mock signing adapter; no ledger |
 | Desk-credential security PR | Proposed | Separate approval boundary |
@@ -63,7 +65,7 @@ A repo desk that may buy and later sell back watches worth millions cannot treat
 - R2. Collectors access only their records; staff access by role; enforced on the server.
 - R3. Original uploads in private MAC storage; thumbnails separate; integrity before “saved.”
 - R4. Versioned contracts, electronic signatures, retained signed PDF, no customer delete/replace.
-- R5. Per-contract and company accounting with balanced postings and exact money.
+- R5. Official cash and inventory stay in QuickBooks and third-party inventory. A MAC ledger (Stage 6) is deferred and is not this product’s books.
 - R6. Snapshot reports that never rewrite archived signed PDFs.
 - R7. Preserve `localStorage` until a tested import exists.
 - R8. Local development uses Neon `development` via Doppler `dev`, never `production`.
@@ -164,7 +166,7 @@ That is Milestone A. It is not “database user exists.”
 3. **Original photos (verified 2026-09-15)** — `photo_objects` on `development`; checksum must match before save; retry of the same digest is a no-op; collector isolation covers photos. Object store is an adapter (in-memory in tests; R2 when bucket, keys, and endpoint or account id are set). Preview data URLs stay in the UI. No server file proxy. `npm run r2:ping` is the development put probe.
 4. **Prepare contract + snapshots (verified 2026-09-15; hardened)** — collector application stays `submitted` until desk prepare; prepare is one transaction; a torn row is resumed; live allocations are unique per timepiece.
 5. **Sign + archive PDF (verified 2026-09-15)** — mock adapter; sign-complete and archive-success are different states; duplicate webhook is a no-op; archive retry does not duplicate the PDF; nobody may replace an archived PDF.
-6. **Ledger + snapshots (blocked)** — integer cents; owner/accountant must name the first accounts before any journal is posted. Do not invent buyback or book-value formulas.
+6. **Ledger + snapshots (deferred — not this product’s books)** — official cash and inventory already live in QuickBooks and third-party inventory. A MAC journal, if ever, waits on accountant-named accounts. Do not invent buyback or book-value formulas. Do not implement Stage 6 to satisfy the live desk or collector UI. The live operations book (end kind, date, amount; derived open / past due) stays on the browser store until an explicit cutover flag.
 7. **Reports (verified 2026-09-15 for contract statements)** — desk can freeze a contract statement from the prepared snapshot + archive checksum; regenerating a report does not mutate the archived PDF. Company trial balance waits on Stage 6.
 8. **Recovery drill** — restore database + files + PDFs + ledger together on `development`. Ledger restore waits on Stage 6.
 

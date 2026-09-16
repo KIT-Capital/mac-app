@@ -1,6 +1,6 @@
 # Architecture
 
-**Tier: CONTRACT** · Last verified: 2026-09-15
+**Tier: CONTRACT** · Last verified: 2026-09-16
 
 Mechanical Art Capital is a single Next.js 16 App Router app (`mechanical-art-capital`). It is not the Kit Vite/Express/tRPC reference. Do not rewrite the framework without a separate approved project.
 
@@ -10,11 +10,12 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 
 - **Collector** — one UI plane on phone, iPad, and desktop (`CollectorShell`). **Implemented.**
 - **Desk** — 16:9 admin console at `/admin/*` (`DeskShell`). Not linked from collector chrome. **Implemented.**
-- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`). **Implemented.** This remains the live app store until a tested server persistence path exists. Do not delete or auto-migrate it.
+- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`). **Implemented.** This remains the live app store until a tested server persistence path exists. Do not delete or auto-migrate it. The repo operations book (end kind, date, amount; derived open / past due) lives on this client store only.
+- **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
 - **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** `proxy.ts` returns 403 for `/admin` without a valid cookie. Moving the secret is a separate security plan.
-- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables yet. The collector/desk UI still uses the browser store. Decision `0002`.
+- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI still uses the browser store. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
 
@@ -40,7 +41,7 @@ Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 
 
 ## Proposed platform (partially implemented)
 
-Neon + Drizzle repositories exist on the `development` branch. The live collector/desk UI still reads `localStorage`. `lib/storage/r2-object-store.mjs` can put originals when R2 names are set; production refuses a silent memory fallback. WorkOS, a Railway worker, and ledger posting are not wired. External accounting systems stay an integration boundary only — no QuickBooks/Xero selection. See `docs/plans/2026-09-15-production-persistence.md`.
+Neon + Drizzle repositories exist on the `development` branch. The live collector/desk UI still reads `localStorage`. `lib/storage/r2-object-store.mjs` can put originals when R2 names are set; production refuses a silent memory fallback. WorkOS and a Railway worker are not wired. Official cash and inventory stay outside this app (QuickBooks and third-party inventory). Stage 6 ledger posting is deferred and is not this product’s books. See `docs/plans/2026-09-15-production-persistence.md` and `docs/plans/2026-09-16-001-feat-repo-operations-book-plan.md`.
 
 ## Out of scope for Phase 1 Kit equip
 
