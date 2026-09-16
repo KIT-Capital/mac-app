@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
 import { money } from "@/lib/catalog";
+import { bookLabel } from "@/lib/contract/repo-book.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 
 export default function AgreementsPage() {
@@ -25,7 +26,7 @@ export default function AgreementsPage() {
             >
               <div className="flex justify-between text-[11px] tracking-[0.14em] text-[#E8D5C0] uppercase">
                 <span className="font-bold">{a.agreementCode || a.id}</span>
-                <span className="text-[#FCB040]">{a.status.replace("_", " ")}</span>
+                <span className="text-[#FCB040]">{bookLabel(a)}</span>
               </div>
               <p className="mt-2 text-2xl font-bold text-mac-fg">{money(a.amount)}</p>
               <p className="mt-1 text-xs text-mac-faint">Originated on {a.createdAt} · {a.termMonths} Months</p>

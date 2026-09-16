@@ -28,7 +28,9 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 
 `lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same client module.
 
-Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces, original photos, applications, prepared agreement versions, mock signature envelopes, archived PDFs, and contract report snapshots on Neon `development`. There is no HTTP or tRPC procedure yet — that is a recorded exception to agent-native parity. Isolation is enforced in the repository and tested by `npm run test:db`. Do not dual-write the browser store until a cutover flag is approved. Do not add a server file proxy. Ledger posting is blocked until the accountant names accounts.
+The repo operations book is a **UI-only exception** to agent-native parity. Book labels (`open`, `past due`, `bought back`, `in liquidation`, `liquidated`) and staff ends (kind, date, amount) exist only on the client store (`lib/contract/repo-book.mjs` + `lib/store.tsx`). There is no HTTP, tRPC, or MCP procedure for recording or reading an end. Official cash and inventory stay in QuickBooks and third-party inventory.
+
+Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces, original photos, applications, prepared agreement versions, mock signature envelopes, archived PDFs, and contract report snapshots on Neon `development`. There is no HTTP or tRPC procedure yet — that is a recorded exception to agent-native parity. Isolation is enforced in the repository and tested by `npm run test:db`. Do not dual-write the browser store until a cutover flag is approved. Do not add a server file proxy. Stage 6 ledger posting is deferred and is not this product’s books.
 
 ## Errors
 

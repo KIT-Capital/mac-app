@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { HALE, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
+import { HALE, openCollectorAgreements, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
 
 test.describe("collector app", () => {
   test("splash shows the official lockup and collector actions", async ({ page }) => {
@@ -157,6 +157,34 @@ test.describe("collector app", () => {
     await signOutFromMenu(page);
     await signInHale(page);
     await expect(page.getByText("DB28")).toBeVisible();
+  });
+
+  test("Hale repo book chip is past due and stays past due after Sign", async ({ page }) => {
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    const haleCard = page.getByRole("link", { name: /MAC-31419/ });
+    await expect(haleCard.getByText("past due")).toBeVisible();
+    await expect(page.getByText(/loan|paid off|vesting/i)).toHaveCount(0);
+    await haleCard.click();
+    await expect(page.getByText(/Book:\s*past due/i)).toBeVisible();
+    await page.getByRole("button", { name: "Review Terms" }).click();
+    await page.getByRole("button", { name: "Sign Repurchase Agreement" }).click();
+    await expect(page.getByRole("button", { name: "Executed & Verified" })).toBeVisible();
+    await expect(page.getByText(/Book:\s*past due/i)).toBeVisible();
+    await page.goto("/agreements");
+    await expect(page.getByRole("link", { name: /MAC-31419/ }).getByText("past due")).toBeVisible();
+  });
+
+  test("new collector agreements list keeps the empty sale-and-repurchase copy", async ({ page }) => {
+    await page.goto("/signup");
+    await page.getByLabel("Full Legal Name").fill("Ada Locke");
+    await page.getByLabel("Email Address").fill(`ada.book.${Date.now()}@example.com`);
+    await page.getByLabel("Direct Phone Number").fill("+1 (212) 555-0199");
+    await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
+    await page.getByRole("checkbox", { name: /privacy policy/i }).check();
+    await page.getByRole("button", { name: "Create Account" }).click();
+    await page.goto("/agreements");
+    await expect(page.getByText("No sale-and-repurchase agreements on file yet.")).toBeVisible();
   });
 
   test("legacy financing routes open repurchase", async ({ page }) => {

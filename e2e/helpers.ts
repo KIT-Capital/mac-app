@@ -26,6 +26,16 @@ export async function openMenu(page: Page) {
   await page.getByRole("button", { name: "Open menu" }).click();
 }
 
+export async function openCollectorAgreements(page: Page) {
+  await page.goto("/agreements");
+  await expect(page.getByRole("heading", { name: "Repurchase agreements" })).toBeVisible();
+}
+
+export async function openDeskAgreements(page: Page) {
+  await page.getByRole("link", { name: "Repo Agreements" }).click();
+  await expect(page.getByText("Live agreements")).toBeVisible();
+}
+
 export async function signOutFromMenu(page: Page) {
   const menu = page.getByRole("button", { name: "Open menu" });
   if (await menu.isVisible()) {
