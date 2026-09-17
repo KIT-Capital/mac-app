@@ -25,6 +25,12 @@ import {
   utcToday,
 } from "@/lib/contract/repo-book.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
+import {
+  browserSessionStorage,
+  persistableState,
+  readSessionUser,
+  writeSessionUser,
+} from "@/lib/session-persist.mjs";
 import type {
   Agreement,
   AgreementEnd,
@@ -92,6 +98,7 @@ const listeners = new Set<() => void>();
 let clientLoaded = false;
 
 function readPersistedState(): AppState {
+  const sessionUser = readSessionUser(browserSessionStorage());
   try {
     const raw =
       localStorage.getItem(STORAGE_KEY) ??
@@ -101,16 +108,22 @@ function readPersistedState(): AppState {
       const parsed = JSON.parse(raw) as AppState;
       const timepieces = Array.isArray(parsed.timepieces) ? parsed.timepieces : [];
       const agreements = Array.isArray(parsed.agreements) ? parsed.agreements : [];
-      const counts = ownedCounts(parsed.user?.email, timepieces, agreements);
+      const counts = ownedCounts(sessionUser?.email, timepieces, agreements);
       return {
-        ...withDeskDefaults({ ...parsed, agreements }, timepieces),
-        user: normalizeUser(parsed.user, counts.pieces, counts.agreements),
+        ...withDeskDefaults({ ...parsed, agreements, user: null }, timepieces),
+        user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
       };
     }
   } catch {
     /* start empty */
   }
-  return { ...demoState(), user: null };
+  const empty = { ...demoState(), user: null };
+  if (!sessionUser) return empty;
+  const counts = ownedCounts(sessionUser.email, empty.timepieces, empty.agreements);
+  return {
+    ...empty,
+    user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
+  };
 }
 
 function subscribeStore(listener: () => void) {
@@ -138,7 +151,8 @@ function updateStore(recipe: (prev: AppState) => AppState) {
   if (next === prev) return;
   snapshot = next;
   if (next.hydrated) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableState(next)));
+    writeSessionUser(browserSessionStorage(), next.user);
   }
   listeners.forEach((listener) => listener());
 }
@@ -539,6 +553,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem("mac-app-state-v2");
         localStorage.removeItem("mac-app-state-v1");
+        writeSessionUser(browserSessionStorage(), null);
         updateStore(() => demoState());
       },
     }),

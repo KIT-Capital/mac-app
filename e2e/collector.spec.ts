@@ -34,6 +34,45 @@ test.describe("collector app", () => {
     await expect(page.getByRole("img", { name: /Richard Mille|Nautilus|Royal Oak|Logical One/ }).first()).toBeVisible();
   });
 
+  test("a leftover saved user on this device still opens splash", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "mac-app-state-v3",
+        JSON.stringify({
+          hydrated: true,
+          user: {
+            email: "jonathan.hale@mechartcap.com",
+            name: "Jonathan Hale",
+            role: "collector",
+            onboardingComplete: true,
+          },
+          timepieces: [],
+          agreements: [],
+          profiles: {},
+        }),
+      );
+    });
+    await page.goto("/");
+    await expect(page.getByRole("img", { name: /Mechanical Art Capital/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My Timepieces" })).toHaveCount(0);
+  });
+
+  test("a new tab always starts at splash, then Sign In recovers Hale's pieces", async ({ context, page }) => {
+    await signInHale(page);
+    const stored = await page.evaluate(() => localStorage.getItem("mac-app-state-v3"));
+    expect(stored).toBeTruthy();
+    expect(JSON.parse(stored as string).user).toBeNull();
+    const fresh = await context.newPage();
+    await fresh.goto("/");
+    await expect(fresh.getByRole("link", { name: "Get Started" })).toBeVisible();
+    await expect(fresh.getByRole("link", { name: "Sign In" })).toBeVisible();
+    await expect(fresh.getByRole("heading", { name: "My Timepieces" })).toHaveCount(0);
+    await signInHale(fresh);
+    await expect(fresh.getByText("Richard Mille")).toBeVisible();
+    await fresh.close();
+  });
+
   test("requesting appraisal sends the piece to reviewing", async ({ page }) => {
     await signInHale(page);
     await page.getByRole("link", { name: /Logical One/ }).click();
