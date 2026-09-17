@@ -129,7 +129,7 @@ export default function AgreementDetailPage() {
       setPieceError(
         result.error === LIVE_WATCH_CONFLICT
           ? "That timepiece is already on a live repo."
-          : "That timepiece could not be added.",
+          : "That timepiece is not free to add to this repo.",
       );
       return;
     }
@@ -143,7 +143,9 @@ export default function AgreementDetailPage() {
       setPieceError(
         result.error === "OVER_LTV"
           ? `The desk can purchase up to ${money(cap)} on these appraisals.`
-          : "Enter a sale amount the desk can purchase.",
+          : result.error === "BELOW_CURRENT"
+            ? "The sale amount can only be raised."
+            : "Enter a sale amount the desk can purchase.",
       );
       return;
     }

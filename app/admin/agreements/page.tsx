@@ -115,8 +115,9 @@ export default function AdminAgreementsPage() {
       setEndError(END_ERRORS[checked.error] ?? "Enter a date and amount.");
       return;
     }
-    if (!recordAgreementEnd(agreement.id, checked.end as AgreementEnd)) {
-      setEndError(END_ERRORS.INVALID_AMOUNT);
+    const recorded = recordAgreementEnd(agreement.id, checked.end as AgreementEnd);
+    if (!recorded.ok) {
+      setEndError(END_ERRORS[recorded.error] ?? "Enter a date and amount.");
       return;
     }
     setEndError("");
