@@ -6,7 +6,7 @@ Source: [github.com/KIT-Capital/mac-app](https://github.com/KIT-Capital/mac-app.
 
 Collectors get one plane of UI on **phone, iPad, and desktop** — full-bleed, no nested device frames. The **admin desk** is a separate 16:9 laptop console (`admin@mechartcap.com`).
 
-The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official Logo-FF gear mark (no wordmark). See `docs/design-reference.md`.
+The original mobile source was lost. This web app follows that deck’s information architecture — Timepieces, Repurchase, Contact us, Account — with navy headers, dark and light collector appearances, white/navy actions, and the official Logo-FF lockup (gear plus MECHANICAL ART CAPITAL) on splash and sign-in. Headers use the gear mark. See `docs/design-reference.md`.
 
 ## What you can do
 
@@ -94,7 +94,7 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 - Gold `#FCB040` — official CAPITAL wordmark, active tab, desk accents
 - Champagne `#E8D5C0` — add-timepiece FAB
 - Black screens, white Save / Get started
-- Official Logo-FF only (Illustrator vector): black gear, three gold pinions, colored jewels. On dark, the gear is solid white — never a hollow outline or a white plate. The gold single-gear mark is not used.
+- Official Logo-FF only (Illustrator vector): black gear, three gold pinions, colored jewels, MECHANICAL ART CAPITAL on splash and sign-in. On dark, the gear is solid white — never a hollow outline or a white plate. The gold single-gear mark is not used.
 - Dark and light collector appearances, toggled in Account → Settings, matching the 2022 deck.
 
 ## Product notes
