@@ -59,7 +59,7 @@ npm test
 
 Playwright covers splash, collector signup/collection/appraisal/repurchase/account, and the desk (appraise, mail, catalog). The suite reuses a server already running on port 43173.
 
-The collector app is one plane on every device: phone (burger + 2-column vault), iPad (top nav + 3 columns), and desktop (top nav + 4 columns). The admin desk is a 16:9 laptop console, not the collector chrome.
+The collector app is one plane on every device: phone (burger + 2-column vault), iPad (top nav + 3 columns), and desktop (top nav + 4 columns). To judge the phone layout on a computer, open `/?view=phone`. The admin desk is a 16:9 laptop console, not the collector chrome.
 
 ### Demo accounts
 

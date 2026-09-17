@@ -31,6 +31,7 @@ Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plu
 - Collector: one plane — phone (burger, 2-column vault), iPad (top nav, 3 columns), desktop (top nav, 4 columns).
 - Desk: 16:9 laptop console, dark only.
 - Dark and light collector appearances, toggled in Account → Settings.
+- Opt-in phone review: `?view=phone` stages the collector at iPhone width on a computer. Default chrome stays full-bleed with no device frame. `?view=desktop` or **Show full screen** leaves that review.
 
 ## Language (overrides the 2022 deck)
 

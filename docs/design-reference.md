@@ -17,7 +17,7 @@ Keep the slide layouts. Rewrite the loan words.
 
 ## Screens in the deck
 
-1. **Splash** — “Unbiased appraisals of premium timepieces.” Get Started (filled) + Sign In (navy). Official Logo-FF lockup, never the MB&F mark.
+1. **Splash** — official Logo-FF lockup (gear plus MECHANICAL ART CAPITAL), “Unbiased appraisals of premium timepieces,” Get Started (filled) + Sign In (navy). Lockup, headline, copy, and actions sit as one poster so the name is never dropped. Light / Dark screen toggle. Never the MB&F mark.
 2. **Splash options** — same screen in dark and light.
 3. **Add a timepiece** — guided required photos (front, back, left side of barrel, right side of barrel, clasp), optional box and papers photos, collector statements that they have the box and original documentation, optional video, manufacturer, missing-a-brand, model, reference, condition, box and papers, case metal / type / diameter, dial, buckle, strap or metal bracelet, Save + Appraise. After Appraise, only the desk can edit.
 4. **My Timepieces** — two-column grid, Appraised / Reviewing, PDF export, membership banner, `+` FAB. Tabs: Timepieces, Repurchase, Contact us, Account. Desktop and iPad headers include Log out next to the collector bar.
