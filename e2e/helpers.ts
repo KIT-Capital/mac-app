@@ -59,11 +59,11 @@ const INTAKE_PNG = Buffer.from(
 );
 
 const REQUIRED_SHOT_PROMPTS = [
-  "Take a photo of the front of the timepiece",
-  "Take a photo of the back of the timepiece",
-  "Take a photo of the left side of the barrel",
-  "Take a photo of the right side of the barrel",
-  "Take a photo of the clasp",
+  "Upload a photo of the front of the timepiece",
+  "Upload a photo of the back of the timepiece",
+  "Upload a photo of the left side of the barrel",
+  "Upload a photo of the right side of the barrel",
+  "Upload a photo of the clasp",
 ] as const;
 
 export async function completeTimepieceIntakePhotos(page: Page) {

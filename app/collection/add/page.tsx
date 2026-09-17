@@ -244,7 +244,7 @@ function AddFormEditor() {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-6">
           <div>
             <p className="text-[13px] text-mac-muted">
-              Take each required photo so the desk can see the barrel from every side. Box and original
+              Upload each required photo so the desk can see the barrel from every side. Box and original
               documentation photos are optional, but you must confirm you have both.
             </p>
             <div className="mt-4 space-y-3">
