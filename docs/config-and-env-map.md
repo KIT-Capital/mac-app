@@ -75,8 +75,12 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | `APP_ENV` | Mapping guard | Doppler + Railway production/Development | `development` · `staging` · `preview` · `production`. Required when any database URL is set |
 | `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Production/Development `https://mechart.app` · staging Railway host |
 | `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default exists; separate security plan |
-| `RESEND_API_KEY` | `/api/mail` | Implemented | Present on Railway production; Development still has `RESEND_API` only |
-| `RESEND_FROM_EMAIL` | Outbound From | Implemented | `info@mechartcap.com` · stay `@mechartcap.com` |
+| `MAC_LIVE_BOOK` | Collector live-book cutover | Implemented, default off | Only `1`, `true`, or `on`; enabled use is development-only |
+| `COLLECTOR_SESSION_SECRET` | Collector verification and session HMAC | Required when live book is on | No committed or runtime fallback |
+| `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin; development may use HTTP localhost |
+| `MAC_INTERNAL_EMAIL` | Internal MAC recipients | Implemented | Temporary prototype default `ricardo.cidale@norfolkgroup.io`; routes info/finance/financing recipients only |
+| `RESEND_API_KEY` | `/api/mail` + collector access mail | Implemented; required when live book is on | Preview remains available for ordinary mail, never for identity verification |
+| `RESEND_FROM_EMAIL` | Outbound From | Implemented | `info@mechartcap.com`; internal recipient routing does not change From |
 | `RESEND_REPLY_TO` | Outbound Reply-To | Implemented | Default `financing@mechartcap.com` |
 | `PORT` | Railway / `next start` | Implemented | Injected by Railway |
 | `NODE_ENV` | Next.js | Implemented | Must not select the database |

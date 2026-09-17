@@ -5,10 +5,12 @@ import { createDb } from "./client";
 import {
   createTimepiece,
   deskActor,
+  findCustomerByEmail,
   getCustomer,
   getTimepiece,
   listTimepieces,
   registerCollector,
+  registerVerifiedCollector,
   timepieceDollars,
   toCollectorActor,
 } from "./records";
@@ -73,5 +75,25 @@ describe("Stage 2 records isolation", { skip }, () => {
       () => registerCollector(db, { email: "admin@mechartcap.com", name: "Nope" }),
       { message: "RESERVED_DESK_EMAIL" },
     );
+  });
+
+  it("registers a verified email once without overwriting the existing collector", async () => {
+    const email = `verified.${suffix}@mac.test`;
+    const first = await registerVerifiedCollector(db, {
+      email,
+      name: "Verified Collector",
+      phone: "+1 212 555 0100",
+    });
+    createdCustomerIds.push(first.id);
+
+    const replay = await registerVerifiedCollector(db, {
+      email: email.toUpperCase(),
+      name: "Replacement Name",
+      phone: "+1 212 555 0199",
+    });
+
+    assert.equal(replay.id, first.id);
+    assert.equal(replay.name, "Verified Collector");
+    assert.equal((await findCustomerByEmail(db, email))?.id, first.id);
   });
 });

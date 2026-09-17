@@ -7,7 +7,9 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 ## `POST` / `GET` `/api/mail`
 
 - `POST` sends or previews mail (`lib/mail.ts`). Kinds: inquiry, welcome, invite, appraisal, repurchase, financing, membership, test.
-- A Resend send failure is stored as a `failed` outbox item. POST still returns 200 so collector signup is not blocked. Missing API key stays preview mode.
+- An ordinary `/api/mail` Resend failure is stored as a `failed` outbox item.
+  POST still returns 200 so browser signup is not blocked. Missing API key keeps
+  ordinary mail in preview mode; collector access mail is excluded from this path.
 - `invite` and `test` require a valid desk session cookie.
 - `GET` lists the process-local outbox; desk session required. Missing or invalid session is **403**.
 - Rate-limited per client IP.
@@ -36,6 +38,25 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 
 - `POST` sets the HMAC-signed `mac_desk` cookie after desk credentials are accepted.
 - `DELETE` clears it.
+
+## Collector session prerequisite
+
+- `POST /api/collector-session` is dormant by default. With `MAC_LIVE_BOOK` off,
+  it returns `{ ok: true, mode: "browser" }` without Neon, mail, or cookie work.
+- Enabled mode is development-only and requires both collector security settings
+  plus `RESEND_API_KEY`; preview delivery is refused for identity verification.
+  `action: "login"` accepts an email; valid-format known and unknown emails both
+  receive the same generic `202` response, but only known customers receive mail.
+- `action: "register"` accepts bounded `name`, normalized `email`, and `phone`.
+  It signs those details into the verification link and does not create a customer.
+- `GET /api/collector-session/verify?token=…` verifies signature, expiry, action,
+  email, and customer binding. Login redirects to `/collection`; registration
+  creates or reuses the email's customer, then redirects to `/collection/setup`.
+  Both set the HttpOnly, session-only `mac_collector` cookie.
+- Links use only `COLLECTOR_MAGIC_LINK_ORIGIN`, never request host headers.
+  Access links are sent through Resend and are never retained in the generic desk
+  outbox, whether delivery succeeds or fails.
+  Login and signup pages are not wired to these endpoints in this prerequisite.
 
 ## Client store
 

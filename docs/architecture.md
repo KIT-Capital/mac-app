@@ -18,6 +18,12 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI still uses the browser store. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
+- **Verified collector access prerequisite** — signed email verification and
+  `mac_collector` session primitives exist behind default-off `MAC_LIVE_BOOK`.
+  Enabled use is development-only; browser login remains the active UI path.
+- **Internal mail routing** — `MAC_INTERNAL_EMAIL` is the single recipient for
+  MAC desk aliases during the prototype. Collector copies remain addressed to
+  collectors and the public From address remains `info@mechartcap.com`.
 
 ## Tree
 
@@ -25,6 +31,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 app/                 routes
 app/api/mail         outbound mail
 app/api/desk-session desk cookie
+app/api/collector-session dormant collector email verification
 proxy.ts             server 403 for /admin without desk cookie
 components/          shells + shadcn
 lib/                 auth, store, mail, theme, env mapping, Drizzle schema and repositories

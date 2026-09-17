@@ -88,6 +88,43 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
   return row;
 }
 
+export async function findCustomerByEmail(db: Database, emailInput: string) {
+  const email = normalizeEmail(emailInput);
+  if (!email.includes("@")) return null;
+  const [row] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
+  return row ?? null;
+}
+
+export async function registerVerifiedCollector(
+  db: Database,
+  input: RegisterCollectorInput,
+) {
+  const email = normalizeEmail(input.email);
+  const name = input.name.trim();
+  const phone = input.phone?.trim() ?? "";
+  if (!email.includes("@")) throw new Error("INVALID_EMAIL");
+  if (DESK_EMAILS.has(email)) throw new Error("RESERVED_DESK_EMAIL");
+  if (!name) throw new Error("NAME_REQUIRED");
+
+  const [created] = await db
+    .insert(customers)
+    .values({
+      id: randomUUID(),
+      email,
+      name,
+      phone,
+      role: "collector",
+      preferences: DEFAULT_PREFERENCES,
+    })
+    .onConflictDoNothing({ target: customers.email })
+    .returning();
+  if (created) return created;
+
+  const existing = await findCustomerByEmail(db, email);
+  if (!existing) throw new Error("COLLECTOR_REGISTRATION_CONFLICT");
+  return existing;
+}
+
 export async function getCustomer(db: Database, actor: Actor, customerId: string) {
   const [row] = await db.select().from(customers).where(eq(customers.id, customerId)).limit(1);
   if (!row) return null;

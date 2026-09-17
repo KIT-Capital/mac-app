@@ -1,7 +1,14 @@
 import "server-only";
 import { Resend } from "resend";
 import { markMailFailed } from "@/lib/mail-delivery.mjs";
-import { MAIL_KINDS, type MailKind, type MailRequest, type OutboxItem } from "@/lib/mail-types";
+import {
+  MAIL_KINDS,
+  type MailKind,
+  type MailRequest,
+  type OutboxItem,
+  type RequestMailKind,
+} from "@/lib/mail-types";
+import { routeInternalRecipients } from "@/lib/internal-mail.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 
 export type { MailKind, MailRequest, OutboxItem };
@@ -16,11 +23,29 @@ type ComposedMail = {
   html: string;
 };
 
+type MailEnvironment = Record<string, string | undefined>;
+type SendEmailResult = {
+  data: { id?: string } | null;
+  error: unknown;
+};
+type MailDeliveryOptions = {
+  env?: MailEnvironment;
+  sendEmail?: (message: {
+    from: string;
+    to: string[];
+    replyTo: string;
+    subject: string;
+    html: string;
+    text: string;
+    tags: { name: string; value: string }[];
+  }) => Promise<SendEmailResult>;
+};
+
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const outbox: OutboxItem[] = [];
 const hits = new Map<string, { n: number; reset: number }>();
 
-export function isMailKind(value: unknown): value is MailKind {
+export function isMailKind(value: unknown): value is RequestMailKind {
   return typeof value === "string" && (MAIL_KINDS as readonly string[]).includes(value);
 }
 
@@ -28,16 +53,17 @@ export function isEmail(value: string) {
   return EMAIL_RE.test(value.trim());
 }
 
-export function mailConfigured() {
-  return Boolean(process.env.RESEND_API_KEY?.trim());
+export function mailConfigured(env: MailEnvironment = process.env) {
+  return Boolean(env.RESEND_API_KEY?.trim());
 }
 
-export function mailFrom() {
-  return process.env.RESEND_FROM_EMAIL?.trim() || "Mechanical Art Capital <onboarding@resend.dev>";
+export function mailFrom(env: MailEnvironment = process.env) {
+  return env.RESEND_FROM_EMAIL?.trim() || "Mechanical Art Capital <info@mechartcap.com>";
 }
 
-export function mailReplyTo() {
-  return process.env.RESEND_REPLY_TO?.trim() || DEFAULT_SETTINGS.financingEmail;
+export function mailReplyTo(env: MailEnvironment = process.env) {
+  const configured = env.RESEND_REPLY_TO?.trim() || DEFAULT_SETTINGS.financingEmail;
+  return routeInternalRecipients([configured], env)[0];
 }
 
 export function listOutbox() {
@@ -92,18 +118,46 @@ export function parseMailRequest(input: unknown): MailRequest {
   };
 }
 
-export async function dispatchMail(request: MailRequest) {
+export async function dispatchMail(
+  request: MailRequest,
+  options: MailDeliveryOptions = {},
+) {
   const composed = composeMail(request);
   const results: OutboxItem[] = [];
 
   for (const mail of composed) {
-    results.push(await deliver(mail));
+    results.push(await deliver(mail, options));
   }
 
   return {
-    preview: !mailConfigured(),
+    preview: !mailConfigured(options.env),
     messages: results,
   };
+}
+
+export async function dispatchCollectorAccessMail(
+  input: {
+    to: string;
+    name: string;
+    action: "login" | "register";
+    url: string;
+  },
+  options: MailDeliveryOptions = {},
+) {
+  const greeting = input.name.split(" ")[0] || "Collector";
+  const mail = letter({
+    kind: "access",
+    to: [input.to],
+    subject: "Your Mechanical Art Capital access link",
+    heading: `${greeting}, verify your email`,
+    intro:
+      input.action === "register"
+        ? "Use the secure link below to verify your email and create your collection."
+        : "Use the secure link below to open your collection.",
+    rows: [["Email", input.to]],
+    body: input.url,
+  });
+  return deliver(mail, options);
 }
 
 function composeMail(request: MailRequest): ComposedMail[] {
@@ -305,11 +359,22 @@ function letter({
   return { kind, to, replyTo, subject, text, html };
 }
 
-async function deliver(mail: ComposedMail): Promise<OutboxItem> {
+async function deliver(
+  mail: ComposedMail,
+  options: MailDeliveryOptions = {},
+): Promise<OutboxItem> {
+  const env = options.env ?? process.env;
+  const apiKey = env.RESEND_API_KEY?.trim();
+  const accessMail = mail.kind === "access";
+  if (accessMail && !apiKey) {
+    throw new Error("COLLECTOR_ACCESS_EMAIL_REQUIRED");
+  }
+
+  const recipients = routeInternalRecipients(mail.to, env);
   const item: OutboxItem = {
     id: `mail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     kind: mail.kind,
-    to: mail.to,
+    to: recipients,
     subject: mail.subject,
     text: mail.text,
     html: mail.html,
@@ -317,34 +382,40 @@ async function deliver(mail: ComposedMail): Promise<OutboxItem> {
     status: "preview",
   };
 
-  const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     remember(item);
     return item;
   }
 
   try {
-    const resend = new Resend(apiKey);
-    const { data, error } = await resend.emails.send({
-      from: mailFrom(),
-      to: mail.to,
-      replyTo: mail.replyTo || mailReplyTo(),
+    const message = {
+      from: mailFrom(env),
+      to: recipients,
+      replyTo: mail.replyTo || mailReplyTo(env),
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
       tags: [{ name: "kind", value: mail.kind }],
-    });
+    };
+    const { data, error } = options.sendEmail
+      ? await options.sendEmail(message)
+      : await new Resend(apiKey).emails.send(message);
 
     if (error) {
-      remember(markMailFailed(item, error));
+      markMailFailed(item, error);
+      if (accessMail) throw new Error("COLLECTOR_ACCESS_EMAIL_FAILED");
+      remember(item);
       return item;
     }
 
     item.status = "sent";
     item.resendId = data?.id;
-    remember(item);
+    if (!accessMail) remember(item);
     return item;
   } catch (error) {
+    if (accessMail) {
+      throw new Error("COLLECTOR_ACCESS_EMAIL_FAILED", { cause: error });
+    }
     remember(markMailFailed(item, error));
     return item;
   }
