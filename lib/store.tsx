@@ -147,6 +147,12 @@ function getServerStoreSnapshot() {
   return SERVER_STATE;
 }
 
+function refreshStoreFromDisk() {
+  snapshot = readPersistedState();
+  listeners.forEach((listener) => listener());
+  return snapshot;
+}
+
 function updateStore(recipe: (prev: AppState) => AppState) {
   const prev = getStoreSnapshot();
   const next = recipe(prev);
@@ -449,7 +455,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             .filter((a) => a.watchIds.length > 0),
         })),
       createAgreement: (input) => {
-        const current = getStoreSnapshot();
+        const current = refreshStoreFromDisk();
         const conflicts = conflictingLiveWatchIds(input.watchIds, current.agreements);
         if (conflicts.length > 0) {
           throw new Error(LIVE_WATCH_CONFLICT);
