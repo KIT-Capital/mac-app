@@ -1,18 +1,19 @@
 # Security
 
-**Tier: CONTRACT** · Last verified: 2026-09-15
+**Tier: CONTRACT** · Last verified: 2026-09-17
 
 ## Authentication (current)
 
 Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
 - **Collector** — any non-desk email plus a non-empty password becomes role `collector`. There is no password verifier.
+- **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). A new tab, device, or browser always starts at splash / Sign In. Collection rows and profiles stay in `localStorage` so the same email can recover pieces after signing in again.
 - **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first.
 - **Social buttons** — UI only; they call the same local `enter()` path.
 
 ## Desk session
 
-`lib/desk-session.ts` signs cookie `mac_desk` with `DESK_SESSION_SECRET` (local default exists for prototype use). Treat the default as unsafe for production. Changing the secret or cookie format is part of the separate security PR, not Phase 1.
+`lib/desk-session.ts` signs cookie `mac_desk` with `DESK_SESSION_SECRET` (local default exists for prototype use). Treat the default as unsafe for production. Changing the secret or cookie format is part of the separate security PR, not Phase 1. The cookie is session-only: do not set `maxAge` or `expires`. Do not add a persistent collector cookie.
 
 ## Data
 

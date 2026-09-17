@@ -43,6 +43,7 @@ export function deskCookieOptions() {
     sameSite: "lax" as const,
     path: "/",
     secure: process.env.NODE_ENV === "production",
+    // Session cookie: omit maxAge and expires so the desk login dies with the browser.
   };
 }
 

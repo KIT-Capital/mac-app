@@ -1,6 +1,6 @@
 # Architecture
 
-**Tier: CONTRACT** · Last verified: 2026-09-16
+**Tier: CONTRACT** · Last verified: 2026-09-17
 
 Mechanical Art Capital is a single Next.js 16 App Router app (`mechanical-art-capital`). It is not the Kit Vite/Express/tRPC reference. Do not rewrite the framework without a separate approved project.
 
@@ -10,7 +10,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 
 - **Collector** — one UI plane on phone, iPad, and desktop (`CollectorShell`). **Implemented.**
 - **Desk** — 16:9 admin console at `/admin/*` (`DeskShell`). Not linked from collector chrome. **Implemented.**
-- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`). **Implemented.** This remains the live app store until a tested server persistence path exists. Do not delete or auto-migrate it. The repo operations book (end kind, date, amount; derived open / past due) lives on this client store only.
+- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) for collection rows, with `user` always stored as `null`. The live Sign In lives in tab `sessionStorage` only. **Implemented.** This remains the live app store until a tested server persistence path exists. Do not delete or auto-migrate it. The repo operations book (end kind, date, amount; derived open / past due) lives on this client store only.
 - **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
