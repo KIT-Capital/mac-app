@@ -20,6 +20,18 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 - Unauthenticated by design so the collector download can call it with an explicit payload. Rate-limit and session policy are still open.
 - Validation errors are JSON `{ error, code, errors }` with 400. Render failures are 400 or 500 with `CONTRACT_PDF_FAILED`.
 
+## `POST` `/api/desk/live-book-import`
+
+- Desk session required. Missing or invalid session is **403**.
+- JSON body: `{ payload, confirmLiveImport, commit }`. `payload` is a `persistableState` export. Preview `data:` URLs are not accepted on this request.
+- `commit: false` (default) returns a dry-run report. `commit: true` writes Neon `development` live-book tables in one transaction when the plan is clean.
+- In-memory Hale demo requires `confirmLiveImport: true`. Reserved desk emails are not customers. Email or ID collisions fail closed.
+- After the owner live-book flag is on, this handler returns **409** and does not write. The flag stays off in this unit. Path is outside `/admin` so the desk matcher does not truncate the body.
+
+## `POST` `/api/desk/live-book-preview`
+
+- Desk session required. **403** without it. One preview URL per request. Used after import when a piece still has a `data:` JPEG in the browser.
+
 ## `POST` / `DELETE` `/api/desk-session`
 
 - `POST` sets the HMAC-signed `mac_desk` cookie after desk credentials are accepted.

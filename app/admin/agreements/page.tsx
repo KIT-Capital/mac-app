@@ -7,8 +7,9 @@ import { Field, NativeSelect, PillButton } from "@/components/field";
 import { money } from "@/lib/catalog";
 import { bookLabel, utcToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
+import { persistableState } from "@/lib/session-persist.mjs";
 import { useStore } from "@/lib/store";
-import type { Agreement, AgreementEnd, AgreementShell, BookEndKind } from "@/lib/types";
+import type { Agreement, AgreementEnd, AgreementShell, AppState, BookEndKind } from "@/lib/types";
 
 function blankShell(termMonths = 12): AgreementShell {
   const scale = settingsToTerms({}, termMonths);
@@ -46,6 +47,91 @@ const END_ERRORS: Record<string, string> = {
   NOT_FOUND: "That repo is no longer on the desk.",
   LIVE_WATCH_CONFLICT: "Those timepieces are already on another live repo.",
 };
+
+function exportableBook(state: AppState) {
+  return persistableState({
+    hydrated: state.hydrated,
+    user: null,
+    timepieces: state.timepieces.map((watch) => ({
+      ...watch,
+      images: (watch.images ?? []).filter((image) => !String(image).startsWith("data:")),
+    })),
+    agreements: state.agreements,
+    users: state.users,
+    catalog: state.catalog,
+    shells: state.shells,
+    photos: [],
+    settings: state.settings,
+    profiles: state.profiles,
+  });
+}
+
+function LiveBookImportPanel() {
+  const store = useStore();
+  const [confirmLiveImport, setConfirmLiveImport] = useState(false);
+  const [report, setReport] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function post(commit: boolean) {
+    setBusy(true);
+    setReport("");
+    try {
+      const response = await fetch("/api/desk/live-book-import", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payload: exportableBook(store),
+          confirmLiveImport,
+          commit,
+        }),
+      });
+      const body = (await response.json()) as {
+        error?: string;
+        plan?: { customers?: unknown[]; timepieces?: unknown[]; agreements?: unknown[]; rejects?: unknown[] };
+      };
+      if (!response.ok) {
+        setReport(body.error || "Import could not run.");
+        return;
+      }
+      setReport(
+        `${commit ? "Imported" : "Dry-run"}: ${body.plan?.customers?.length ?? 0} people, ${body.plan?.timepieces?.length ?? 0} pieces, ${body.plan?.agreements?.length ?? 0} repos. The collector screen still reads this browser.`,
+      );
+    } catch {
+      setReport("Import could not run.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mt-10 space-y-3 border border-white/25 bg-[#222] p-4">
+      <h2 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">Development book import</h2>
+      <p className="text-[12px] text-white/55">
+        Staff can copy this browser book onto Neon development. Preview photos that are still data URLs stay
+        off this request. The owner flag stays off.
+      </p>
+      <label className="flex items-center gap-2 text-[12px] text-white/70">
+        <input
+          type="checkbox"
+          checked={confirmLiveImport}
+          onChange={(event) => setConfirmLiveImport(event.target.checked)}
+        />
+        This is the live book, not the in-memory demo.
+      </label>
+      <div className="flex flex-wrap gap-3">
+        <PillButton type="button" variant="navy" className="md:w-auto px-6" disabled={busy} onClick={() => void post(false)}>
+          Dry-run import
+        </PillButton>
+        <PillButton type="button" variant="gold" className="md:w-auto px-6" disabled={busy} onClick={() => void post(true)}>
+          Import to development
+        </PillButton>
+      </div>
+      {report ? <p className="text-[12px] text-white/60">{report}</p> : null}
+    </section>
+  );
+}
 
 function endDraftFrom(agreement: Agreement) {
   return {
@@ -318,6 +404,7 @@ export default function AdminAgreementsPage() {
           />
         </section>
       ) : null}
+      <LiveBookImportPanel />
     </AdminChrome>
   );
 }

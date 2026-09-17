@@ -14,7 +14,7 @@ export function issueDeskToken(email: string, role: "admin" | "staff") {
   return `${payload}.${sign(payload)}`;
 }
 
-export function readDeskToken(token?: string | null) {
+export function readDeskToken(token?: string | null): { email: string; role: "admin" | "staff" } | null {
   if (!token) return null;
   const dot = token.lastIndexOf(".");
   if (dot < 1) return null;
