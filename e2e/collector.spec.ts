@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { HALE, completeTimepieceIntakePhotos, openCollectorAgreements, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
+import { HALE, appraiseHaleRoyalOak, completeTimepieceIntakePhotos, openCollectorAgreements, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
 
 test.describe("collector app", () => {
   test("splash shows the official lockup and collector actions", async ({ page }) => {
@@ -167,7 +167,19 @@ test.describe("collector app", () => {
     await expect(page.getByRole("button", { name: "Subscribe to Monthly Appraisals" })).toBeVisible();
   });
 
+  test("Hale cannot start a second live repo with pieces already on the past-due book", async ({ page }) => {
+    await signInHale(page);
+    await page.goto("/repurchase");
+    await expect(page.getByText(/Appraise a timepiece in your collection to send an application/i)).toBeVisible();
+    await page.goto("/collection/rm-011");
+    await expect(page.getByText(/already on a live repo/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Apply to Sell/i })).toHaveCount(0);
+  });
+
   test("repurchase application is in dollars and creates a signable agreement", async ({ page }) => {
+    await signInHale(page);
+    await signOutFromMenu(page);
+    await appraiseHaleRoyalOak(page);
     await signInHale(page);
     await page.goto("/repurchase");
     await expect(page.getByText(/Enter Amount Up to/i)).toBeVisible();

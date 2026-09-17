@@ -6,6 +6,7 @@ import { Check, Clock, HelpCircle, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchPhoto } from "@/components/watch-photo";
 import { moneyRange } from "@/lib/catalog";
+import { liveWatchIds } from "@/lib/contract/repo-book.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
@@ -13,9 +14,10 @@ import { useStore } from "@/lib/store";
 export default function WatchDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { updateTimepiece, removeTimepiece, settings, user } = useStore();
+  const { updateTimepiece, removeTimepiece, settings, user, agreements } = useStore();
   const { timepieces } = useOwnedAssets();
   const watch = timepieces.find((w) => w.id === params.id);
+  const onLiveRepo = watch ? liveWatchIds(agreements).has(watch.id) : false;
 
   if (!watch) {
     return (
@@ -89,10 +91,15 @@ export default function WatchDetailPage() {
               {moneyRange(watch.valueLow, watch.valueHigh)}
             </p>
 
-            {watch.status === "appraised" && watch.financeable ? (
+            {watch.status === "appraised" && watch.financeable && !onLiveRepo ? (
               <p className="mt-3 border-t border-mac-line pt-3 text-[12px] text-mac-muted">
                 Eligible for a sale-and-repurchase application. MAC would buy this piece; you may
                 buy it back on the preset scale. This is not a loan.
+              </p>
+            ) : null}
+            {watch.status === "appraised" && onLiveRepo ? (
+              <p className="mt-3 border-t border-mac-line pt-3 text-[12px] text-mac-muted">
+                This timepiece is already on a live repo.
               </p>
             ) : null}
           </div>
@@ -160,7 +167,7 @@ export default function WatchDetailPage() {
             </div>
           ) : null}
 
-          {watch.status === "appraised" && watch.financeable ? (
+          {watch.status === "appraised" && watch.financeable && !onLiveRepo ? (
             <button
               type="button"
               onClick={() => router.push(`/repurchase/new?watch=${watch.id}`)}

@@ -3,6 +3,7 @@ import {
   DESK,
   DESK_PASSWORD,
   HALE,
+  completeTimepieceIntakePhotos,
   openCollectorAgreements,
   openDeskAgreements,
   signIn,
@@ -73,6 +74,7 @@ test.describe("desk", () => {
     await page.getByRole("button", { name: /Missing a brand/i }).click();
     await page.getByPlaceholder("Manufacturer name").fill("Urwerk");
     await page.getByLabel(/Your Model/).fill("UR-100V");
+    await completeTimepieceIntakePhotos(page);
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("heading", { name: "UR-100V" })).toBeVisible();
     await signOutFromMenu(page);

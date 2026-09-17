@@ -22,6 +22,15 @@ export async function signInDesk(page: Page) {
   await expect(page.getByText(/Desk ·/)).toBeVisible();
 }
 
+export async function appraiseHaleRoyalOak(page: Page) {
+  await signInDesk(page);
+  await page.getByRole("link", { name: "Client Assets" }).click();
+  const row = page.getByRole("row").filter({ hasText: "Royal Oak Selfwinding" });
+  await row.getByRole("button", { name: "Appraise" }).click();
+  await expect(row.getByText(/\$\d/)).toBeVisible();
+  await signOutFromMenu(page);
+}
+
 export async function openMenu(page: Page) {
   await page.getByRole("button", { name: "Open menu" }).click();
 }
