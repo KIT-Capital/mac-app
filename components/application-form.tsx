@@ -8,6 +8,7 @@ import { LineField, NativeSelect } from "@/components/field";
 import { ScreenHeader } from "@/components/screen-header";
 import { DELIVERY_METHODS, TERMS, maxPurchaseAmount, money } from "@/lib/catalog";
 import { WatchPhoto } from "@/components/watch-photo";
+import { LIVE_WATCH_CONFLICT, liveWatchIds } from "@/lib/contract/repo-book.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
@@ -15,10 +16,16 @@ import { useStore } from "@/lib/store";
 export function ApplicationForm({ backHref = "/collection" }: { backHref?: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, createAgreement, settings, shells } = useStore();
+  const { user, createAgreement, settings, shells, agreements: book } = useStore();
   const { timepieces, agreements } = useOwnedAssets();
-  const eligible = timepieces.filter((w) => w.status === "appraised" && w.financeable);
-  const initialId = params.get("watch") || eligible[0]?.id || "";
+  const live = liveWatchIds(book);
+  const eligible = timepieces.filter(
+    (w) => w.status === "appraised" && w.financeable && !live.has(w.id),
+  );
+  const requestedId = params.get("watch") || "";
+  const initialId = (requestedId && eligible.some((w) => w.id === requestedId)
+    ? requestedId
+    : eligible[0]?.id) || "";
   const openShell = shells.find((s) => s.status === "open");
   const [watchId, setWatchId] = useState(initialId);
   const [term, setTerm] = useState(openShell?.termMonths || settings.typicalTerm || 8);
@@ -30,7 +37,7 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const watch = timepieces.find((w) => w.id === watchId) ?? eligible[0];
+  const watch = eligible.find((w) => w.id === watchId) ?? eligible[0];
   const purchaseShare = openShell?.ltv || settings.maxLtv;
   const maxPurchase = watch ? maxPurchaseAmount(watch.valueLow, watch.valueHigh, purchaseShare) : 0;
 
@@ -54,14 +61,26 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
       return;
     }
     setBusy(true);
-    const agreement = createAgreement({
-      watchIds: [watch.id],
-      amount: n,
-      termMonths: term,
-      delivery,
-      ownerName: name,
-      email,
-    });
+    setError("");
+    let agreement;
+    try {
+      agreement = createAgreement({
+        watchIds: [watch.id],
+        amount: n,
+        termMonths: term,
+        delivery,
+        ownerName: name,
+        email,
+      });
+    } catch (err) {
+      setBusy(false);
+      setError(
+        err instanceof Error && err.message === LIVE_WATCH_CONFLICT
+          ? "That timepiece is already on a live repo."
+          : "The application could not be sent.",
+      );
+      return;
+    }
     await sendAppEmail({
       kind: "repurchase",
       name,

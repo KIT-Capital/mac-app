@@ -42,8 +42,14 @@ export type Timepiece = {
 
 export type AgreementStatus = "draft" | "pending_signature" | "signed";
 
-export type BookEndKind = "bought_back" | "in_liquidation" | "liquidated";
-export type BookLabel = "open" | "past due" | "bought back" | "in liquidation" | "liquidated";
+export type BookEndKind = "bought_back" | "in_liquidation" | "liquidated" | "renewed";
+export type BookLabel =
+  | "open"
+  | "past due"
+  | "bought back"
+  | "in liquidation"
+  | "liquidated"
+  | "renewed";
 
 export type AgreementEnd = {
   kind: BookEndKind;

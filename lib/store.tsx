@@ -22,6 +22,8 @@ import { mergePreferences } from "@/lib/preferences";
 import {
   applyAgreementEnd,
   clearAgreementEnd as stripAgreementEnd,
+  conflictingLiveWatchIds,
+  LIVE_WATCH_CONFLICT,
   utcToday,
 } from "@/lib/contract/repo-book.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
@@ -448,6 +450,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })),
       createAgreement: (input) => {
         const current = getStoreSnapshot();
+        const conflicts = conflictingLiveWatchIds(input.watchIds, current.agreements);
+        if (conflicts.length > 0) {
+          throw new Error(LIVE_WATCH_CONFLICT);
+        }
         const openShell = current.shells.find((shell) => shell.status === "open");
         const agreement: Agreement = {
           ...input,
