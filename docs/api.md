@@ -7,6 +7,7 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 ## `POST` / `GET` `/api/mail`
 
 - `POST` sends or previews mail (`lib/mail.ts`). Kinds: inquiry, welcome, invite, appraisal, repurchase, financing, membership, test.
+- A Resend send failure is stored as a `failed` outbox item. POST still returns 200 so collector signup is not blocked. Missing API key stays preview mode.
 - `invite` and `test` require a valid desk session cookie.
 - `GET` lists the process-local outbox; desk session required. Missing or invalid session is **403**.
 - Rate-limited per client IP.

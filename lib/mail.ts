@@ -1,5 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
+import { markMailFailed } from "@/lib/mail-delivery.mjs";
 import { MAIL_KINDS, type MailKind, type MailRequest, type OutboxItem } from "@/lib/mail-types";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 
@@ -335,7 +336,8 @@ async function deliver(mail: ComposedMail): Promise<OutboxItem> {
     });
 
     if (error) {
-      throw new Error(error.message);
+      remember(markMailFailed(item, error));
+      return item;
     }
 
     item.status = "sent";
@@ -343,10 +345,8 @@ async function deliver(mail: ComposedMail): Promise<OutboxItem> {
     remember(item);
     return item;
   } catch (error) {
-    item.status = "failed";
-    item.error = error instanceof Error ? error.message : "Resend could not send.";
-    remember(item);
-    throw new Error(item.error);
+    remember(markMailFailed(item, error));
+    return item;
   }
 }
 
