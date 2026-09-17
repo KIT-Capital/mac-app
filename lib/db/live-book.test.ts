@@ -123,6 +123,14 @@ describe("live-book operation repository", { skip }, () => {
       }),
       { message: "DESK_REQUIRED" },
     );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, deskActor("staff", "desk@mechartcap.com"), {
+        action: "agreement.recordEnd",
+        id: repoId,
+        end: { kind: "renewed", date: "2026-09-17", amount: 70000 },
+      }),
+      { message: "ADMIN_RENEW_REQUIRED" },
+    );
     await executeLiveBookOperation(db, deskActor("staff", "desk@mechartcap.com"), {
       action: "agreement.recordEnd",
       id: repoId,

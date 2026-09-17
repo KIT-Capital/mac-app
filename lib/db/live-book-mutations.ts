@@ -4,6 +4,7 @@ import {
   applyAgreementEnd,
   bookLabel,
   isLiveBookLabel,
+  validateRecordedEndKind,
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
@@ -326,6 +327,10 @@ export async function executeLiveBookOperation(
 
   if (action === "agreement.recordEnd") {
     requireDesk(actor);
+    const recordable = validateRecordedEndKind(
+      (operation.end as { kind?: string }).kind,
+    );
+    if (!recordable.ok) throw new Error(recordable.error);
     const agreement = await ownedAgreement(db, actor, String(operation.id));
     const checked = applyAgreementEnd(
       agreement,
