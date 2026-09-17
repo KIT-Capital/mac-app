@@ -41,6 +41,7 @@ import {
   isLiveBookLabel,
   LIVE_WATCH_CONFLICT,
   utcToday,
+  validateRecordedEndKind,
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
@@ -831,6 +832,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           deferLive: true,
         }),
       recordAgreementEnd: async (id, end) => {
+        const recordable = validateRecordedEndKind(end.kind);
+        if (!recordable.ok) return recordable;
         const currentState = refreshStoreFromDisk();
         const current = currentState.agreements.find((a) => a.id === id);
         if (!current) return { ok: false, error: "NOT_FOUND" };
