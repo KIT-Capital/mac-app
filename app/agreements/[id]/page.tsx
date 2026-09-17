@@ -107,7 +107,10 @@ export default function AgreementDetailPage() {
   }
   const liveAgreement = agreement;
 
-  const live = isLiveBookLabel(bookLabel(liveAgreement));
+  const live =
+    isLiveBookLabel(bookLabel(liveAgreement)) &&
+    liveAgreement.status !== "signed" &&
+    !liveAgreement.bookEnd;
   const openShell = shells.find((shell) => shell.status === "open");
   const share = openShell?.ltv || settings.maxLtv;
   const cap = watches.reduce(

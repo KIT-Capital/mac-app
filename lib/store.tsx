@@ -27,6 +27,7 @@ import {
   parseLiveBookResponse,
   parseLiveBookMutationResponse,
   selectLiveUser,
+  shouldApplyReconciliation,
   shouldPersistBrowserBook,
 } from "@/lib/live-book-mode.mjs";
 import { ownedCounts } from "@/lib/owners";
@@ -297,10 +298,10 @@ function readLiveBookMode() {
   return request;
 }
 
-async function reconcileLiveStore() {
+async function reconcileLiveStore(force = false) {
   const generation = optimisticGeneration;
   const result = await readLiveBookMode();
-  if (!result.ok || generation !== optimisticGeneration) return;
+  if (!result.ok || !shouldApplyReconciliation(force, generation, optimisticGeneration)) return;
   if (result.mode === "browser") {
     storeMode = "browser";
     snapshot = readPersistedState();
@@ -345,7 +346,7 @@ function queueLiveWrite(operation: unknown) {
     }).catch(() => null);
     window.clearTimeout(timeout);
     if (!response) {
-      await reconcileLiveStore().catch(() => undefined);
+      await reconcileLiveStore(true).catch(() => undefined);
       return { ok: false, error: "LIVE_BOOK_TIMEOUT" };
     }
     const body = await response.json().catch(() => null);
@@ -358,7 +359,7 @@ function queueLiveWrite(operation: unknown) {
     } else if (result.ok && result.mode === "live") {
       return { ok: true, mode: "live" };
     } else if (!result.ok) {
-      await reconcileLiveStore().catch(() => undefined);
+      await reconcileLiveStore(true).catch(() => undefined);
       return { ok: false, error: typeof body?.error === "string" ? body.error : "LIVE_BOOK_WRITE_FAILED" };
     }
     return { ok: false, error: "LIVE_BOOK_WRITE_FAILED" };

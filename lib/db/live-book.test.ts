@@ -408,6 +408,26 @@ describe("live-book operation repository", { skip }, () => {
     });
     for (const id of [signedId, endedId]) {
       await assert.rejects(
+        () => executeLiveBookOperation(db, desk, { action: "agreement.markSigned", id }),
+        { message: "AGREEMENT_IMMUTABLE" },
+      );
+      await assert.rejects(
+        () => executeLiveBookOperation(db, a.actor, {
+          action: "agreement.addWatches",
+          id,
+          watchIds: [id === signedId ? second.id : first.id],
+        }),
+        { message: "AGREEMENT_IMMUTABLE" },
+      );
+      await assert.rejects(
+        () => executeLiveBookOperation(db, a.actor, {
+          action: "agreement.setAmount",
+          id,
+          amount: 11000,
+        }),
+        { message: "AGREEMENT_IMMUTABLE" },
+      );
+      await assert.rejects(
         () => executeLiveBookOperation(db, desk, {
           action: "agreement.updateScale",
           id,

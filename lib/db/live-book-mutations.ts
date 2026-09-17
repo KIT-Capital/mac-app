@@ -291,6 +291,7 @@ export async function executeLiveBookOperation(
     const agreement = await ownedAgreement(db, actor, String(operation.id));
     if (action === "agreement.markSigned") requireDesk(actor);
     if (action === "agreement.signCollector" && actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+    requireMutableAgreement(agreement);
     await db.update(liveAgreements).set({
       status: "signed",
       signedOn: new Date().toISOString().slice(0, 10),
@@ -426,6 +427,7 @@ export async function executeLiveBookOperation(
   if (action === "agreement.addWatches") {
     if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
     const agreement = await ownedAgreement(db, actor, String(operation.id));
+    requireMutableAgreement(agreement);
     if (!isLiveBookLabel(bookLabel(agreement))) throw new Error("NOT_LIVE");
     const watchIds = operation.watchIds as string[];
     const pieces = await db.select().from(timepieces).where(inArray(timepieces.id, watchIds));
@@ -452,6 +454,7 @@ export async function executeLiveBookOperation(
   if (action === "agreement.setAmount") {
     if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
     const agreement = await ownedAgreement(db, actor, String(operation.id));
+    requireMutableAgreement(agreement);
     if (!isLiveBookLabel(bookLabel(agreement))) throw new Error("NOT_LIVE");
     const amount = Number(operation.amount);
     const checked = validateSaleAmountRaise(agreement.amount, amount);

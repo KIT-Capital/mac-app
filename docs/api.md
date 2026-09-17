@@ -86,8 +86,9 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
   previews are never included in ordinary mutations.
 - Store actions that show success await the live mutation response; rejected or
   timed-out operations reconcile before returning a stable failure.
-- Signed or ended agreements reject scale edits and removal with
-  `AGREEMENT_IMMUTABLE`; the desk UI hides those controls.
+- Signed or ended agreements reject repeated signing, scale edits, removal,
+  added pieces, and amount changes with `AGREEMENT_IMMUTABLE`; the UI hides
+  controls that no longer apply.
 - Agreement scale remains calculated from browser-local desk settings, but the
   server rejects purchase share above the MAC default and any submitted
   fee/adjustment term below the Scenario 60 safety defaults.
