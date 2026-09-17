@@ -17,6 +17,8 @@ import {
 const skip = !process.env.DATABASE_URL;
 const suffix = Date.now();
 const createdCustomerIds: string[] = [];
+const createdAgreementIds: string[] = [];
+const createdPieceIds: string[] = [];
 const desk = deskActor("staff", "desk@mechartcap.com");
 const email = `hale.import.${suffix}@mac.test`;
 const customerId = `cust-${email}`;
@@ -65,11 +67,12 @@ describe("commitLiveBookImport", { skip }, () => {
 
   after(async () => {
     createdCustomerIds.push(customerId);
-    const pieceIds = haleExport.timepieces.map((watch) => watch.id);
+    const pieceIds = [...new Set([...haleExport.timepieces.map((watch) => watch.id), ...createdPieceIds])];
     await db.delete(livePreviews).where(inArray(livePreviews.timepieceId, pieceIds));
     await db.delete(liveAgreementMembers).where(inArray(liveAgreementMembers.timepieceId, pieceIds));
-    await db.delete(liveAgreementEnds).where(inArray(liveAgreementEnds.agreementId, [haleExport.agreements[0].id]));
-    await db.delete(liveAgreements).where(inArray(liveAgreements.id, [haleExport.agreements[0].id]));
+    const agreementIds = [...new Set([haleExport.agreements[0].id, ...createdAgreementIds])];
+    await db.delete(liveAgreementEnds).where(inArray(liveAgreementEnds.agreementId, agreementIds));
+    await db.delete(liveAgreements).where(inArray(liveAgreements.id, agreementIds));
     await db.delete(timepieces).where(inArray(timepieces.id, pieceIds));
     await db.delete(customers).where(inArray(customers.id, createdCustomerIds));
   });
@@ -120,11 +123,58 @@ describe("commitLiveBookImport", { skip }, () => {
     assert.equal(ended.ok, true);
     const withEnd = await getLiveAgreement(db, desk, haleExport.agreements[0].id);
     assert.equal(withEnd?.bookEnd?.kind, "bought_back");
+    assert.ok(withEnd?.members.every((member) => member.status === "released"));
 
     const cleared = await commitLiveBookImport(db, desk, haleExport, { confirmLiveImport: true });
     assert.equal(cleared.ok, true);
     const withoutEnd = await getLiveAgreement(db, desk, haleExport.agreements[0].id);
     assert.equal(withoutEnd?.bookEnd, null);
+  });
+
+  it("imports a renewed repo and successor that share the same pieces", async () => {
+    const oldId = `agr-old-${suffix}`;
+    const newId = `agr-new-${suffix}`;
+    const watchId = `rm-successor-${suffix}`;
+    createdAgreementIds.push(oldId, newId);
+    createdPieceIds.push(watchId);
+    const payload = {
+      timepieces: [
+        {
+          id: watchId,
+          ownerEmail: email,
+          brand: "Richard Mille",
+          model: "RM 011",
+          status: "appraised",
+          financeable: true,
+          valueLow: 280000,
+          valueHigh: 350000,
+          images: ["/watches/richard-mille.jpg"],
+        },
+      ],
+      agreements: [
+        {
+          ...haleExport.agreements[0],
+          id: oldId,
+          watchIds: [watchId],
+          bookEnd: { kind: "renewed", date: "2022-03-14", amount: 220000 },
+        },
+        {
+          ...haleExport.agreements[0],
+          id: newId,
+          watchIds: [watchId],
+          createdAt: "2022-03-14",
+        },
+      ],
+    };
+    const imported = await commitLiveBookImport(db, desk, payload, { confirmLiveImport: true });
+    assert.equal(imported.ok, true);
+    const oldRepo = await getLiveAgreement(db, desk, oldId);
+    const newRepo = await getLiveAgreement(db, desk, newId);
+    assert.equal(oldRepo?.bookEnd?.kind, "renewed");
+    assert.ok(oldRepo?.members.every((member) => member.status === "released"));
+    assert.equal(newRepo?.bookEnd, null);
+    assert.ok(newRepo?.members.every((member) => member.status === "live"));
+    assert.deepEqual(oldRepo?.watchIds.sort(), newRepo?.watchIds.sort());
   });
 
   it("refuses commit after the owner flag", async () => {
