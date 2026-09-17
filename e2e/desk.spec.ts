@@ -35,6 +35,14 @@ test.describe("desk", () => {
     await expect(response.json()).resolves.toEqual({ error: "Desk session required." });
   });
 
+  test("staff cannot see the Renew control", async ({ page }) => {
+    await signIn(page, "desk@mechartcap.com", DESK_PASSWORD);
+    await expect(page).toHaveURL(/\/admin/);
+    await page.goto("/admin/agreements");
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).click();
+    await expect(page.getByRole("button", { name: "Renew", exact: true })).toHaveCount(0);
+  });
+
   test("desk-only mail kinds require a desk session", async ({ request }) => {
     const response = await request.post("/api/mail", {
       data: { kind: "invite", name: "Guest", email: "guest@mac.test" },

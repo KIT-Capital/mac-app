@@ -1,11 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { catalogValuation, moneyRange } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function AdminAssetsPage() {
   const { timepieces, catalog, updateTimepiece, removeTimepiece } = useStore();
+  const [error, setError] = useState("");
+
+  async function save(operation: Promise<{ ok: boolean; error?: string }>) {
+    const result = await operation;
+    setError(result.ok ? "" : result.error || "The asset change could not be saved.");
+  }
 
   return (
     <AdminChrome title="Asset database">
@@ -13,6 +20,7 @@ export default function AdminAssetsPage() {
         Collector pieces. Match a catalog reference first; if missing, create the asset from the
         photographs and specifications.
       </p>
+      {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
       <AdminTable
         headers={["Code", "Piece", "Owner", "Status", "Value", ""]}
         rows={timepieces.map((w) => [
@@ -22,24 +30,24 @@ export default function AdminAssetsPage() {
           w.status.replace("_", " "),
           moneyRange(w.valueLow, w.valueHigh),
           <div key={w.id} className="flex flex-wrap gap-3 text-[#FCB040]">
-            <button type="button" onClick={() => updateTimepiece(w.id, { status: "reviewing" })}>
+            <button type="button" onClick={() => void save(updateTimepiece(w.id, { status: "reviewing" }))}>
               Review
             </button>
             <button
               type="button"
               onClick={() => {
                 const range = catalogValuation(w, catalog);
-                updateTimepiece(w.id, {
+                void save(updateTimepiece(w.id, {
                   status: "appraised",
                   evaluatedAt: new Date().toISOString().slice(0, 10),
                   valueLow: range.valueLow,
                   valueHigh: range.valueHigh,
-                });
+                }));
               }}
             >
               Appraise
             </button>
-            <button type="button" onClick={() => removeTimepiece(w.id)}>
+            <button type="button" onClick={() => void save(removeTimepiece(w.id))}>
               Remove
             </button>
           </div>,

@@ -1,3 +1,4 @@
+import "server-only";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { assertDatabaseMapping } from "../env/database-mapping.mjs";
@@ -21,3 +22,11 @@ export function createDb(env: NodeJS.ProcessEnv = process.env) {
 }
 
 export type Database = ReturnType<typeof createDb>;
+
+let sharedDb: Database | undefined;
+
+/** Reuse one pool per Node process; tests may keep using createDb for isolated fixtures. */
+export function getDb() {
+  sharedDb ??= createDb();
+  return sharedDb;
+}

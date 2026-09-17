@@ -2,10 +2,12 @@ import "server-only";
 import {
   decideCollectorAccessRequest,
   openVerificationToken,
+  requireActiveCollector,
   sealCollectorSession,
 } from "@/lib/collector-access.mjs";
-import { createDb } from "@/lib/db/client";
+import { getDb } from "@/lib/db/client";
 import {
+  activateInvitedCollector,
   findCustomerByEmail,
   registerVerifiedCollector,
 } from "@/lib/db/records";
@@ -21,7 +23,7 @@ export async function requestCollectorAccess(input: unknown) {
     process.env,
     {
       findCustomerByEmail: async (email: string) => {
-        const db = createDb();
+        const db = getDb();
         return findCustomerByEmail(db, email);
       },
       sendAccessEmail: dispatchCollectorAccessMail,
@@ -35,7 +37,7 @@ export async function verifyCollectorAccess(token: string) {
   if (!config.ok) throw new Error(config.errors[0]);
 
   const payload = openVerificationToken(token, config.secret);
-  const db = createDb();
+  const db = getDb();
   let customer;
   let redirectPath;
 
@@ -44,6 +46,9 @@ export async function verifyCollectorAccess(token: string) {
     if (!customer || customer.id !== payload.customerId) {
       throw new Error("TOKEN_CUSTOMER_MISMATCH");
     }
+    customer = customer.status === "invited"
+      ? await activateInvitedCollector(db, customer.id, customer.email)
+      : requireActiveCollector(customer);
     redirectPath = "/collection";
   } else {
     customer = await registerVerifiedCollector(db, {
@@ -51,6 +56,7 @@ export async function verifyCollectorAccess(token: string) {
       email: payload.email,
       phone: payload.phone,
     });
+    requireActiveCollector(customer);
     await dispatchMail({
       kind: "welcome",
       name: customer.name,

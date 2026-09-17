@@ -56,13 +56,51 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 - Links use only `COLLECTOR_MAGIC_LINK_ORIGIN`, never request host headers.
   Access links are sent through Resend and are never retained in the generic desk
   outbox, whether delivery succeeds or fails.
-  Login and signup pages are not wired to these endpoints in this prerequisite.
+- Login and signup use this request path. Browser mode preserves the prototype
+  local flow. Live mode stops after the generic check-email response; only
+  verification creates a session or registration customer.
+- `DELETE /api/collector-session` clears `mac_collector`. Verification clears
+  `mac_desk`; desk login clears `mac_collector`.
+
+## `GET` / `POST` `/api/live-book`
+
+- Unset `MAC_LIVE_BOOK` returns browser mode before opening Neon. Enabled use is
+  development-only and requires the verified collector-access configuration.
+- `GET` requires exactly one valid desk or collector session and returns
+  `Cache-Control: private, no-store`. Desk reads all rows; a collector session is
+  bound to immutable customer ID and email and reads only that customer.
+- Live reads include the server-authenticated viewer role and identity. The client
+  uses that viewer to replace stale tab identity instead of trusting sessionStorage;
+  desk viewers are rebuilt from the trusted staff/admin profiles.
+- `POST` accepts a validated operation action, never a whole-book snapshot.
+  Collector actions are limited to own profile, intake-safe piece fields, own
+  pending repos, collector signature, eligible added pieces, and permitted amount
+  raises. Desk controls valuation, status, ends, and marking signed; renewal is
+  admin-only.
+- Collector signature records the seller-side contract action only. It does not
+  record desk payment, cash movement, or a book end.
+- Successful mutations return a durable `{ mode: "live", acknowledged: true }`
+  after commit. The client then performs a separate authoritative `GET`; mutation
+  responses do not couple commit success to a second read. Browser rollback
+  responses switch the client back to its preserved browser state. Data-URL
+  previews are never included in ordinary mutations.
+- Store actions that show success await the live mutation response; rejected or
+  timed-out operations reconcile before returning a stable failure.
+- Signed or ended agreements reject repeated signing, scale edits, removal,
+  added pieces, and amount changes with `AGREEMENT_IMMUTABLE`; the UI hides
+  controls that no longer apply.
+- Agreement scale remains calculated from browser-local desk settings, but the
+  server rejects purchase share above the MAC default and any submitted
+  fee/adjustment term below the Scenario 60 safety defaults.
 
 ## Client store
 
 `lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same client module.
 
-The repo operations book is a **UI-only exception** to agent-native parity. Book labels (`open`, `past due`, `bought back`, `in liquidation`, `liquidated`) and staff ends (kind, date, amount) exist only on the client store (`lib/contract/repo-book.mjs` + `lib/store.tsx`). There is no HTTP, tRPC, or MCP procedure for recording or reading an end. Official cash and inventory stay in QuickBooks and third-party inventory.
+The default repo operations book remains browser state. After tested import, the
+server-runtime owner switch moves reads and writes together to the scoped
+`/api/live-book` handlers. Catalog, shells, and desk settings remain browser-only.
+There is no tRPC or MCP procedure. Official cash and inventory stay outside this app.
 
 Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces, original photos, applications, prepared agreement versions, mock signature envelopes, archived PDFs, and contract report snapshots on Neon `development`. There is no HTTP or tRPC procedure yet — that is a recorded exception to agent-native parity. Isolation is enforced in the repository and tested by `npm run test:db`. Do not dual-write the browser store until a cutover flag is approved. Do not add a server file proxy. Stage 6 ledger posting is deferred and is not this product’s books.
 

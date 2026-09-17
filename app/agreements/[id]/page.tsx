@@ -107,7 +107,10 @@ export default function AgreementDetailPage() {
   }
   const liveAgreement = agreement;
 
-  const live = isLiveBookLabel(bookLabel(liveAgreement));
+  const live =
+    isLiveBookLabel(bookLabel(liveAgreement)) &&
+    liveAgreement.status !== "signed" &&
+    !liveAgreement.bookEnd;
   const openShell = shells.find((shell) => shell.status === "open");
   const share = openShell?.ltv || settings.maxLtv;
   const cap = watches.reduce(
@@ -123,8 +126,8 @@ export default function AgreementDetailPage() {
       !held.has(watch.id),
   );
 
-  function addFreePiece(watchId: string) {
-    const result = addAgreementWatches(liveAgreement.id, [watchId]);
+  async function addFreePiece(watchId: string) {
+    const result = await addAgreementWatches(liveAgreement.id, [watchId]);
     if (!result.ok) {
       setPieceError(
         result.error === LIVE_WATCH_CONFLICT
@@ -136,9 +139,9 @@ export default function AgreementDetailPage() {
     setPieceError("");
   }
 
-  function onRaiseAmount() {
+  async function onRaiseAmount() {
     const n = Number(raiseAmount.replace(/[^0-9.]/g, ""));
-    const result = setAgreementAmount(liveAgreement.id, n);
+    const result = await setAgreementAmount(liveAgreement.id, n);
     if (!result.ok) {
       setPieceError(
         result.error === "OVER_LTV"

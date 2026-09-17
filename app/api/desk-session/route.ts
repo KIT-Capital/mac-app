@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { COLLECTOR_COOKIE } from "@/lib/collector-access.mjs";
 import { DESK_COOKIE, deskCookieOptions, openDeskSession } from "@/lib/desk-session";
 
 export async function POST(request: Request) {
@@ -8,6 +9,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Desk credentials were not recognized." }, { status: 401 });
   }
   const jar = await cookies();
+  jar.delete(COLLECTOR_COOKIE);
   jar.set(DESK_COOKIE, token, deskCookieOptions());
   return Response.json({ ok: true });
 }

@@ -172,6 +172,7 @@ export default function AdminAgreementsPage() {
     recordAgreementEnd,
     renewAgreement,
     clearAgreementEnd,
+    user,
   } = useStore();
   const [draft, setDraft] = useState<AgreementShell>(blankShell(settings.typicalTerm));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -210,7 +211,7 @@ export default function AdminAgreementsPage() {
     });
   }
 
-  function onRecordEnd(e: FormEvent, agreement: Agreement) {
+  async function onRecordEnd(e: FormEvent, agreement: Agreement) {
     e.preventDefault();
     const amount = endDraft.amount === "" ? Number.NaN : Number(endDraft.amount);
     const input: AgreementEnd = { kind: endDraft.kind, date: endDraft.date, amount };
@@ -219,7 +220,7 @@ export default function AdminAgreementsPage() {
       setEndError(END_ERRORS[checked.error] ?? "Enter a date and amount.");
       return;
     }
-    const recorded = recordAgreementEnd(agreement.id, checked.end as AgreementEnd);
+    const recorded = await recordAgreementEnd(agreement.id, checked.end as AgreementEnd);
     if (!recorded.ok) {
       setEndError(END_ERRORS[recorded.error] ?? "Enter a date and amount.");
       return;
@@ -228,9 +229,9 @@ export default function AdminAgreementsPage() {
     setEndDraft({ kind: checked.end.kind as BookEndKind, date: checked.end.date, amount: String(checked.end.amount) });
   }
 
-  function onRenew(agreement: Agreement) {
+  async function onRenew(agreement: Agreement) {
     const closeDate = endDraft.date || utcToday();
-    const result = renewAgreement(agreement.id, closeDate);
+    const result = await renewAgreement(agreement.id, closeDate);
     if (!result.ok) {
       setEndError(END_ERRORS[result.error] ?? "Renewal could not be recorded.");
       return;
@@ -317,8 +318,10 @@ export default function AdminAgreementsPage() {
           a.status.replace("_", " "),
           bookLabel(a),
           <div key={a.id} className="flex gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={() => signAgreement(a.id)}>Mark signed</button>
-            <button type="button" onClick={() => removeAgreement(a.id)}>Remove</button>
+            <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
+            {a.status !== "signed" && !a.bookEnd ? (
+              <button type="button" onClick={() => void removeAgreement(a.id)}>Remove</button>
+            ) : null}
           </div>,
         ])}
         expandedRows={agreements.map((a) => {
@@ -376,7 +379,7 @@ export default function AdminAgreementsPage() {
                 <PillButton type="submit" variant="gold" className="md:w-auto px-6">
                   {a.bookEnd ? "Overwrite end" : "Record end"}
                 </PillButton>
-                {!a.bookEnd || a.bookEnd.kind === "in_liquidation" ? (
+                {user?.role === "admin" && (!a.bookEnd || a.bookEnd.kind === "in_liquidation") ? (
                   <PillButton
                     type="button"
                     variant="navy"
@@ -390,8 +393,8 @@ export default function AdminAgreementsPage() {
                   <button
                     type="button"
                     className="text-[12px] font-bold tracking-[0.18em] text-[#FCB040] uppercase"
-                    onClick={() => {
-                      if (!clearAgreementEnd(a.id)) {
+                    onClick={async () => {
+                      if (!await clearAgreementEnd(a.id)) {
                         setEndError(END_ERRORS.LIVE_WATCH_CONFLICT);
                         return;
                       }
@@ -408,7 +411,7 @@ export default function AdminAgreementsPage() {
         })}
       />
 
-      {selected ? (
+      {selected && selected.status !== "signed" && !selected.bookEnd ? (
         <section className="mt-6 space-y-4 border border-white/25 bg-[#222] p-4">
           <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
             Contract terms — {selected.agreementCode || selected.id}

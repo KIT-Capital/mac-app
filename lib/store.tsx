@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -19,6 +20,16 @@ import { maxPurchaseAmount } from "@/lib/catalog";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
+import {
+  mergeLocalDataPreviews,
+  liveBookFailureState,
+  operationDisposition,
+  parseLiveBookResponse,
+  parseLiveBookMutationResponse,
+  selectLiveUser,
+  shouldApplyReconciliation,
+  shouldPersistBrowserBook,
+} from "@/lib/live-book-mode.mjs";
 import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
 import {
@@ -54,6 +65,7 @@ import type {
 } from "@/lib/types";
 
 const STORAGE_KEY = "mac-app-state-v3";
+const LIVE_PREVIEW_KEY = "mac-app-live-previews-v1";
 
 type Store = AppState & {
   signIn: (profile?: Partial<Profile>) => void;
@@ -62,27 +74,27 @@ type Store = AppState & {
   updateProfile: (patch: Partial<Profile>) => void;
   updatePreferences: (patch: Partial<UserPreferences>) => void;
   completeOnboarding: () => void;
-  addTimepiece: (watch: Timepiece) => void;
-  updateTimepiece: (id: string, patch: Partial<Timepiece>) => void;
-  removeTimepiece: (id: string) => void;
-  createAgreement: (input: Omit<Agreement, "id" | "createdAt" | "status">) => Agreement;
+  addTimepiece: (watch: Timepiece) => Promise<OperationAck>;
+  updateTimepiece: (id: string, patch: Partial<Timepiece>) => Promise<OperationAck>;
+  removeTimepiece: (id: string) => Promise<OperationAck>;
+  createAgreement: (input: Omit<Agreement, "id" | "createdAt" | "status">) => Promise<Agreement>;
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
-  removeAgreement: (id: string) => void;
-  signAgreement: (id: string) => void;
-  recordAgreementEnd: (id: string, end: AgreementEnd) => { ok: true } | { ok: false; error: string };
-  renewAgreement: (id: string, closeDate: string) => { ok: true; successor: Agreement } | { ok: false; error: string };
-  addAgreementWatches: (id: string, watchIds: string[]) => { ok: true } | { ok: false; error: string };
-  setAgreementAmount: (id: string, amount: number) => { ok: true } | { ok: false; error: string };
-  clearAgreementEnd: (id: string) => boolean;
+  removeAgreement: (id: string) => Promise<OperationAck>;
+  signAgreement: (id: string) => Promise<OperationAck>;
+  recordAgreementEnd: (id: string, end: AgreementEnd) => Promise<{ ok: true } | { ok: false; error: string }>;
+  renewAgreement: (id: string, closeDate: string) => Promise<{ ok: true; successor: Agreement } | { ok: false; error: string }>;
+  addAgreementWatches: (id: string, watchIds: string[]) => Promise<{ ok: true } | { ok: false; error: string }>;
+  setAgreementAmount: (id: string, amount: number) => Promise<{ ok: true } | { ok: false; error: string }>;
+  clearAgreementEnd: (id: string) => Promise<boolean>;
   updateSettings: (patch: Partial<AppSettings>) => void;
-  upsertUser: (user: ManagedUser) => void;
-  removeUser: (id: string) => void;
+  upsertUser: (user: ManagedUser) => Promise<OperationAck>;
+  removeUser: (id: string) => Promise<OperationAck>;
   upsertCatalog: (entry: CatalogEntry) => void;
   removeCatalog: (id: string) => void;
   upsertShell: (shell: AgreementShell) => void;
   removeShell: (id: string) => void;
   upsertPhoto: (photo: PhotoRecord) => void;
-  removePhoto: (id: string) => void;
+  removePhoto: (id: string) => Promise<OperationAck>;
   resetDemo: () => void;
 };
 
@@ -106,7 +118,17 @@ function emptyState(): AppState {
 const SERVER_STATE = emptyState();
 let snapshot: AppState = SERVER_STATE;
 const listeners = new Set<() => void>();
-let clientLoaded = false;
+let storeMode: "unknown" | "browser" | "live" = "unknown";
+type OperationAck = { ok: boolean; error?: string; mode?: "browser" | "live" };
+let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
+let loadStarted = false;
+let optimisticGeneration = 0;
+let liveBookReadInFlight: Promise<ReturnType<typeof parseLiveBookResponse>> | null = null;
+
+type BookState = Pick<
+  AppState,
+  "timepieces" | "agreements" | "users" | "photos" | "profiles"
+>;
 
 function readPersistedState(): AppState {
   const sessionUser = readSessionUser(browserSessionStorage());
@@ -137,18 +159,228 @@ function readPersistedState(): AppState {
   };
 }
 
+function notifyStore() {
+  listeners.forEach((listener) => listener());
+}
+
+function isLiveStoreMode() {
+  return storeMode === "live";
+}
+
+function mergeBook(
+  base: AppState,
+  book: BookState,
+  viewer: { role: string; email: string; customerId?: string },
+): AppState {
+  const mergedBook = mergeLocalDataPreviews(book, readLiveDataPreviews()) as BookState;
+  const storage = browserSessionStorage();
+  const authenticated = selectLiveUser(viewer, readSessionUser(storage), mergedBook.profiles) as
+    | Partial<Profile>
+    | null;
+  const sessionUser = authenticated?.role === "admin" || authenticated?.role === "staff"
+    ? profileForEmail(viewer.email, { role: authenticated.role })
+    : authenticated as Profile | null;
+  const counts = ownedCounts(sessionUser?.email, mergedBook.timepieces, mergedBook.agreements);
+  if (sessionUser) writeSessionUser(storage, sessionUser);
+  return {
+    ...base,
+    ...mergedBook,
+    hydrated: true,
+    user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
+  };
+}
+
+function readLiveDataPreviews() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LIVE_PREVIEW_KEY) ?? "{}");
+    return {
+      timepieces: Array.isArray(parsed.timepieces) ? parsed.timepieces : [],
+      photos: Array.isArray(parsed.photos) ? parsed.photos : [],
+    };
+  } catch {
+    return { timepieces: [], photos: [] };
+  }
+}
+
+function persistLiveDataPreviews(state: AppState) {
+  const timepieces = state.timepieces
+    .map((piece) => {
+      const indexes = piece.images.map((url, index) => ({ url, kind: piece.photoKinds?.[index] }))
+        .filter((item) => item.url.startsWith("data:"));
+      return {
+        id: piece.id,
+        images: indexes.map((item) => item.url),
+        photoKinds: indexes.map((item) => item.kind ?? "other"),
+      };
+    })
+    .filter((piece) => piece.images.length > 0);
+  const photos = state.photos.filter((photo) => photo.url.startsWith("data:"));
+  localStorage.setItem(LIVE_PREVIEW_KEY, JSON.stringify({ timepieces, photos }));
+}
+
+function persistLiveSafeState(next: AppState) {
+  let browser: Partial<AppState> = {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) browser = JSON.parse(raw) as AppState;
+  } catch {
+    browser = {};
+  }
+  const safe: AppState = {
+    hydrated: true,
+    user: null,
+    timepieces: browser.timepieces ?? [],
+    agreements: browser.agreements ?? [],
+    users: browser.users ?? [],
+    photos: browser.photos ?? [],
+    profiles: browser.profiles ?? {},
+    catalog: next.catalog,
+    shells: next.shells,
+    settings: next.settings,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableState(safe)));
+  writeSessionUser(browserSessionStorage(), next.user);
+}
+
+async function loadAuthoritativeStore() {
+  const browser = readPersistedState();
+  try {
+    const result = await readLiveBookMode();
+    if (result.ok && result.mode === "browser") {
+      storeMode = "browser";
+      snapshot = browser;
+    } else if (result.ok && result.mode === "live") {
+      storeMode = "live";
+      persistLiveDataPreviews(browser);
+      snapshot = mergeBook(browser, result.book, result.viewer);
+    } else {
+      storeMode = "unknown";
+      snapshot = liveBookFailureState(browser) as AppState;
+    }
+  } catch {
+    storeMode = "unknown";
+    snapshot = liveBookFailureState(browser) as AppState;
+  }
+  notifyStore();
+  return snapshot;
+}
+
+function readLiveBookMode() {
+  if (liveBookReadInFlight) return liveBookReadInFlight;
+  const request = (async () => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 10_000);
+      try {
+        const response = await fetch("/api/live-book", {
+          cache: "no-store",
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const parsed = parseLiveBookResponse(
+          response.status,
+          await response.json().catch(() => null),
+        );
+        if (parsed.ok) return parsed;
+      } catch {
+        // Retry once below.
+      } finally {
+        window.clearTimeout(timeout);
+      }
+      if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 200));
+    }
+    return { ok: false, mode: "unknown" as const };
+  })()
+    .finally(() => {
+      if (liveBookReadInFlight === request) liveBookReadInFlight = null;
+    });
+  liveBookReadInFlight = request;
+  return request;
+}
+
+async function reconcileLiveStore(force = false) {
+  const generation = optimisticGeneration;
+  const result = await readLiveBookMode();
+  if (!result.ok || !shouldApplyReconciliation(force, generation, optimisticGeneration)) return;
+  if (result.mode === "browser") {
+    storeMode = "browser";
+    snapshot = readPersistedState();
+    notifyStore();
+  } else {
+    if (result.mode !== "live" || !("book" in result)) return;
+    if (storeMode === "browser") persistLiveDataPreviews(snapshot);
+    storeMode = "live";
+    snapshot = mergeBook(snapshot, result.book, result.viewer);
+    notifyStore();
+  }
+}
+
+async function reloadAfterIdentityChange() {
+  if (liveBookReadInFlight) await liveBookReadInFlight;
+  await reconcileLiveStore();
+}
+
+function queueLiveWrite(operation: unknown) {
+  liveWriteQueue = liveWriteQueue.catch(() => ({ ok: false, error: "LIVE_BOOK_WRITE_FAILED" })).then(async () => {
+    const disposition = operationDisposition(storeMode);
+    if (disposition !== "dispatch") {
+      const discovered = await readLiveBookMode();
+      if (!discovered.ok) return { ok: false, error: "LIVE_BOOK_MODE_UNKNOWN" };
+      if (discovered.mode === "browser") {
+        storeMode = "browser";
+        return { ok: true };
+      }
+      if (storeMode === "browser") persistLiveDataPreviews(snapshot);
+      storeMode = "live";
+    }
+    if (!isLiveStoreMode()) return { ok: false, error: "LIVE_BOOK_MODE_UNKNOWN" };
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
+    const response = await fetch("/api/live-book", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(operation),
+      cache: "no-store",
+      credentials: "include",
+      signal: controller.signal,
+    }).catch(() => null);
+    window.clearTimeout(timeout);
+    if (!response) {
+      await reconcileLiveStore(true).catch(() => undefined);
+      return { ok: false, error: "LIVE_BOOK_TIMEOUT" };
+    }
+    const body = await response.json().catch(() => null);
+    const result = parseLiveBookMutationResponse(response.status, body);
+    if (result.ok && result.mode === "browser") {
+      storeMode = "browser";
+      snapshot = readPersistedState();
+      notifyStore();
+      return { ok: true, mode: "browser" };
+    } else if (result.ok && result.mode === "live") {
+      return { ok: true, mode: "live" };
+    } else if (!result.ok) {
+      await reconcileLiveStore(true).catch(() => undefined);
+      return { ok: false, error: typeof body?.error === "string" ? body.error : "LIVE_BOOK_WRITE_FAILED" };
+    }
+    return { ok: false, error: "LIVE_BOOK_WRITE_FAILED" };
+  });
+  return liveWriteQueue;
+}
+
 function subscribeStore(listener: () => void) {
   listeners.add(listener);
+  if (storeMode === "unknown" && !loadStarted) {
+    loadStarted = true;
+    void loadAuthoritativeStore().finally(() => {
+      if (storeMode === "unknown") loadStarted = false;
+    });
+  }
   return () => {
     listeners.delete(listener);
   };
 }
 
 function getStoreSnapshot() {
-  if (!clientLoaded) {
-    clientLoaded = true;
-    snapshot = readPersistedState();
-  }
   return snapshot;
 }
 
@@ -157,21 +389,68 @@ function getServerStoreSnapshot() {
 }
 
 function refreshStoreFromDisk() {
-  snapshot = readPersistedState();
-  listeners.forEach((listener) => listener());
+  if (storeMode === "browser") snapshot = readPersistedState();
+  notifyStore();
   return snapshot;
 }
 
-function updateStore(recipe: (prev: AppState) => AppState) {
+function updateStore(
+  recipe: (prev: AppState) => AppState,
+  options: { operation?: unknown; deferLive?: boolean } = {},
+) {
   const prev = getStoreSnapshot();
   const next = recipe(prev);
-  if (next === prev) return;
-  snapshot = next;
-  if (next.hydrated) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableState(next)));
-    writeSessionUser(browserSessionStorage(), next.user);
+  if (next === prev) return Promise.resolve({ ok: true } as OperationAck);
+  const deferred = storeMode === "live" && options.deferLive && options.operation;
+  if (!deferred) snapshot = next;
+  let acknowledgement: Promise<OperationAck> = Promise.resolve({ ok: true });
+  if (next.hydrated && !deferred) {
+    if (storeMode === "live") {
+      persistLiveSafeState(next);
+      if ((options.operation as { action?: string } | undefined)?.action !== "timepiece.remove") {
+        persistLiveDataPreviews(next);
+      }
+      if (options.operation) {
+        optimisticGeneration += 1;
+        acknowledgement = queueLiveWrite(options.operation);
+        void acknowledgement.then((result) => {
+          if (result.ok && result.mode === "live") return reconcileLiveStore();
+        }).catch(() => undefined);
+      }
+    } else if (shouldPersistBrowserBook(storeMode)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableState(next)));
+      writeSessionUser(browserSessionStorage(), next.user);
+    } else {
+      writeSessionUser(browserSessionStorage(), next.user);
+    }
   }
-  listeners.forEach((listener) => listener());
+  if (!deferred) notifyStore();
+  if (deferred) {
+    optimisticGeneration += 1;
+    return queueLiveWrite(options.operation).then((result) => {
+      if (result.ok && storeMode === "live") {
+        snapshot = next;
+        persistLiveSafeState(next);
+        persistLiveDataPreviews(next);
+        notifyStore();
+        void reconcileLiveStore().catch(() => undefined);
+      }
+      return result;
+    });
+  }
+  if (storeMode === "browser" && options.operation) {
+    optimisticGeneration += 1;
+    void queueLiveWrite(options.operation).then((result) => {
+      if (result.ok && result.mode === "live") return reconcileLiveStore();
+    }).catch(() => undefined);
+  } else if (storeMode === "unknown" && options.operation) {
+    optimisticGeneration += 1;
+    acknowledgement = queueLiveWrite(options.operation);
+    void acknowledgement.then((result) => {
+      if (result.ok && result.mode === "live") return reconcileLiveStore();
+    }).catch(() => undefined);
+  }
+  return acknowledgement;
 }
 
 function demoState(): AppState {
@@ -297,11 +576,29 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const state = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerStoreSnapshot);
+  useEffect(() => {
+    let lastCheck = 0;
+    const recheck = () => {
+      const now = Date.now();
+      if (now - lastCheck < 5_000) return;
+      lastCheck = now;
+      void reconcileLiveStore().catch(() => undefined);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") recheck();
+    };
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const value = useMemo<Store>(
     () => ({
       ...state,
-      signIn: (profile) =>
+      signIn: (profile) => {
         updateStore((prev) => {
           const email = (profile?.email ?? prev.user?.email ?? DEMO_PROFILE.email).trim();
           const key = profileKey(email);
@@ -323,7 +620,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           let timepieces = prev.timepieces;
           let agreements = prev.agreements;
           let photos = prev.photos;
-          if (key === profileKey(DEMO_PROFILE.email)) {
+          if (storeMode !== "live" && key === profileKey(DEMO_PROFILE.email)) {
             const haleOwns = timepieces.some(
               (watch) => profileKey(watch.ownerEmail || DEMO_PROFILE.email) === key,
             );
@@ -346,8 +643,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             users: rememberUser(prev.users, user),
             profiles: { ...prev.profiles, [key]: user },
           };
-        }),
-      signUp: (profile) =>
+        });
+        void reloadAfterIdentityChange().catch(() => undefined);
+      },
+      signUp: (profile) => {
         updateStore((prev) => {
           const user = profileForEmail(profile.email, {
             ...profile,
@@ -362,7 +661,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             users: rememberUser(prev.users, user),
             profiles: { ...prev.profiles, [key]: user },
           };
-        }),
+        });
+        void reloadAfterIdentityChange().catch(() => undefined);
+      },
       signOut: () =>
         updateStore((prev) => ({
           ...prev,
@@ -371,7 +672,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateProfile: (patch) =>
         updateStore((prev) => {
           if (!prev.user) return prev;
-          const nextEmail = (patch.email ?? prev.user.email).trim();
+          const nextEmail = (storeMode === "live" ? prev.user.email : (patch.email ?? prev.user.email)).trim();
           if (prev.user.role === "collector" && isReservedDeskEmail(nextEmail)) {
             return prev;
           }
@@ -410,7 +711,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 : item,
             ),
           };
-        }),
+        }, { operation: { action: "profile.update", patch } }),
       updatePreferences: (patch) =>
         updateStore((prev) => {
           const nextPrefs = mergePreferences({ ...prev.user?.preferences, ...patch });
@@ -421,7 +722,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             user,
             profiles: user ? { ...prev.profiles, [profileKey(user.email)]: user } : prev.profiles,
           };
-        }),
+        }, { operation: { action: "profile.update", patch: { preferences: { ...state.user?.preferences, ...patch } } } }),
       completeOnboarding: () =>
         updateStore((prev) => {
           if (!prev.user) return prev;
@@ -431,8 +732,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             user,
             profiles: { ...prev.profiles, [profileKey(user.email)]: user },
           };
-        }),
-      addTimepiece: (watch) =>
+        }, { operation: { action: "profile.update", patch: { onboardingComplete: true } } }),
+      addTimepiece: async (watch) =>
         updateStore((prev) => ({
           ...prev,
           timepieces: [watch, ...prev.timepieces],
@@ -448,13 +749,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             })),
             ...prev.photos,
           ],
-        })),
-      updateTimepiece: (id, patch) =>
+        }), { operation: { action: "timepiece.create", timepiece: watch }, deferLive: true }),
+      updateTimepiece: async (id, patch) =>
         updateStore((prev) => ({
           ...prev,
           timepieces: prev.timepieces.map((w) => (w.id === id ? { ...w, ...patch } : w)),
-        })),
-      removeTimepiece: (id) =>
+        }), {
+          operation: {
+            action: state.user?.role === "collector" ? "timepiece.update" : "timepiece.deskUpdate",
+            id,
+            patch,
+          },
+          deferLive: true,
+        }),
+      removeTimepiece: async (id) =>
         updateStore((prev) => ({
           ...prev,
           timepieces: prev.timepieces.filter((w) => w.id !== id),
@@ -462,8 +770,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           agreements: prev.agreements
             .map((a) => ({ ...a, watchIds: a.watchIds.filter((wid) => wid !== id) }))
             .filter((a) => a.watchIds.length > 0),
-        })),
-      createAgreement: (input) => {
+        }), { operation: { action: "timepiece.remove", id }, deferLive: true }),
+      createAgreement: async (input) => {
         const current = refreshStoreFromDisk();
         const conflicts = conflictingLiveWatchIds(input.watchIds, current.agreements);
         if (conflicts.length > 0) {
@@ -478,7 +786,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           status: "pending_signature",
           scale: input.scale ?? agreementScaleFromDesk(current.settings, openShell, input.termMonths),
         };
-        updateStore((prev) => {
+        const acknowledgement = await updateStore((prev) => {
           const user = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;
           return {
             ...prev,
@@ -486,20 +794,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             user,
             profiles: user ? { ...prev.profiles, [profileKey(user.email)]: user } : prev.profiles,
           };
-        });
+        }, { operation: { action: "agreement.create", agreement }, deferLive: true });
+        if (!acknowledgement.ok) throw new Error(acknowledgement.error);
         return agreement;
       },
       updateAgreement: (id, patch) =>
         updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-        })),
-      removeAgreement: (id) =>
+        }), {
+          operation: {
+            action: "agreement.updateScale",
+            id,
+            scale: patch.scale ?? {},
+            termMonths: patch.termMonths ?? state.agreements.find((item) => item.id === id)?.termMonths ?? 12,
+          },
+        }),
+      removeAgreement: async (id) =>
         updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.filter((a) => a.id !== id),
-        })),
-      signAgreement: (id) =>
+        }), { operation: { action: "agreement.remove", id }, deferLive: true }),
+      signAgreement: async (id) =>
         updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((a) =>
@@ -507,8 +823,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? { ...a, status: "signed", signedAt: new Date().toISOString().slice(0, 10) }
               : a
           ),
-        })),
-      recordAgreementEnd: (id, end) => {
+        }), {
+          operation: {
+            action: state.user?.role === "collector" ? "agreement.signCollector" : "agreement.markSigned",
+            id,
+          },
+          deferLive: true,
+        }),
+      recordAgreementEnd: async (id, end) => {
         const currentState = refreshStoreFromDisk();
         const current = currentState.agreements.find((a) => a.id === id);
         if (!current) return { ok: false, error: "NOT_FOUND" };
@@ -521,13 +843,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ) {
           return { ok: false, error: LIVE_WATCH_CONFLICT };
         }
-        updateStore((prev) => ({
+        const acknowledgement = await updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((a) => (a.id === id ? result.agreement : a)),
-        }));
+        }), { operation: { action: "agreement.recordEnd", id, end: result.agreement.bookEnd }, deferLive: true });
+        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
         return { ok: true };
       },
-      renewAgreement: (id, closeDate) => {
+      renewAgreement: async (id, closeDate) => {
         const current = refreshStoreFromDisk();
         const agreement = current.agreements.find((item) => item.id === id);
         if (!agreement) return { ok: false, error: "NOT_FOUND" };
@@ -548,7 +871,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           createdAt: planned.successor.createdAt,
           scale: successorScale,
         };
-        updateStore((prev) => ({
+        const acknowledgement = await updateStore((prev) => ({
           ...prev,
           agreements: [
             successor,
@@ -556,10 +879,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               item.id === id ? { ...item, bookEnd: planned.end } : item,
             ),
           ],
-        }));
+        }), {
+          operation: {
+            action: "agreement.renew",
+            id,
+            closeDate,
+            successorId: successor.id,
+            agreementCode: successor.agreementCode,
+            scale: successorScale,
+          },
+          deferLive: true,
+        });
+        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
         return { ok: true, successor };
       },
-      addAgreementWatches: (id, watchIds) => {
+      addAgreementWatches: async (id, watchIds) => {
         const current = refreshStoreFromDisk();
         const agreement = current.agreements.find((item) => item.id === id);
         if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
@@ -576,15 +910,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (!eligible) return { ok: false, error: "INELIGIBLE_PIECE" };
         if (extras.length === 0) return { ok: true };
-        updateStore((prev) => ({
+        const acknowledgement = await updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((item) =>
             item.id === id ? { ...item, watchIds: [...item.watchIds, ...extras] } : item,
           ),
-        }));
+        }), { operation: { action: "agreement.addWatches", id, watchIds: extras }, deferLive: true });
+        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
         return { ok: true };
       },
-      setAgreementAmount: (id, amount) => {
+      setAgreementAmount: async (id, amount) => {
         const current = refreshStoreFromDisk();
         const agreement = current.agreements.find((item) => item.id === id);
         if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
@@ -600,13 +935,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           0,
         );
         if (amount > cap) return { ok: false, error: "OVER_LTV" };
-        updateStore((prev) => ({
+        const acknowledgement = await updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((item) => (item.id === id ? { ...item, amount } : item)),
-        }));
+        }), { operation: { action: "agreement.setAmount", id, amount }, deferLive: true });
+        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
         return { ok: true };
       },
-      clearAgreementEnd: (id) => {
+      clearAgreementEnd: async (id) => {
         const current = refreshStoreFromDisk();
         const agreement = current.agreements.find((item) => item.id === id);
         if (!agreement?.bookEnd) return false;
@@ -614,24 +950,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (conflictingLiveWatchIds(agreement.watchIds, others).length > 0) {
           return false;
         }
-        updateStore((prev) => ({
+        const acknowledgement = await updateStore((prev) => ({
           ...prev,
           agreements: prev.agreements.map((item) => (item.id === id ? stripAgreementEnd(item) : item)),
-        }));
-        return true;
+        }), { operation: { action: "agreement.clearEnd", id }, deferLive: true });
+        return acknowledgement.ok;
       },
       updateSettings: (patch) =>
         updateStore((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
-      upsertUser: (user) =>
+      upsertUser: async (user) =>
         updateStore((prev) => {
           const exists = prev.users.some((u) => u.id === user.id);
           return {
             ...prev,
             users: exists ? prev.users.map((u) => (u.id === user.id ? user : u)) : [user, ...prev.users],
           };
+        }, {
+          operation: state.users.some((existing) => existing.id === user.id)
+            ? {
+                action: "customer.update",
+                id: user.id,
+                patch: { name: user.name, phone: user.phone, status: user.status, member: user.member },
+              }
+            : { action: "customer.invite", customer: user },
+          deferLive: true,
         }),
-      removeUser: (id) =>
-        updateStore((prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) })),
+      removeUser: async (id) =>
+        updateStore(
+          (prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) }),
+          { operation: { action: "customer.remove", id }, deferLive: true },
+        ),
       upsertCatalog: (entry) =>
         updateStore((prev) => {
           const exists = prev.catalog.some((c) => c.id === entry.id);
@@ -659,15 +1007,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             photos: exists ? prev.photos.map((p) => (p.id === photo.id ? photo : p)) : [photo, ...prev.photos],
           };
+        }, {
+          operation: photo.assetId && !photo.url.startsWith("data:")
+            ? { action: "preview.upsert", id: photo.id, timepieceId: photo.assetId, kind: photo.kind, url: photo.url }
+            : undefined,
         }),
-      removePhoto: (id) =>
-        updateStore((prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) })),
+      removePhoto: async (id) =>
+        updateStore(
+          (prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) }),
+          {
+            operation: state.photos.find((photo) => photo.id === id)?.url.startsWith("data:")
+              ? undefined
+              : { action: "preview.remove", id },
+            deferLive: true,
+          },
+        ),
       resetDemo: () => {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem("mac-app-state-v2");
         localStorage.removeItem("mac-app-state-v1");
+        localStorage.removeItem(LIVE_PREVIEW_KEY);
         writeSessionUser(browserSessionStorage(), null);
-        updateStore(() => demoState());
+        updateStore(
+          () => (storeMode === "live" ? { ...snapshot, hydrated: true, user: null } : demoState()),
+        );
       },
     }),
     [state]

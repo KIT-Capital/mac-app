@@ -180,15 +180,20 @@ function AddFormEditor() {
     }
   }
 
-  function persist(watch: Timepiece, notify = false) {
+  async function persist(watch: Timepiece, notify = false) {
     const stamped: Timepiece = {
       ...watch,
       assetCode:
         watch.assetCode ||
         new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
     };
-    if (existing) updateTimepiece(existing.id, stamped);
-    else addTimepiece(stamped);
+    const saved = existing
+      ? await updateTimepiece(existing.id, stamped)
+      : await addTimepiece(stamped);
+    if (!saved.ok) {
+      setError(saved.error || "That timepiece could not be saved.");
+      return;
+    }
     if (notify && user) {
       void sendAppEmail({
         kind: "appraisal",
@@ -215,23 +220,23 @@ function AddFormEditor() {
     return missing;
   }
 
-  function onSave(e: FormEvent) {
+  async function onSave(e: FormEvent) {
     e.preventDefault();
     const missing = missingFields();
     if (missing.length) {
       setError(`Add ${formatIntakeList(missing)}.`);
       return;
     }
-    persist(draft);
+    await persist(draft);
   }
 
-  function onAppraise() {
+  async function onAppraise() {
     const missing = missingFields();
     if (missing.length) {
       setError(`Add ${formatIntakeList(missing)}.`);
       return;
     }
-    persist({ ...draft, status: "reviewing" }, true);
+    await persist({ ...draft, status: "reviewing" }, true);
   }
 
   return (
