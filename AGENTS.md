@@ -53,7 +53,7 @@ Kit prefers presigned direct upload to object storage. This prototype stores col
 
 ## 6. Quality gates are blocking
 
-`npm run lint` · `npm test` · `npm run build` — all green before merge. `typecheck` is not yet a named script; `next build` typechecks. No blanket `eslint-disable`, `@ts-ignore`, or `any` cast.
+`npm run lint` · `npm test` · `npm run build` — all green before merge. `npm run typecheck` is a named alias of the same `next build` gate for static harness declaration; do not run both as separate quality work. No blanket `eslint-disable`, `@ts-ignore`, or `any` cast.
 
 ## 7. Tests must be honest
 

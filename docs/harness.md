@@ -1,6 +1,6 @@
 # Norfolk project harness
 
-**Tier: REFERENCE** · Source reviewed: 2026-09-13
+**Tier: REFERENCE** · Source reviewed: 2026-09-17
 
 The harness is the repeatable work cycle around a Norfolk project, not just a
 checker or template. It connects a business idea to understood context, one plan,
@@ -119,6 +119,42 @@ adoption. Likewise, settings and package-manager declarations do not prove
 installed/pinned plugins, editor rule loading or runtime versions. Optional
 integrations are not blanket requirements. A tailored exception should be
 reviewed against the contract, not hidden by modifying this check to claim success.
+
+## Feedback loop observed in this repository
+
+The 17 September 2026 live-book work exercised the harness as a real blocking
+loop rather than a checklist:
+
+- `kit-guard` rejected an `.env.example` edit because that kit-managed path was
+  absent from `.kit/manifest.json`. The product PR removed the edit and kept key
+  names in `docs/config-and-env-map.md`; the guard was not bypassed.
+- The static check reported a missing `typecheck` script even though this pinned
+  Next.js build performs TypeScript checking. This repository now declares
+  `npm run typecheck` as the same `next build` gate so the static contract is
+  truthful without adding a second compiler path.
+- Full auth/money review stopped the first live-book adapter: the browser demo
+  accepted any non-empty collector password, and whole-book replacement could
+  lose another machine's edits. A separate verified-email PR landed first; the
+  adapter then changed to operation-level, role-authorized mutations.
+- Documentation review found that generic staff ends could still write
+  `renewed`. The code returned to implementation and now reserves renewal for
+  the admin transaction that also creates the successor.
+
+The reusable rule is evidence → narrow correction → rerun the real gate →
+upstream feedback. A green intermediate check never overrides a later
+trust-boundary, review-bot, or documentation finding.
+
+### Feedback sent upstream
+
+Norfolk Kit feedback should include the exact command, observed output, project
+contract, and the local resolution. The two actionable Kit-level findings from
+this run are:
+
+1. Let the static harness declare that a framework build is the typecheck gate,
+   instead of requiring a duplicate script name in every client project.
+2. Make the payload contract for common client-safe files such as
+   `.env.example` explicit during equip, so plans do not direct edits that
+   `kit-guard` must later reject as `MANIFEST-SCOPE`.
 
 This is a development CLI, not an application capability or a production audit.
 If a future product exposes assessment to users or agents, it needs the shared
