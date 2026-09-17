@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Database } from "./client";
 import { liveBookFlagOn, planLiveBookImport } from "./live-book-import.mjs";
 import { dollarsToCents } from "./money.mjs";
@@ -115,6 +115,15 @@ export async function commitLiveBookImport(
         });
     }
 
+    if (plan.agreements.length) {
+      await tx.delete(liveAgreementMembers).where(
+        inArray(
+          liveAgreementMembers.agreementId,
+          plan.agreements.map((agreement) => agreement.id),
+        ),
+      );
+    }
+
     for (const agreement of plan.agreements) {
       const amountCents = dollarsToCents(agreement.amount);
       if (amountCents === null) {
@@ -153,14 +162,13 @@ export async function commitLiveBookImport(
             updatedAt: new Date(),
           },
         });
-      await tx.delete(liveAgreementMembers).where(eq(liveAgreementMembers.agreementId, agreement.id));
       if (agreement.watchIds.length) {
         await tx.insert(liveAgreementMembers).values(
           agreement.watchIds.map((timepieceId: string) => ({
             id: `${agreement.id}:${timepieceId}`,
             agreementId: agreement.id,
             timepieceId,
-            status: "live",
+            status: agreement.memberStatus === "released" ? "released" : "live",
           })),
         );
       }
