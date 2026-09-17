@@ -7,7 +7,7 @@
 Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
 - **Collector** — any non-desk email plus a non-empty password becomes role `collector`. There is no password verifier.
-- **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). A new tab, device, or browser always starts at splash / Sign In. Collection rows and profiles stay in `localStorage` so the same email can recover pieces after signing in again.
+- **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). Live-book authorization adds a signed, HttpOnly, session-only `mac_collector` cookie after collector Sign In or development live registration and clears it on Sign Out. A new browser session still starts at splash / Sign In.
 - **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first.
 - **Social buttons** — UI only; they call the same local `enter()` path.
 
@@ -21,7 +21,9 @@ When enabled, collector access is development-only and fails closed unless
 `COLLECTOR_SESSION_SECRET`, a valid fixed `COLLECTOR_MAGIC_LINK_ORIGIN`, and
 `RESEND_API_KEY` are present. Preview mail cannot prove identity. Login links are
 issued only for an existing Neon customer, but valid unknown emails receive the
-same generic accepted response. Registration details are bounded and signed;
+same generic accepted response. Suspended collectors receive that same response
+without mail, and existing sessions are rejected as
+soon as the Neon customer is no longer active. Registration details are bounded and signed;
 reserved desk identities are refused and the customer is created only after link
 verification. Verification sets the signed, expiring, HttpOnly, session-only
 `mac_collector` cookie. Links are never derived from request hosts and access
@@ -29,6 +31,10 @@ mail is never retained in the generic desk outbox, including send failures.
 Tokens must not be logged. A genuinely delivered link can be replayed during its
 15-minute lifetime; one-time nonce persistence remains deferred. WorkOS and Neon
 Auth remain disabled.
+
+An invited collector may request the same non-enumerating login link. Successful
+verification atomically activates that exact customer ID and email before issuing
+the session. Suspended collectors remain blocked.
 
 ## Desk session
 
@@ -40,7 +46,7 @@ Collection state and photos still live in the browser. Neon `development` has sy
 
 ## Authorization
 
-Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; the client redirect in `components/app-frame.tsx` is not the gate. Collector routes stay client-gated. Record access uses an explicit actor stub in `lib/db/isolation.mjs`: a collector may only read their own customer, timepieces, photos, applications, and agreements; only staff/admin may prepare a contract or archive a signed PDF. WorkOS is not wired. Do not rotate `DESK_SESSION_SECRET` here.
+Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; the client redirect in `components/app-frame.tsx` is not the gate. Collector page routes stay client-gated. When the development live-book switch is on, `/api/live-book` opens the verified collector session with the configured secret, confirms immutable customer ID and email against Neon, and scopes reads and operation-level mutations to that customer. Desk and collector cookies are mutually exclusive; a request carrying both is rejected. Existing repository isolation still applies. WorkOS is not wired. Do not rotate `DESK_SESSION_SECRET` here.
 
 ## Secrets
 

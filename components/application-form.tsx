@@ -64,7 +64,7 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
     setError("");
     let agreement;
     try {
-      agreement = createAgreement({
+      agreement = await createAgreement({
         watchIds: [watch.id],
         amount: n,
         termMonths: term,

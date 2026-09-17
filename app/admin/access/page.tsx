@@ -29,9 +29,16 @@ export default function AdminAccessPage() {
     e.preventDefault();
     if (!draft.name || !draft.email.includes("@")) return;
     const creating = !draft.id;
-    upsertUser({ ...draft, id: draft.id || `usr-${Date.now()}` });
+    setBusy(true);
+    const saved = await upsertUser({ ...draft, id: draft.id || `usr-${Date.now()}` });
+    if (!saved.ok) {
+      setBusy(false);
+      setNotice("");
+      setError(saved.error || "User could not be saved.");
+      return;
+    }
+    setError("");
     if (creating) {
-      setBusy(true);
       const result = await sendAppEmail({
         kind: "invite",
         name: draft.name,
@@ -39,7 +46,6 @@ export default function AdminAccessPage() {
         role: draft.role,
         phone: draft.phone,
       });
-      setBusy(false);
       if (!result.ok) {
         setError(result.error || "User saved, but the invite email failed.");
         setNotice("");
@@ -48,6 +54,7 @@ export default function AdminAccessPage() {
         setNotice(result.preview ? "User saved. Invite is in the preview outbox." : "Invite sent through Resend.");
       }
     }
+    setBusy(false);
     setDraft(BLANK);
   }
 
@@ -96,7 +103,7 @@ export default function AdminAccessPage() {
           u.status,
           <div key={u.id} className="flex gap-3 text-[#FCB040]">
             <button type="button" onClick={() => setDraft(u)}>Edit</button>
-            <button type="button" onClick={() => removeUser(u.id)}>Remove</button>
+            <button type="button" onClick={() => void removeUser(u.id)}>Remove</button>
           </div>,
         ])}
       />

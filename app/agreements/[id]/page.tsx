@@ -123,8 +123,8 @@ export default function AgreementDetailPage() {
       !held.has(watch.id),
   );
 
-  function addFreePiece(watchId: string) {
-    const result = addAgreementWatches(liveAgreement.id, [watchId]);
+  async function addFreePiece(watchId: string) {
+    const result = await addAgreementWatches(liveAgreement.id, [watchId]);
     if (!result.ok) {
       setPieceError(
         result.error === LIVE_WATCH_CONFLICT
@@ -136,9 +136,9 @@ export default function AgreementDetailPage() {
     setPieceError("");
   }
 
-  function onRaiseAmount() {
+  async function onRaiseAmount() {
     const n = Number(raiseAmount.replace(/[^0-9.]/g, ""));
-    const result = setAgreementAmount(liveAgreement.id, n);
+    const result = await setAgreementAmount(liveAgreement.id, n);
     if (!result.ok) {
       setPieceError(
         result.error === "OVER_LTV"

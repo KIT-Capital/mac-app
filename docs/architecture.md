@@ -10,7 +10,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 
 - **Collector** — one UI plane on phone, iPad, and desktop (`CollectorShell`). **Implemented.**
 - **Desk** — 16:9 admin console at `/admin/*` (`DeskShell`). Not linked from collector chrome. **Implemented.**
-- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) for collection rows, with `user` always stored as `null`. The live Sign In lives in tab `sessionStorage` only. **Implemented.** This remains the live app store until a tested server persistence path exists. Do not delete or auto-migrate it. The repo operations book (end kind, date, amount; derived open / past due) lives on this client store only.
+- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) remains the default and rollback store, with `user` always stored as `null`. The development-only owner switch moves repo-book reads and operation-level writes together to Neon after verified collector or desk access. Catalog, shells, settings, and new data-URL previews remain browser-local. Do not delete or auto-migrate the browser book.
 - **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
@@ -18,9 +18,9 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI still uses the browser store. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
-- **Verified collector access prerequisite** — signed email verification and
+- **Verified collector access** — signed email verification and
   `mac_collector` session primitives exist behind default-off `MAC_LIVE_BOOK`.
-  Enabled use is development-only; browser login remains the active UI path.
+  Enabled use is development-only; login and signup request a verification link.
 - **Internal mail routing** — `MAC_INTERNAL_EMAIL` is the single recipient for
   MAC desk aliases during the prototype. Collector copies remain addressed to
   collectors and the public From address remains `info@mechartcap.com`.
@@ -31,7 +31,8 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 app/                 routes
 app/api/mail         outbound mail
 app/api/desk-session desk cookie
-app/api/collector-session dormant collector email verification
+app/api/collector-session collector email verification
+app/api/live-book scoped repo-book reads and operations
 proxy.ts             server 403 for /admin without desk cookie
 components/          shells + shadcn
 lib/                 auth, store, mail, theme, env mapping, Drizzle schema and repositories
@@ -48,7 +49,11 @@ Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 
 
 ## Proposed platform (partially implemented)
 
-Neon + Drizzle repositories exist on the `development` branch. The live collector/desk UI still reads `localStorage`. `lib/storage/r2-object-store.mjs` can put originals when R2 names are set; production refuses a silent memory fallback. WorkOS and a Railway worker are not wired. Official cash and inventory stay outside this app (QuickBooks and third-party inventory). Stage 6 ledger posting is deferred and is not this product’s books. See `docs/plans/2026-09-15-production-persistence.md` and `docs/plans/2026-09-16-001-feat-repo-operations-book-plan.md`.
+Neon + Drizzle repositories and a default-off live-book adapter exist on the
+`development` branch. Browser state remains the default until the owner switch is
+enabled after import. `lib/storage/r2-object-store.mjs` can put originals when R2
+names are set; production refuses a silent memory fallback. WorkOS and a Railway
+worker are not wired. Official cash and inventory stay outside this app.
 
 ## Out of scope for Phase 1 Kit equip
 

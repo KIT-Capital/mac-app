@@ -16,9 +16,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
 
   async function enter(nextEmail: string, nextPassword: string) {
+    setError("");
+    setNotice("");
     const result = authenticate(nextEmail, nextPassword);
     if (!result.ok) {
       setError(result.error);
@@ -29,9 +32,34 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: nextEmail, password: nextPassword }),
+        cache: "no-store",
+        credentials: "include",
       });
       if (!session.ok) {
         setError("Desk session could not start.");
+        return;
+      }
+    } else {
+      const access = await fetch("/api/collector-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", email: nextEmail }),
+        cache: "no-store",
+        credentials: "include",
+      });
+      const accessResult = (await access.json().catch(() => null)) as
+        | { mode?: "browser" | "live"; accepted?: boolean }
+        | null;
+      if (!access.ok) {
+        setError("Collector access could not start.");
+        return;
+      }
+      if (accessResult?.mode === "live" && accessResult.accepted) {
+        setNotice("Check your email for a secure sign-in link.");
+        return;
+      }
+      if (accessResult?.mode !== "browser") {
+        setError("Collector access could not start.");
         return;
       }
     }
@@ -130,6 +158,7 @@ export default function LoginPage() {
         </div>
 
         {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
+        {notice ? <p className="text-center text-xs text-[#FCB040]">{notice}</p> : null}
 
         <button
           type="submit"

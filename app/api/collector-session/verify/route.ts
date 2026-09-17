@@ -4,9 +4,11 @@ import {
   collectorCookieOptions,
 } from "@/lib/collector-access.mjs";
 import { verifyCollectorAccess } from "@/lib/collector-access.server";
+import { DESK_COOKIE } from "@/lib/desk-session";
 
 function errorStatus(message: string) {
   if (message === "COLLECTOR_LIVE_BOOK_DEVELOPMENT_ONLY") return 403;
+  if (message === "COLLECTOR_INACTIVE") return 403;
   if (
     message === "COLLECTOR_LIVE_BOOK_DISABLED" ||
     message === "COLLECTOR_SESSION_SECRET_REQUIRED" ||
@@ -33,6 +35,7 @@ export async function GET(request: Request) {
       verified.sessionToken,
       collectorCookieOptions({ secure: verified.secureCookie }),
     );
+    response.cookies.delete(DESK_COOKIE);
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "COLLECTOR_VERIFICATION_FAILED";

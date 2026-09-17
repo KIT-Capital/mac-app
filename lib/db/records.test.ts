@@ -4,6 +4,7 @@ import { inArray } from "drizzle-orm";
 import { createDb } from "./client";
 import {
   createTimepiece,
+  activateInvitedCollector,
   deskActor,
   findCustomerByEmail,
   getCustomer,
@@ -95,5 +96,29 @@ describe("Stage 2 records isolation", { skip }, () => {
     assert.equal(replay.id, first.id);
     assert.equal(replay.name, "Verified Collector");
     assert.equal((await findCustomerByEmail(db, email))?.id, first.id);
+  });
+
+  it("does not verify registration over a suspended collector", async () => {
+    const email = `suspended.${suffix}@mac.test`;
+    const customer = await registerVerifiedCollector(db, { email, name: "Suspended", phone: "" });
+    createdCustomerIds.push(customer.id);
+    await db.update(customers).set({ status: "suspended" }).where(inArray(customers.id, [customer.id]));
+    await assert.rejects(
+      () => registerVerifiedCollector(db, { email, name: "Replacement", phone: "" }),
+      { message: "COLLECTOR_INACTIVE" },
+    );
+  });
+
+  it("atomically activates the exact invited collector on verified login", async () => {
+    const email = `invited-login.${suffix}@mac.test`;
+    const customer = await registerVerifiedCollector(db, { email, name: "Invited", phone: "" });
+    createdCustomerIds.push(customer.id);
+    await db.update(customers).set({ status: "invited" }).where(inArray(customers.id, [customer.id]));
+    const activated = await activateInvitedCollector(db, customer.id, email.toUpperCase());
+    assert.equal(activated.status, "active");
+    await assert.rejects(
+      () => activateInvitedCollector(db, "other-id", email),
+      { message: "COLLECTOR_NOT_FOUND" },
+    );
   });
 });

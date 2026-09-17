@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import { Check, Clock, HelpCircle, Trash2 } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchPhoto } from "@/components/watch-photo";
@@ -16,6 +17,7 @@ export default function WatchDetailPage() {
   const router = useRouter();
   const { updateTimepiece, removeTimepiece, settings, user, agreements } = useStore();
   const { timepieces } = useOwnedAssets();
+  const [actionError, setActionError] = useState("");
   const watch = timepieces.find((w) => w.id === params.id);
   const onLiveRepo = watch ? liveWatchIds(agreements).has(watch.id) : false;
 
@@ -141,8 +143,13 @@ export default function WatchDetailPage() {
           {watch.status === "not_evaluated" ? (
             <button
               type="button"
-              onClick={() => {
-                updateTimepiece(watch.id, { status: "reviewing" });
+              onClick={async () => {
+                const updated = await updateTimepiece(watch.id, { status: "reviewing" });
+                if (!updated.ok) {
+                  setActionError(updated.error || "The appraisal request could not be saved.");
+                  return;
+                }
+                setActionError("");
                 if (user) {
                   void sendAppEmail({
                     kind: "appraisal",
@@ -158,6 +165,7 @@ export default function WatchDetailPage() {
               Request Certified Appraisal
             </button>
           ) : null}
+          {actionError ? <p className="text-sm text-red-400">{actionError}</p> : null}
 
           {watch.status === "reviewing" ? (
             <div className="rounded-xl border border-[#FCB040]/30 bg-[#FCB040]/10 p-4 text-center">
@@ -189,9 +197,13 @@ export default function WatchDetailPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                removeTimepiece(watch.id);
-                router.push("/collection");
+              onClick={async () => {
+                const removed = await removeTimepiece(watch.id);
+                if (removed.ok) {
+                  router.push("/collection");
+                } else {
+                  setActionError(removed.error || "The timepiece could not be removed.");
+                }
               }}
               className="flex items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-red-300 transition hover:bg-red-500/20"
               aria-label="Remove watch"

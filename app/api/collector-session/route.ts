@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { COLLECTOR_COOKIE } from "@/lib/collector-access.mjs";
 import { requestCollectorAccess } from "@/lib/collector-access.server";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
 import { allowMailRequest } from "@/lib/mail";
@@ -49,4 +51,13 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "COLLECTOR_ACCESS_FAILED";
     return Response.json({ error: message }, { status: errorStatus(message) });
   }
+}
+
+export async function DELETE() {
+  const jar = await cookies();
+  jar.delete(COLLECTOR_COOKIE);
+  return Response.json(
+    { ok: true },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

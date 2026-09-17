@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { WatchStatus } from "../types";
 import type { Database } from "./client";
 import {
@@ -62,6 +62,18 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function constraintName(error: unknown) {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!current || typeof current !== "object") return null;
+    if ("constraint" in current && typeof current.constraint === "string") {
+      return current.constraint;
+    }
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return null;
+}
+
 function collectorActor(customer: typeof customers.$inferSelect): Actor {
   return { role: "collector", customerId: customer.id, email: customer.email };
 }
@@ -74,18 +86,25 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
   if (DESK_EMAILS.has(email)) {
     throw new Error("RESERVED_DESK_EMAIL");
   }
-  const [row] = await db
-    .insert(customers)
-    .values({
-      id: randomUUID(),
-      email,
-      name: input.name.trim() || "Collector",
-      phone: input.phone?.trim() ?? "",
-      role: "collector",
-      preferences: DEFAULT_PREFERENCES,
-    })
-    .returning();
-  return row;
+  try {
+    const [row] = await db
+      .insert(customers)
+      .values({
+        id: randomUUID(),
+        email,
+        name: input.name.trim() || "Collector",
+        phone: input.phone?.trim() ?? "",
+        role: "collector",
+        preferences: DEFAULT_PREFERENCES,
+      })
+      .returning();
+    return row;
+  } catch (error) {
+    if (constraintName(error) === "customers_email_unique") {
+      throw new Error("DUPLICATE_EMAIL");
+    }
+    throw error;
+  }
 }
 
 export async function findCustomerByEmail(db: Database, emailInput: string) {
@@ -93,6 +112,32 @@ export async function findCustomerByEmail(db: Database, emailInput: string) {
   if (!email.includes("@")) return null;
   const [row] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
   return row ?? null;
+}
+
+export async function activateInvitedCollector(
+  db: Database,
+  customerId: string,
+  emailInput: string,
+) {
+  const email = normalizeEmail(emailInput);
+  return db.transaction(async (tx) => {
+    const [activated] = await tx.update(customers).set({
+      status: "active",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(customers.id, customerId),
+      eq(customers.email, email),
+      eq(customers.status, "invited"),
+    )).returning();
+    if (activated) return activated;
+    const [existing] = await tx.select().from(customers).where(and(
+      eq(customers.id, customerId),
+      eq(customers.email, email),
+    )).limit(1);
+    if (!existing) throw new Error("COLLECTOR_NOT_FOUND");
+    if (existing.status !== "active") throw new Error("COLLECTOR_INACTIVE");
+    return existing;
+  });
 }
 
 export async function registerVerifiedCollector(
@@ -122,6 +167,7 @@ export async function registerVerifiedCollector(
 
   const existing = await findCustomerByEmail(db, email);
   if (!existing) throw new Error("COLLECTOR_REGISTRATION_CONFLICT");
+  if (existing.status !== "active") throw new Error("COLLECTOR_INACTIVE");
   return existing;
 }
 

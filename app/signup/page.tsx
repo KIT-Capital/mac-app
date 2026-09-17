@@ -17,6 +17,7 @@ export default function SignupPage() {
   const [adult, setAdult] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent) {
@@ -38,6 +39,33 @@ export default function SignupPage() {
       return;
     }
     setBusy(true);
+    setError("");
+    setNotice("");
+    const registration = await fetch("/api/collector-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "register", name, email, phone }),
+      cache: "no-store",
+      credentials: "include",
+    }).catch(() => null);
+    if (!registration?.ok) {
+      setError("Your account could not be created. Please try again.");
+      setBusy(false);
+      return;
+    }
+    const access = (await registration.json().catch(() => null)) as
+      | { mode?: "browser" | "live"; accepted?: boolean }
+      | null;
+    if (access?.mode === "live" && access.accepted) {
+      setNotice("Check your email to verify your account and continue.");
+      setBusy(false);
+      return;
+    }
+    if (access?.mode !== "browser") {
+      setError("Your account could not be created. Please try again.");
+      setBusy(false);
+      return;
+    }
     signUp({
       name,
       email,
@@ -137,6 +165,7 @@ export default function SignupPage() {
           </div>
 
           {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
+          {notice ? <p className="text-center text-xs text-[#FCB040]">{notice}</p> : null}
 
           <div className="pt-4 space-y-3">
             <button
