@@ -42,6 +42,9 @@ const END_ERRORS: Record<string, string> = {
   DATE_AFTER_TODAY: "End date cannot be after today.",
   INVALID_AMOUNT: "Enter a dollar amount of zero or more.",
   INVALID_KIND: "Choose bought back, in liquidation, or liquidated.",
+  NOT_LIVE: "Only an open, past due, or in-liquidation repo can be renewed.",
+  NOT_FOUND: "That repo is no longer on the desk.",
+  LIVE_WATCH_CONFLICT: "Those timepieces are already on another live repo.",
 };
 
 function endDraftFrom(agreement: Agreement) {
@@ -63,6 +66,7 @@ export default function AdminAgreementsPage() {
     signAgreement,
     updateAgreement,
     recordAgreementEnd,
+    renewAgreement,
     clearAgreementEnd,
   } = useStore();
   const [draft, setDraft] = useState<AgreementShell>(blankShell(settings.typicalTerm));
@@ -111,12 +115,25 @@ export default function AdminAgreementsPage() {
       setEndError(END_ERRORS[checked.error] ?? "Enter a date and amount.");
       return;
     }
-    if (!recordAgreementEnd(agreement.id, checked.end as AgreementEnd)) {
-      setEndError(END_ERRORS.INVALID_AMOUNT);
+    const recorded = recordAgreementEnd(agreement.id, checked.end as AgreementEnd);
+    if (!recorded.ok) {
+      setEndError(END_ERRORS[recorded.error] ?? "Enter a date and amount.");
       return;
     }
     setEndError("");
     setEndDraft({ kind: checked.end.kind as BookEndKind, date: checked.end.date, amount: String(checked.end.amount) });
+  }
+
+  function onRenew(agreement: Agreement) {
+    const closeDate = endDraft.date || utcToday();
+    const result = renewAgreement(agreement.id, closeDate);
+    if (!result.ok) {
+      setEndError(END_ERRORS[result.error] ?? "Renewal could not be recorded.");
+      return;
+    }
+    setEndError("");
+    setSelectedId(result.successor.id);
+    setEndDraft(endDraftFrom(result.successor));
   }
 
   return (
@@ -255,12 +272,25 @@ export default function AdminAgreementsPage() {
                 <PillButton type="submit" variant="gold" className="md:w-auto px-6">
                   {a.bookEnd ? "Overwrite end" : "Record end"}
                 </PillButton>
+                {!a.bookEnd || a.bookEnd.kind === "in_liquidation" ? (
+                  <PillButton
+                    type="button"
+                    variant="navy"
+                    className="md:w-auto px-6"
+                    onClick={() => onRenew(a)}
+                  >
+                    Renew
+                  </PillButton>
+                ) : null}
                 {a.bookEnd ? (
                   <button
                     type="button"
                     className="text-[12px] font-bold tracking-[0.18em] text-[#FCB040] uppercase"
                     onClick={() => {
-                      clearAgreementEnd(a.id);
+                      if (!clearAgreementEnd(a.id)) {
+                        setEndError(END_ERRORS.LIVE_WATCH_CONFLICT);
+                        return;
+                      }
                       setEndError("");
                       setEndDraft(endDraftFrom({ ...a, bookEnd: undefined }));
                     }}

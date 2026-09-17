@@ -15,16 +15,22 @@ import {
   photosFromWatches,
 } from "@/lib/admin-seed";
 import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
+import { maxPurchaseAmount } from "@/lib/catalog";
+import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
 import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
 import {
   applyAgreementEnd,
+  bookLabel,
   clearAgreementEnd as stripAgreementEnd,
   conflictingLiveWatchIds,
+  isEligibleLiveAddWatch,
+  isLiveBookLabel,
   LIVE_WATCH_CONFLICT,
   utcToday,
+  validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
@@ -63,8 +69,11 @@ type Store = AppState & {
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
   removeAgreement: (id: string) => void;
   signAgreement: (id: string) => void;
-  recordAgreementEnd: (id: string, end: AgreementEnd) => boolean;
-  clearAgreementEnd: (id: string) => void;
+  recordAgreementEnd: (id: string, end: AgreementEnd) => { ok: true } | { ok: false; error: string };
+  renewAgreement: (id: string, closeDate: string) => { ok: true; successor: Agreement } | { ok: false; error: string };
+  addAgreementWatches: (id: string, watchIds: string[]) => { ok: true } | { ok: false; error: string };
+  setAgreementAmount: (id: string, amount: number) => { ok: true } | { ok: false; error: string };
+  clearAgreementEnd: (id: string) => boolean;
   updateSettings: (patch: Partial<AppSettings>) => void;
   upsertUser: (user: ManagedUser) => void;
   removeUser: (id: string) => void;
@@ -500,25 +509,117 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ),
         })),
       recordAgreementEnd: (id, end) => {
-        let persisted = false;
-        updateStore((prev) => {
-          const current = prev.agreements.find((a) => a.id === id);
-          if (!current) return prev;
-          const result = applyAgreementEnd(current, end, utcToday());
-          if (!result.ok) return prev;
-          persisted = true;
-          return {
-            ...prev,
-            agreements: prev.agreements.map((a) => (a.id === id ? result.agreement : a)),
-          };
-        });
-        return persisted;
-      },
-      clearAgreementEnd: (id) =>
+        const currentState = refreshStoreFromDisk();
+        const current = currentState.agreements.find((a) => a.id === id);
+        if (!current) return { ok: false, error: "NOT_FOUND" };
+        const result = applyAgreementEnd(current, end, utcToday());
+        if (!result.ok) return { ok: false, error: result.error };
+        const others = currentState.agreements.filter((a) => a.id !== id);
+        if (
+          isLiveBookLabel(bookLabel(result.agreement)) &&
+          conflictingLiveWatchIds(result.agreement.watchIds, others).length > 0
+        ) {
+          return { ok: false, error: LIVE_WATCH_CONFLICT };
+        }
         updateStore((prev) => ({
           ...prev,
-          agreements: prev.agreements.map((a) => (a.id === id ? stripAgreementEnd(a) : a)),
-        })),
+          agreements: prev.agreements.map((a) => (a.id === id ? result.agreement : a)),
+        }));
+        return { ok: true };
+      },
+      renewAgreement: (id, closeDate) => {
+        const current = refreshStoreFromDisk();
+        const agreement = current.agreements.find((item) => item.id === id);
+        if (!agreement) return { ok: false, error: "NOT_FOUND" };
+        const openShell = current.shells.find((shell) => shell.status === "open");
+        const successorScale = agreementScaleFromDesk(current.settings, openShell, 12);
+        const planned = planRenewal(agreement, closeDate, utcToday(), successorScale);
+        if (!planned.ok) return { ok: false, error: planned.error };
+        const successor: Agreement = {
+          id: nextId("agr"),
+          agreementCode: `MAC-${nextId("r").slice(-6).toUpperCase()}`,
+          watchIds: planned.successor.watchIds,
+          amount: planned.successor.amount,
+          termMonths: planned.successor.termMonths,
+          delivery: planned.successor.delivery,
+          ownerName: planned.successor.ownerName,
+          email: planned.successor.email,
+          status: "pending_signature",
+          createdAt: planned.successor.createdAt,
+          scale: successorScale,
+        };
+        updateStore((prev) => ({
+          ...prev,
+          agreements: [
+            successor,
+            ...prev.agreements.map((item) =>
+              item.id === id ? { ...item, bookEnd: planned.end } : item,
+            ),
+          ],
+        }));
+        return { ok: true, successor };
+      },
+      addAgreementWatches: (id, watchIds) => {
+        const current = refreshStoreFromDisk();
+        const agreement = current.agreements.find((item) => item.id === id);
+        if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
+          return { ok: false, error: "NOT_LIVE" };
+        }
+        const extras = watchIds.filter((watchId) => !agreement.watchIds.includes(watchId));
+        const others = current.agreements.filter((item) => item.id !== id);
+        if (conflictingLiveWatchIds(extras, others).length > 0) {
+          return { ok: false, error: LIVE_WATCH_CONFLICT };
+        }
+        const eligible = extras.every((watchId) => {
+          const watch = current.timepieces.find((item) => item.id === watchId);
+          return isEligibleLiveAddWatch(watch, agreement.email);
+        });
+        if (!eligible) return { ok: false, error: "INELIGIBLE_PIECE" };
+        if (extras.length === 0) return { ok: true };
+        updateStore((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((item) =>
+            item.id === id ? { ...item, watchIds: [...item.watchIds, ...extras] } : item,
+          ),
+        }));
+        return { ok: true };
+      },
+      setAgreementAmount: (id, amount) => {
+        const current = refreshStoreFromDisk();
+        const agreement = current.agreements.find((item) => item.id === id);
+        if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
+          return { ok: false, error: "NOT_LIVE" };
+        }
+        const raised = validateSaleAmountRaise(agreement.amount, amount);
+        if (!raised.ok) return raised;
+        const openShell = current.shells.find((shell) => shell.status === "open");
+        const share = openShell?.ltv || current.settings.maxLtv;
+        const pieces = current.timepieces.filter((watch) => agreement.watchIds.includes(watch.id));
+        const cap = pieces.reduce(
+          (sum, watch) => sum + maxPurchaseAmount(watch.valueLow, watch.valueHigh, share),
+          0,
+        );
+        if (amount > cap) return { ok: false, error: "OVER_LTV" };
+        updateStore((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((item) => (item.id === id ? { ...item, amount } : item)),
+        }));
+        return { ok: true };
+      },
+      clearAgreementEnd: (id) => {
+        const current = refreshStoreFromDisk();
+        const agreement = current.agreements.find((item) => item.id === id);
+        if (!agreement?.bookEnd) return false;
+        const others = current.agreements.filter((item) => item.id !== id);
+        if (conflictingLiveWatchIds(agreement.watchIds, others).length > 0) {
+          return false;
+        }
+        updateStore((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((item) => (item.id === id ? stripAgreementEnd(item) : item)),
+        }));
+        return true;
+      },
       updateSettings: (patch) =>
         updateStore((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
       upsertUser: (user) =>

@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
-import { COMPANY, hasApplication, money } from "@/lib/catalog";
-import { bookLabel } from "@/lib/contract/repo-book.mjs";
+import { COMPANY, hasApplication, maxPurchaseAmount, money } from "@/lib/catalog";
+import { LIVE_WATCH_CONFLICT, bookLabel, isLiveBookLabel, liveWatchIds } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
@@ -22,13 +22,16 @@ function moneyExact(amount: number) {
 
 export default function AgreementDetailPage() {
   const params = useParams<{ id: string }>();
-  const { signAgreement, user, settings } = useStore();
+  const { signAgreement, addAgreementWatches, setAgreementAmount, user, settings, shells, agreements: book } =
+    useStore();
   const { agreements, timepieces } = useOwnedAssets();
   const agreement = agreements.find((a) => a.id === params.id);
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
   const [started, setStarted] = useState(false);
   const [pdfError, setPdfError] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [pieceError, setPieceError] = useState("");
+  const [raiseAmount, setRaiseAmount] = useState("");
   const pageOpen = useRef(true);
   useEffect(() => () => {
     pageOpen.current = false;
@@ -102,6 +105,53 @@ export default function AgreementDetailPage() {
       <main className="flex flex-1 items-center justify-center text-mac-faint">Agreement not found.</main>
     );
   }
+  const liveAgreement = agreement;
+
+  const live = isLiveBookLabel(bookLabel(liveAgreement));
+  const openShell = shells.find((shell) => shell.status === "open");
+  const share = openShell?.ltv || settings.maxLtv;
+  const cap = watches.reduce(
+    (sum, watch) => sum + maxPurchaseAmount(watch.valueLow, watch.valueHigh, share),
+    0,
+  );
+  const held = liveWatchIds(book);
+  const freePieces = timepieces.filter(
+    (watch) =>
+      watch.status === "appraised" &&
+      watch.financeable &&
+      !liveAgreement.watchIds.includes(watch.id) &&
+      !held.has(watch.id),
+  );
+
+  function addFreePiece(watchId: string) {
+    const result = addAgreementWatches(liveAgreement.id, [watchId]);
+    if (!result.ok) {
+      setPieceError(
+        result.error === LIVE_WATCH_CONFLICT
+          ? "That timepiece is already on a live repo."
+          : "That timepiece is not free to add to this repo.",
+      );
+      return;
+    }
+    setPieceError("");
+  }
+
+  function onRaiseAmount() {
+    const n = Number(raiseAmount.replace(/[^0-9.]/g, ""));
+    const result = setAgreementAmount(liveAgreement.id, n);
+    if (!result.ok) {
+      setPieceError(
+        result.error === "OVER_LTV"
+          ? `The desk can purchase up to ${money(cap)} on these appraisals.`
+          : result.error === "BELOW_CURRENT"
+            ? "The sale amount can only be raised."
+            : "Enter a sale amount the desk can purchase.",
+      );
+      return;
+    }
+    setPieceError("");
+    setRaiseAmount("");
+  }
 
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
@@ -121,6 +171,51 @@ export default function AgreementDetailPage() {
             </button>
           ) : null}
         </div>
+
+        {live ? (
+          <div className="mb-4 space-y-3 rounded-xl border border-mac-line bg-mac-card p-3">
+            <p className="text-[12px] text-mac-muted">
+              Free appraised timepieces can join this repo. You may raise the sale amount only up to
+              the desk purchase cap of {money(cap)}.
+            </p>
+            {freePieces.length ? (
+              <ul className="space-y-2">
+                {freePieces.map((watch) => (
+                  <li key={watch.id} className="flex items-center justify-between gap-3 text-[13px]">
+                    <span>
+                      {watch.brand} {watch.model}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                      onClick={() => addFreePiece(watch.id)}
+                    >
+                      Add to this repo
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="flex gap-2">
+              <input
+                aria-label="Raise sale amount"
+                inputMode="numeric"
+                value={raiseAmount}
+                onChange={(event) => setRaiseAmount(event.target.value)}
+                placeholder={money(Math.min(agreement.amount, cap || agreement.amount))}
+                className="min-w-0 flex-1 bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
+              />
+              <button
+                type="button"
+                className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                onClick={onRaiseAmount}
+              >
+                Update amount
+              </button>
+            </div>
+            {pieceError ? <p className="text-xs text-red-400">{pieceError}</p> : null}
+          </div>
+        ) : null}
 
         <article className="space-y-4 rounded-2xl bg-white p-5 text-[#1a1a1a] shadow-md font-sans">
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
