@@ -37,13 +37,18 @@ export async function openDeskAgreements(page: Page) {
 }
 
 export async function signOutFromMenu(page: Page) {
-  const menu = page.getByRole("button", { name: "Open menu" });
-  if (await menu.isVisible()) {
-    await openMenu(page);
-    await page.getByRole("button", { name: "Log out" }).click();
+  const desktop = page.getByRole("button", { name: "Log out" });
+  if (await desktop.isVisible()) {
+    await desktop.click();
   } else {
-    await page.goto("/profile");
-    await page.getByRole("button", { name: "Log Out" }).click();
+    const menu = page.getByRole("button", { name: "Open menu" });
+    if (await menu.isVisible()) {
+      await openMenu(page);
+      await page.getByRole("button", { name: "Log out" }).click();
+    } else {
+      await page.goto("/profile");
+      await page.getByRole("button", { name: "Log Out" }).click();
+    }
   }
   await expect(page.getByRole("heading", { name: "Sign In to Your Collection" })).toBeVisible();
 }

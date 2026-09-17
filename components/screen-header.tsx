@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { BurgerButton } from "@/components/burger-menu";
 import { CollectorNav } from "@/components/collector-nav";
+import { CollectorSignOut } from "@/components/collector-sign-out";
 import { MacLogoMark } from "@/components/mac-logo";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,7 @@ export function ScreenHeader({
           </Link>
         ) : null}
         {right}
+        {menu ? <CollectorSignOut /> : null}
         {menu ? (
           <span className="md:hidden">
             {backHref ? <BurgerButton /> : null}

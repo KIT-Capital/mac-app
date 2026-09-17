@@ -205,6 +205,9 @@ test.describe("collector layouts", () => {
     await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0);
     await expect(page.locator(".mac-desk-screen")).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Timepieces" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    await page.getByRole("button", { name: "Log out" }).click();
+    await expect(page.getByRole("heading", { name: "Sign In to Your Collection" })).toBeVisible();
   });
 
   test("iPad shows the collector bar and a wider vault", async ({ page }) => {
@@ -212,5 +215,6 @@ test.describe("collector layouts", () => {
     await signInHale(page);
     await expect(page.getByRole("navigation", { name: "Collector" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Add a timepiece" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
   });
 });
