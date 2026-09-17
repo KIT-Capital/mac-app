@@ -43,6 +43,13 @@
       "when": 1789489835949,
       "tag": "0005_live_allocation_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789670243797,
+      "tag": "0006_live_book",
+      "breakpoints": true
     }
   ]
 }

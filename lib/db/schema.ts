@@ -244,3 +244,81 @@ export const reportSnapshots = pgTable(
   },
   (table) => [index("report_snapshots_agreement_id_idx").on(table.agreementId)],
 );
+
+/**
+ * Live collector/desk repo book. Separate from Stage 4 one-piece `agreements`.
+ * Client string IDs survive. Open / past due stay derived; a recorded end wins.
+ */
+export const liveAgreements = pgTable(
+  "live_agreements",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    amountCents: integer("amount_cents").notNull(),
+    termMonths: integer("term_months").notNull(),
+    delivery: text("delivery").notNull().default(""),
+    ownerName: text("owner_name").notNull(),
+    email: text("email").notNull(),
+    status: text("status").notNull().default("pending_signature"),
+    agreementCode: text("agreement_code"),
+    createdOn: text("created_on").notNull(),
+    signedOn: text("signed_on"),
+    scale: jsonb("scale"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("live_agreements_customer_id_idx").on(table.customerId)],
+);
+
+/** Membership of a timepiece on a live-book repo. Released rows stay for history. */
+export const liveAgreementMembers = pgTable(
+  "live_agreement_members",
+  {
+    id: text("id").primaryKey(),
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => liveAgreements.id),
+    timepieceId: text("timepiece_id")
+      .notNull()
+      .references(() => timepieces.id),
+    status: text("status").notNull().default("live"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("live_agreement_members_agreement_id_idx").on(table.agreementId),
+    uniqueIndex("live_agreement_members_agreement_timepiece_uidx").on(
+      table.agreementId,
+      table.timepieceId,
+    ),
+    uniqueIndex("live_agreement_members_live_timepiece_uidx")
+      .on(table.timepieceId)
+      .where(sql`${table.status} = 'live'`),
+  ],
+);
+
+export const liveAgreementEnds = pgTable("live_agreement_ends", {
+  agreementId: text("agreement_id")
+    .primaryKey()
+    .references(() => liveAgreements.id),
+  kind: text("kind").notNull(),
+  endedOn: text("ended_on").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Labeled preview URL only. Never an original object key or JPEG jsonb. */
+export const livePreviews = pgTable(
+  "live_previews",
+  {
+    id: text("id").primaryKey(),
+    timepieceId: text("timepiece_id")
+      .notNull()
+      .references(() => timepieces.id),
+    kind: text("kind").notNull().default("legacy_preview"),
+    previewUrl: text("preview_url").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("live_previews_timepiece_id_idx").on(table.timepieceId)],
+);
