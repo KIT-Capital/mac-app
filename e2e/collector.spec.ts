@@ -16,6 +16,15 @@ test.describe("collector app", () => {
     await expect(page.getByText(/Get Estimate/i)).toHaveCount(0);
   });
 
+  test("phone preview stages the splash on a wide screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/?view=phone");
+    await expect(page.getByText(/Phone preview/i)).toBeVisible();
+    await expect(page.locator("[data-device='phone']")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Get Started" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
+  });
+
   test("Hale collection shows demo pieces and photographs", async ({ page }) => {
     await signInHale(page);
     await expect(page.getByText("Richard Mille")).toBeVisible();
