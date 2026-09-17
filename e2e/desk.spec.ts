@@ -161,6 +161,29 @@ test.describe("desk", () => {
     await expect(haleRow.getByText("past due")).toBeVisible();
   });
 
+  test("admin renews Hale at the scheduled price and the collector sees both books", async ({ page }) => {
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
+    await haleRow.click();
+    await page.getByRole("button", { name: "Renew" }).click();
+    await expect(page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByText("renewed")).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByText("open")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Renew" }).first()).toBeVisible();
+    await page.getByRole("button", { name: "Log out" }).click();
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await expect(page.getByRole("link", { name: /MAC-31419/ }).getByText("renewed")).toBeVisible();
+    const successor = page.getByRole("link").filter({ hasText: "open" }).filter({ hasText: /MAC-/ });
+    await expect(successor).toBeVisible();
+    await expect(page.getByRole("button", { name: "Renew" })).toHaveCount(0);
+    await successor.click();
+    await expect(page.getByText(/Book:\s*open/i)).toBeVisible();
+    await expect(page.getByText(/Richard Mille/)).toBeVisible();
+    await expect(page.getByText(/Nautilus/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Download contract PDF" })).toBeVisible();
+  });
+
   test("catalog and config save on this device", async ({ page }) => {
     await signInDesk(page);
     await page.getByRole("link", { name: "Timepiece Catalog" }).click();
