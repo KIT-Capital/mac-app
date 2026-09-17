@@ -5,7 +5,7 @@ import { ENDPOINT_BY_APP_ENV } from "../env/database-mapping.mjs";
 import { evaluateDevelopmentMigration } from "../env/development-migration.mjs";
 import { createDb } from "./client";
 import { getLiveAgreement, insertLiveAgreement, insertLivePreview } from "./live-book";
-import { createTimepiece, registerCollector, toCollectorActor } from "./records";
+import { createTimepiece, deskActor, registerCollector, toCollectorActor } from "./records";
 import {
   customers,
   liveAgreementEnds,
@@ -83,7 +83,7 @@ describe("live book tables", { skip }, () => {
       brand: "Patek Philippe",
       model: "Nautilus",
     });
-    const agreement = await insertLiveAgreement(db, {
+    const agreement = await insertLiveAgreement(db, actor, {
       id: `agr-live-${suffix}`,
       customerId: customer.id,
       watchIds: [first.id, second.id],
@@ -98,7 +98,7 @@ describe("live book tables", { skip }, () => {
     assert.equal(agreement?.id, `agr-live-${suffix}`);
     assert.equal(agreement?.amountCents, 20000000);
     assert.equal(agreement?.createdOn, "2021-03-14");
-    const loaded = await getLiveAgreement(db, agreement.id);
+    const loaded = await getLiveAgreement(db, actor, agreement.id);
     assert.equal(loaded?.createdOn, "2021-03-14");
     assert.deepEqual(loaded?.watchIds.sort(), [first.id, second.id].sort());
     assert.equal(loaded?.bookEnd, null);
@@ -116,7 +116,7 @@ describe("live book tables", { skip }, () => {
       brand: "Audemars Piguet",
       model: "Royal Oak",
     });
-    const preview = await insertLivePreview(db, {
+    const preview = await insertLivePreview(db, actor, {
       timepieceId: piece.id,
       previewUrl: "https://example.test/legacy-preview/royal-oak.jpg",
       kind: "legacy_preview",
@@ -137,7 +137,7 @@ describe("live book tables", { skip }, () => {
       brand: "Richard Mille",
       model: "RM 011",
     });
-    await insertLiveAgreement(db, {
+    await insertLiveAgreement(db, actor, {
       id: `agr-live-a-${suffix}`,
       customerId: customer.id,
       watchIds: [piece.id],
@@ -150,7 +150,7 @@ describe("live book tables", { skip }, () => {
     });
     await assert.rejects(
       () =>
-        insertLiveAgreement(db, {
+        insertLiveAgreement(db, actor, {
           id: `agr-live-b-${suffix}`,
           customerId: customer.id,
           watchIds: [piece.id],
@@ -162,6 +162,73 @@ describe("live book tables", { skip }, () => {
           createdOn: "2026-09-17",
         }),
       { message: "LIVE_WATCH_CONFLICT" },
+    );
+  });
+
+  it("keeps collector B from reading collector A and names a replayed id separately", async () => {
+    const customerA = await registerCollector(db, {
+      email: `live-iso-a.${suffix}@mac.test`,
+      name: "Live A",
+    });
+    const customerB = await registerCollector(db, {
+      email: `live-iso-b.${suffix}@mac.test`,
+      name: "Live B",
+    });
+    createdCustomerIds.push(customerA.id, customerB.id);
+    const actorA = toCollectorActor(customerA);
+    const actorB = toCollectorActor(customerB);
+    const desk = deskActor("staff", "desk@mechartcap.com");
+    const piece = await createTimepiece(db, actorA, customerA.id, {
+      brand: "Vacheron Constantin",
+      model: "Overseas",
+    });
+    const extra = await createTimepiece(db, actorA, customerA.id, {
+      brand: "Jaeger-LeCoultre",
+      model: "Reverso",
+    });
+    const agreement = await insertLiveAgreement(db, desk, {
+      id: `agr-live-iso-${suffix}`,
+      customerId: customerA.id,
+      watchIds: [piece.id],
+      amount: 80000,
+      termMonths: 12,
+      delivery: "Desk arranges intake",
+      ownerName: "Live A",
+      email: customerA.email,
+      createdOn: "2021-03-14",
+    });
+    await assert.rejects(() => getLiveAgreement(db, actorB, agreement.id), {
+      message: "ISOLATION_DENIED",
+    });
+    await assert.rejects(
+      () =>
+        insertLiveAgreement(db, actorB, {
+          id: `agr-live-stolen-${suffix}`,
+          customerId: customerA.id,
+          watchIds: [extra.id],
+          amount: 55000,
+          termMonths: 12,
+          delivery: "Desk arranges intake",
+          ownerName: "Live A",
+          email: customerA.email,
+          createdOn: "2021-03-14",
+        }),
+      { message: "ISOLATION_DENIED" },
+    );
+    await assert.rejects(
+      () =>
+        insertLiveAgreement(db, desk, {
+          id: agreement.id,
+          customerId: customerA.id,
+          watchIds: [extra.id],
+          amount: 55000,
+          termMonths: 12,
+          delivery: "Desk arranges intake",
+          ownerName: "Live A",
+          email: customerA.email,
+          createdOn: "2021-03-14",
+        }),
+      { message: "DUPLICATE_ID" },
     );
   });
 });
