@@ -1,7 +1,17 @@
 export type WatchStatus = "not_evaluated" | "reviewing" | "appraised";
 export type Role = "collector" | "staff" | "admin";
 export type UserStatus = "active" | "invited" | "suspended";
-export type PhotoKind = "front" | "back" | "left" | "more" | "buckle" | "papers" | "other";
+export type PhotoKind =
+  | "front"
+  | "back"
+  | "left"
+  | "right"
+  | "clasp"
+  | "more"
+  | "buckle"
+  | "box"
+  | "papers"
+  | "other";
 export type Appearance = "dark" | "light";
 
 export type Timepiece = {
@@ -11,6 +21,7 @@ export type Timepiece = {
   model: string;
   reference?: string;
   images: string[];
+  photoKinds?: PhotoKind[];
   status: WatchStatus;
   valueLow?: number;
   valueHigh?: number;

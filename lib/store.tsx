@@ -409,7 +409,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...watch.images.map((url, index) => ({
               id: nextId(`ph-${watch.id}-${index}`),
               url,
-              kind: (["front", "back", "left", "more"] as const)[index] ?? "other",
+              kind: watch.photoKinds?.[index] ?? (["front", "back", "left", "right", "clasp"] as const)[index] ?? "other",
               assetId: watch.id,
               caption: `${watch.brand} ${watch.model}`,
               uploadedAt: new Date().toISOString().slice(0, 10),

@@ -112,7 +112,7 @@ export default function AdminConfigPage() {
             checked={form.requireFourPhotos}
             onChange={(e) => setForm({ ...form, requireFourPhotos: e.target.checked })}
           />
-          Require front / back / left photos
+          Require the five guided shots (front, back, left, right, clasp)
         </label>
         {saved ? <p className="text-sm text-[#FCB040]">Configuration saved to this device.</p> : null}
         <PillButton type="submit" variant="gold" className="mt-4">

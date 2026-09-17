@@ -17,7 +17,7 @@ export default function CollectionSetupPage() {
             Welcome to Mechanical Art Capital
           </h2>
           <p className="text-[13px] leading-relaxed text-mac-muted">
-            Every registered member begins with a confidential, empty collection. Add timepieces one by one with front, back, and side photographs, matched against our manufacturer catalog.
+            Every registered member begins with a confidential, empty collection. Add timepieces one by one with guided photographs of the front, back, left and right sides of the barrel, and the clasp, matched against our manufacturer catalog.
           </p>
 
           <div className="rounded-2xl border border-mac-line bg-mac-card p-4 text-[12px] space-y-2 text-mac-muted">

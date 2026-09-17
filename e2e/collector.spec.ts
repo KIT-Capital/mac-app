@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { HALE, openCollectorAgreements, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
+import { HALE, completeTimepieceIntakePhotos, openCollectorAgreements, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
 
 test.describe("collector app", () => {
   test("splash shows the official lockup and collector actions", async ({ page }) => {
@@ -28,13 +28,13 @@ test.describe("collector app", () => {
     await expect(page.getByText(/Desk specialists are reviewing/i)).toBeVisible();
   });
 
-  test("saving a timepiece without photos uses an illustration", async ({ page }) => {
+  test("saving a timepiece without photos asks for the guided shots", async ({ page }) => {
     await signInHale(page);
     await page.getByRole("link", { name: "Add a timepiece" }).click();
-    await expect(page.getByText(/photorealistic illustration/i)).toBeVisible();
+    await expect(page.getByText(/right side of the barrel/i)).toBeVisible();
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Illustration").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Request Certified Appraisal" })).toBeVisible();
+    await expect(page.getByText(/Add a photo of the front of the timepiece/i)).toBeVisible();
+    await expect(page).toHaveURL(/\/collection\/add/);
   });
 
   test("promo HOUSE65 persists after navigation", async ({ page }) => {
@@ -65,6 +65,7 @@ test.describe("collector app", () => {
     await page.getByRole("button", { name: "Create Account" }).click();
     await expect(page.getByText("Welcome to Mechanical Art Capital")).toBeVisible();
     await page.getByRole("link", { name: "Add First Timepiece" }).click();
+    await completeTimepieceIntakePhotos(page);
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByRole("button", { name: "Enter Collection" }).click();
     await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
@@ -152,6 +153,7 @@ test.describe("collector app", () => {
     await page.getByRole("button", { name: /Missing a brand/i }).click();
     await page.getByPlaceholder("Manufacturer name").fill("De Bethune");
     await page.getByLabel(/Your Model/).fill("DB28");
+    await completeTimepieceIntakePhotos(page);
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("heading", { name: "DB28" })).toBeVisible();
     await signOutFromMenu(page);

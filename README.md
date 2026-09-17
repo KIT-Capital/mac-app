@@ -15,7 +15,7 @@ Collector app:
 - Splash, sign in, and create account (18+ and privacy consent) — welcome email via Resend
 - Empty vault for new members, then add pieces one by one
 - Collection grid: 2 columns on phone, 3 on iPad, 4 on desktop. Missing photos use a photorealistic illustration until a collector upload is on file.
-- Add a timepiece: front / back / left photos, catalog dropdowns, Save or Appraise
+- Add a timepiece: guided shots (front, back, left and right barrel, clasp), box and papers confirmation, catalog dropdowns, Save or Appraise
 - Sale-and-repurchase application (MAC buys; collector may buy back — not a loan)
 - Collection appraisal certificate
 - $4.99/month membership

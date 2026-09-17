@@ -24,9 +24,33 @@ import { readImageFile } from "@/lib/image";
 import { ownerKey } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
-import type { Timepiece } from "@/lib/types";
+import {
+  TIMEPIECE_SHOTS,
+  formatIntakeList,
+  intakePhotoErrors,
+  isShotRequired,
+  packShots,
+  slotsFromExisting,
+} from "@/lib/timepiece-shots.mjs";
+import type { PhotoKind, Timepiece } from "@/lib/types";
 
-const SLOTS = ["Front", "Back", "Left", "More"] as const;
+function photoKind(value: string): PhotoKind {
+  switch (value) {
+    case "front":
+    case "back":
+    case "left":
+    case "right":
+    case "clasp":
+    case "more":
+    case "buckle":
+    case "box":
+    case "papers":
+    case "other":
+      return value;
+    default:
+      throw new Error("UNKNOWN_SHOT_KIND");
+  }
+}
 
 function AddForm() {
   const params = useSearchParams();
@@ -52,9 +76,9 @@ function AddFormEditor() {
     if (isDesk(user)) return true;
     return ownerKey(w.ownerEmail) === ownerKey(user?.email);
   });
-  const [images, setImages] = useState<string[]>(() =>
-    existing ? [...existing.images, "", "", "", ""].slice(0, 4) : ["", "", "", ""],
-  );
+  const [images, setImages] = useState<string[]>(() => slotsFromExisting(existing?.images, existing?.photoKinds));
+  const [hasBox, setHasBox] = useState(() => Boolean(existing));
+  const [hasPapers, setHasPapers] = useState(() => Boolean(existing));
   const [videoName, setVideoName] = useState("");
   const [brand, setBrand] = useState(
     existing && TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])
@@ -87,6 +111,10 @@ function AddFormEditor() {
   const resolvedBrand = missingBrand ? customBrand.trim() : brand;
   const models = MODELS_BY_BRAND[brand] ?? catalog.filter((c) => c.brand === brand).map((c) => c.model);
 
+  const packedShots = packShots(images).map((shot) => ({
+    url: shot.url,
+    kind: photoKind(shot.kind),
+  }));
   const draft = useMemo(
     () =>
       ({
@@ -96,7 +124,8 @@ function AddFormEditor() {
         brand: resolvedBrand || "Untitled manufacturer",
         model: model || "Untitled model",
         reference,
-        images: images.filter(Boolean),
+        images: packedShots.map((shot) => shot.url),
+        photoKinds: packedShots.map((shot) => shot.kind),
         status: existing?.status ?? "not_evaluated",
         valueLow: existing?.valueLow,
         valueHigh: existing?.valueHigh,
@@ -128,7 +157,7 @@ function AddFormEditor() {
       draftId,
       existing,
       complication,
-      images,
+      packedShots,
       model,
       reference,
       resolvedBrand,
@@ -172,13 +201,15 @@ function AddFormEditor() {
     router.push(onboarding ? "/collection/continue" : `/collection/${stamped.id}`);
   }
 
-  function missingFields(forAppraise = false) {
-    const missing: string[] = [];
-    const uploaded = images.filter(Boolean).length;
-    const need = settings.requireFourPhotos ? 4 : 3;
-    if (forAppraise && uploaded < need) {
-      missing.push(need === 4 ? "four photographs" : "front, back, and left photos");
-    }
+  function missingFields() {
+    const missing = [
+      ...intakePhotoErrors({
+        slots: images,
+        hasBox,
+        hasPapers,
+        requireFourPhotos: settings.requireFourPhotos,
+      }),
+    ];
     if (!resolvedBrand) missing.push("a manufacturer");
     if (!model.trim()) missing.push("a model name");
     return missing;
@@ -186,18 +217,18 @@ function AddFormEditor() {
 
   function onSave(e: FormEvent) {
     e.preventDefault();
-    const missing = missingFields(false);
+    const missing = missingFields();
     if (missing.length) {
-      setError(`Add ${missing.join(" and ")}.`);
+      setError(`Add ${formatIntakeList(missing)}.`);
       return;
     }
     persist(draft);
   }
 
   function onAppraise() {
-    const missing = missingFields(true);
+    const missing = missingFields();
     if (missing.length) {
-      setError(`Add ${missing.join(" and ")}.`);
+      setError(`Add ${formatIntakeList(missing)}.`);
       return;
     }
     persist({ ...draft, status: "reviewing" }, true);
@@ -213,39 +244,61 @@ function AddFormEditor() {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-6">
           <div>
             <p className="text-[13px] text-mac-muted">
-              Please upload at least 4 images of the timepiece. Missing angles use a photorealistic
-              illustration until you add a photo.
+              Take each required photo so the desk can see the barrel from every side. Box and original
+              documentation photos are optional, but you must confirm you have both.
             </p>
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              {SLOTS.map((label, i) => (
-                <label key={label} className="group block cursor-pointer text-center">
-                  <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md border border-mac-line bg-mac-card text-[22px] font-light text-mac-faint">
-                    {images[i] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={images[i]} alt={label} className="h-full w-full object-cover" />
-                    ) : (
-                      <>
-                        <WatchPhoto
-                          src={null}
-                          watch={draft}
-                          alt=""
-                          className="opacity-55"
-                        />
-                        <span className="absolute inset-0 flex items-center justify-center text-white">+</span>
-                      </>
-                    )}
-                  </span>
-                  <span className="mt-1.5 block text-[9px] tracking-[0.16em] text-mac-faint uppercase">
-                    {label}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={(e) => onPick(i, e.target.files?.[0])}
-                  />
-                </label>
-              ))}
+            <div className="mt-4 space-y-3">
+              {TIMEPIECE_SHOTS.map((shot, i) => {
+                const required = isShotRequired(shot, settings.requireFourPhotos);
+                return (
+                  <label key={shot.kind} className="flex cursor-pointer items-center gap-3">
+                    <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-mac-line bg-mac-card text-[22px] font-light text-mac-faint">
+                      {images[i] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={images[i]} alt={shot.prompt} className="h-full w-full object-cover" />
+                      ) : (
+                        <>
+                          <WatchPhoto src={null} watch={draft} alt="" className="opacity-55" />
+                          <span className="absolute inset-0 flex items-center justify-center text-white">+</span>
+                        </>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] text-mac-fg">{shot.prompt}</span>
+                      <span className="mt-1 block text-[10px] tracking-[0.14em] text-mac-faint uppercase">
+                        {required ? "Required" : "Optional"}
+                      </span>
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      aria-label={shot.prompt}
+                      className="sr-only"
+                      onChange={(e) => onPick(i, e.target.files?.[0])}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-4 space-y-3 border-t border-mac-line pt-4">
+              <label className="flex items-start gap-3 text-[13px] text-mac-fg">
+                <input
+                  type="checkbox"
+                  checked={hasBox}
+                  onChange={(e) => setHasBox(e.target.checked)}
+                  className="mt-0.5 accent-[#0E2A44]"
+                />
+                I have the box
+              </label>
+              <label className="flex items-start gap-3 text-[13px] text-mac-fg">
+                <input
+                  type="checkbox"
+                  checked={hasPapers}
+                  onChange={(e) => setHasPapers(e.target.checked)}
+                  className="mt-0.5 accent-[#0E2A44]"
+                />
+                I have the original documentation
+              </label>
             </div>
           </div>
 

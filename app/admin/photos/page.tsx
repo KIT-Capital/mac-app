@@ -33,7 +33,7 @@ export default function AdminPhotosPage() {
         <label className="text-[12px] text-white/50">
           Kind
           <NativeSelect value={kind} onChange={(e) => setKind(e.target.value as PhotoKind)} className="mt-1 block w-40 border-b border-white/15">
-            {["front", "back", "left", "buckle", "papers", "other"].map((k) => (
+            {["front", "back", "left", "right", "clasp", "box", "papers", "buckle", "other"].map((k) => (
               <option key={k} value={k} className="bg-black">
                 {k}
               </option>
