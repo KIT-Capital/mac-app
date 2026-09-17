@@ -9,10 +9,11 @@ export const MAIL_KINDS = [
   "test",
 ] as const;
 
-export type MailKind = (typeof MAIL_KINDS)[number];
+export type RequestMailKind = (typeof MAIL_KINDS)[number];
+export type MailKind = RequestMailKind | "access";
 
 export type MailRequest = {
-  kind: MailKind;
+  kind: RequestMailKind;
   name: string;
   email: string;
   message?: string;
