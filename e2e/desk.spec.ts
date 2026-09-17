@@ -22,6 +22,13 @@ test.describe("desk", () => {
     expect(response.status()).toBe(403);
   });
 
+  test("live-book import requires a desk session and does not change the store", async ({ request }) => {
+    const response = await request.post("/api/desk/live-book-import", {
+      data: { payload: { agreements: [], timepieces: [] }, commit: true, confirmLiveImport: true },
+    });
+    expect(response.status()).toBe(403);
+  });
+
   test("desk pages require a desk session", async ({ request }) => {
     const response = await request.get("/admin");
     expect(response.status()).toBe(403);
