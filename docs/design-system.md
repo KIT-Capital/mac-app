@@ -24,7 +24,7 @@ Geist (`next/font/google`) is the app face. Do not switch to Inter or IBM Plex t
 
 ## Brand mark
 
-Official Logo-FF only: black gear, gray arc, three gold pinions with jewels. On dark, the gear is **solid white**, never a hollow outline or a white plate. No MB&F mark. No Norfolk brand tree.
+Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plus MECHANICAL ART CAPITAL on splash and sign-in. On dark, the gear is **solid white**, never a hollow outline or a white plate. Chrome uses the gear mark. No MB&F mark. No Norfolk brand tree.
 
 ## Layout
 
