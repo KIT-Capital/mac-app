@@ -15,7 +15,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
 - **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** `proxy.ts` returns 403 for `/admin` without a valid cookie. Moving the secret is a separate security plan.
-- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses schema-only branch `development`. **Verified** connectivity. Stage 1–5 and 7 tables exist on `development` only (probe, customers, timepieces, photos, applications, agreements, allocations, envelopes, archives, report snapshots). No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI still uses the browser store. Decision `0002`.
+- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses the isolated `development` branch. **Verified** connectivity. Stage 1–5 and 7 plus the live operations-book tables exist on `development` only. No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI uses the browser store by default and the scoped Neon path only when the development owner switch is enabled. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
 - **Verified collector access** — signed email verification and
@@ -57,4 +57,7 @@ worker are not wired. Official cash and inventory stay outside this app.
 
 ## Out of scope for Phase 1 Kit equip
 
-Framework rewrite, tRPC/MCP product surface, R2, Sentry, and enabling Neon Auth remain out of the Kit equip change. Dual-write and UI cutover stay behind an explicit flag.
+Framework rewrite, tRPC/MCP product surface, R2, Sentry, and enabling Neon Auth
+remain out of the Kit equip change. The UI cutover stays behind an explicit
+development flag. Dual-write is not an allowed holding pattern: import first,
+then switch reads and operation-level writes together.

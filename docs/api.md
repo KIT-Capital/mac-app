@@ -1,6 +1,6 @@
 # API
 
-**Tier: CONTRACT** · Last verified: 2026-09-16
+**Tier: CONTRACT** · Last verified: 2026-09-17
 
 There is no tRPC router. Server surface is App Router handlers. Everything else is client state.
 
@@ -97,12 +97,22 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 
 `lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same client module.
 
-The default repo operations book remains browser state. After tested import, the
+The default repo operations book remains browser state. After a tested staff import, the
 server-runtime owner switch moves reads and writes together to the scoped
 `/api/live-book` handlers. Catalog, shells, and desk settings remain browser-only.
-There is no tRPC or MCP procedure. Official cash and inventory stay outside this app.
+New browser-resized JPEG data previews remain local; ordinary live-book operations
+never send `data:` URLs. There is no tRPC or MCP procedure. The HTTP handlers are
+the shared human path, but an agent tool adapter remains an explicit parity
+exception. Official cash and inventory stay outside this app.
 
-Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces, original photos, applications, prepared agreement versions, mock signature envelopes, archived PDFs, and contract report snapshots on Neon `development`. There is no HTTP or tRPC procedure yet — that is a recorded exception to agent-native parity. Isolation is enforced in the repository and tested by `npm run test:db`. Do not dual-write the browser store until a cutover flag is approved. Do not add a server file proxy. Stage 6 ledger posting is deferred and is not this product’s books.
+Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces,
+original photos, applications, prepared agreement versions, mock signature
+envelopes, archived PDFs, and contract report snapshots on Neon `development`.
+Only the live operations book has an HTTP surface. The other repositories remain
+an agent-native exception. Isolation is enforced in the repository and tested by
+`npm run test:db`. Do not dual-write or auto-migrate the browser store. Do not add
+a server file proxy. Stage 6 ledger posting is deferred and is not this product’s
+books.
 
 ## Errors
 
