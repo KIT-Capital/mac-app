@@ -8,13 +8,18 @@ origin: owner brief 2026-09-15 (production repo desk)
 
 # Production persistence
 
-**Status:** active · Stage 1 Drizzle probe on Neon `development` only · browser store still live · no production migration
+**Status:** active · live-book adapter ready on Neon `development` · browser store remains default · owner flag off · no production migration
 
 Keep Next.js, React, TypeScript, Tailwind, and shadcn. Do not rewrite the framework. Do not run production migrations or deploy from this plan.
 
 ## Summary
 
-MAC must hold customer, timepiece, contract, and photo records on servers it controls. Today those records live in one browser `localStorage` blob. Neon **MAC App** and Doppler are connected for development. The app still reads and writes the browser store. Browser data stays until an explicit, tested migration path exists.
+MAC must hold customer, timepiece, contract, and photo records on servers it
+controls. Neon **MAC App** and Doppler are connected for development. The browser
+book remains the default and rollback source; staff can import it explicitly and
+the owner can switch reads and operation-level writes together with
+`MAC_LIVE_BOOK`. There is no dual-write or automatic migration. See
+`docs/plans/2026-09-17-001-feat-live-book-cutover-plan.md`.
 
 This app is the **repo operations book / analytics**. Official cash is QuickBooks. Official inventory is a third-party inventory book. Stage 6 (a MAC ledger) stays **deferred** and is **not this product’s books**. Do not treat a journal as the next UI stage.
 
@@ -23,23 +28,23 @@ This app is the **repo operations book / analytics**. Official cash is QuickBook
 | Area | Status | Notes |
 |---|---|---|
 | Collector/desk UI | Implemented | Next.js App Router |
-| Browser store `mac-app-state-v3` | Implemented | Live source of truth |
+| Browser store `mac-app-state-v3` | Implemented | Default source of truth; retained as rollback source |
 | Preview JPEGs (900px, q 0.82) | Implemented | Originals discarded on upload |
 | HTML “sign” flag | Implemented | Not a signed PDF |
 | Prototype money helpers | Implemented | Not accounting policy |
 | Splash “not a loan” e2e | Verified on a fresh `next dev` | `reuseExistingServer: !process.env.CI`; 23/23 passed 2026-09-15 |
 | Neon project MAC App | Verified | `withered-lake-05570428` — do not create another |
-| Branch `development` | Verified | Schema-only `br-summer-truth-a52brhnv` |
+| Branch `development` | Verified | Isolated `br-summer-truth-a52brhnv` |
 | Branch `production` | Verified | Default; local must not target it |
 | Doppler `dev` / `prd` | Verified | Plus `APP_ENV`; see env-separation plan |
 | `npm run db:ping` | Verified | `neondb` / Postgres 18.6 |
 | Drizzle Stage 1 | Verified | `mac_schema_probe` on `development` only; production and staging have no tables |
 | Neon Auth | Disabled | Keep off |
-| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; UI still browser; Stage 6 deferred / not this product’s books; mock signing |
-| Drizzle `customers` / `timepieces` | Verified | `development` only; UI still uses `localStorage` |
+| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; browser is default; Stage 6 deferred / not this product’s books; mock signing |
+| Drizzle `customers` / `timepieces` | Verified | `development` only; UI defaults to `localStorage`, with default-off live-book adapter |
 | Drizzle applications / agreements / archives / reports | Verified | `development` only; mock signing adapter; no ledger |
 | Desk-credential security PR | Proposed | Separate approval boundary |
-| Browser → server migration | Incomplete | No path yet; preserve local data |
+| Browser → server cutover | Ready, default off | Tested staff import and owner flag exist; no production cutover |
 
 ## Problem frame
 
@@ -142,7 +147,9 @@ Collector `/admin` and mail outbox must be **403 on the server**, not only a cli
 
 ## Migration approach
 
-1. Keep `lib/store.tsx` writing `mac-app-state-v3` until a dual-write or cutover flag is approved.
+1. Keep `mac-app-state-v3` as the default and rollback book. Import explicitly,
+   verify Neon, then switch reads and operation-level writes together with the
+   development-only owner flag. Never dual-write or auto-migrate.
 2. Development database uses **synthetic** fixtures only. No production customer information in seeds.
 3. Existing data URLs may be imported later as `legacy_preview`, labeled as previews, never as recovered originals.
 4. No automatic promotion of a browser blob to production.
@@ -150,11 +157,15 @@ Collector `/admin` and mail outbox must be **403 on the server**, not only a cli
 
 ## First end-to-end milestone
 
-The smallest **complete** business slice that can be implemented and verified:
+The smallest **complete** repo-operations slice that can be implemented and verified:
 
-**customer → timepiece → original photo → prepared contract → electronic signatures → retained signed PDF → recorded financial events → reconciled contract and company report.**
+**customer → timepiece → original photo → prepared contract → electronic signatures → retained signed PDF → recorded repo end → frozen contract report.**
 
-Thinning allowed inside that path: one synthetic collector, one watch, one original + one thumbnail, one template version, collector + MAC via a **signing adapter** (sandbox or recorded mock — provider purchase later), one retained PDF, one balanced posting pair whose **accounts the accountant names**, one contract statement + one company trial balance that match.
+Thinning allowed inside that path: one synthetic collector, one watch, one
+original + one thumbnail, one template version, collector + MAC via a **signing
+adapter** (sandbox or recorded mock — provider purchase later), one retained PDF,
+one six-label operations-book end, and one matching contract statement. Official
+cash and inventory reporting remain outside this app.
 
 That is Milestone A. It is not “database user exists.”
 
@@ -166,11 +177,13 @@ That is Milestone A. It is not “database user exists.”
 3. **Original photos (verified 2026-09-15)** — `photo_objects` on `development`; checksum must match before save; retry of the same digest is a no-op; collector isolation covers photos. Object store is an adapter (in-memory in tests; R2 when bucket, keys, and endpoint or account id are set). Preview data URLs stay in the UI. No server file proxy. `npm run r2:ping` is the development put probe.
 4. **Prepare contract + snapshots (verified 2026-09-15; hardened)** — collector application stays `submitted` until desk prepare; prepare is one transaction; a torn row is resumed; live allocations are unique per timepiece.
 5. **Sign + archive PDF (verified 2026-09-15)** — mock adapter; sign-complete and archive-success are different states; duplicate webhook is a no-op; archive retry does not duplicate the PDF; nobody may replace an archived PDF.
-6. **Ledger + snapshots (deferred — not this product’s books)** — official cash and inventory already live in QuickBooks and third-party inventory. A MAC journal, if ever, waits on accountant-named accounts. Do not invent buyback or book-value formulas. Do not implement Stage 6 to satisfy the live desk or collector UI. The live operations book (end kind, date, amount; derived open / past due) stays on the browser store until an explicit cutover flag.
+6. **Ledger + snapshots (deferred — not this product’s books)** — official cash and inventory already live in QuickBooks and third-party inventory. A MAC journal, if ever, waits on accountant-named accounts. Do not invent buyback or book-value formulas. Do not implement Stage 6 to satisfy the live desk or collector UI. The six-label operations book has its own default-off development adapter; it is not a ledger.
 7. **Reports (verified 2026-09-15 for contract statements)** — desk can freeze a contract statement from the prepared snapshot + archive checksum; regenerating a report does not mutate the archived PDF. Company trial balance waits on Stage 6.
 8. **Recovery drill** — restore database + files + PDFs + ledger together on `development`. Ledger restore waits on Stage 6.
 
-Stage 1 is the smallest **technical** increment after this pass. Milestone A is the smallest **complete** increment that satisfies the owner brief.
+Stages 1–5 and 7 establish the verified server foundation. The default-off
+live-book cutover is the current complete repo-operations increment; remaining
+Milestone A evidence work stays separate.
 
 ## Local commands
 
@@ -193,7 +206,7 @@ Stage 1 is the smallest **technical** increment after this pass. Milestone A is 
 |---|---|---|
 | `@neon/config` | `neon.ts` | Keep |
 | `@neon/env` | dependency of `@neon/config`; unused by app | Keep installed; do not import in app code |
-| `@neondatabase/serverless` | HTTP driver used by `tools/harness/neon-ping.mjs` | Keep; planned Drizzle driver |
+| `@neondatabase/serverless` | HTTP/WebSocket driver used by the harness and Drizzle repositories | Keep |
 | Neon Auth libraries | none | Do not add |
 | Drizzle | installed | Stage 1 probe on `development`; migrate via `DATABASE_URL_UNPOOLED` |
 
@@ -205,10 +218,10 @@ Conflict: `neon checkout` can pull `DATABASE_URL` into `.env.local` and fight Do
 - Desk routes and outbox are 403 without a staff session.
 - Photo is not “saved” until checksum verifies; retry does not duplicate the original.
 - Application is not executable until desk prepare freezes a version.
-- Sign-complete + archive-fail posts no purchase; retry archives once; duplicate webhook is a no-op.
+- Sign-complete + archive-fail records no repo end; retry archives once; duplicate webhook is a no-op.
 - Customer cannot delete or replace a signed PDF.
-- Appraisal change does not change book or cash.
-- Company report for date D matches the stored snapshot.
+- Appraisal change does not change the agreement amount or repo end.
+- Contract report for date D matches the stored agreement snapshot.
 - `NEON_BRANCH` under Doppler `dev` is `development`.
 - Splash suite still asserts the product is not a loan.
 
@@ -225,10 +238,13 @@ Conflict: `neon checkout` can pull `DATABASE_URL` into `.env.local` and fight Do
 
 ## Verification of this pass
 
-- Branches: `production` (default, empty public), `development` (`mac_schema_probe` + Drizzle log only), `staging` (empty public).
+- Branches: `production` (default, no product migrations from this plan),
+  `development` (Stages 1–5, 7, and live-book tables), and `staging`
+  (no product migration from this plan).
 - `.neon` branch: `development`.
 - Doppler `dev` injects `NEON_BRANCH=development`; `prd` injects `production`.
 - `npm run db:ping` and `npm run db:drizzle-ping` connected to `neondb` / development without printing URLs.
-- `npm run db:migrate` refused staging/production in unit tests and applied the probe only on `development`.
+- `npm run db:migrate` refused staging/production in unit tests and applies approved migrations only on `development`.
 - Playwright e2e strips `RESEND_API_KEY` so inquiries stay in the preview outbox.
-- No production migration. Browser store unchanged.
+- No production migration. Browser store remains the default and rollback source;
+  the development live-book adapter is ready but the owner flag remains off.

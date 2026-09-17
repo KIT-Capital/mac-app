@@ -24,6 +24,14 @@ Keep the slide layouts. Rewrite the loan words.
 5. **Sale & repurchase application** — hero photo, term (months), amount up to the appraisal purchase cap, delivery method, email, owner name, 18+, submit. No % scale or vault until the application is in.
 6. **Account** — Edit Profile / Log Out on the navy header, avatar, name, email, phone, then Membership / Promo Codes / Partners / Settings.
 
+## 2021 behavior detail
+
+The 2021 App Screenshots folder supplements the 2022 Limus deck only where the
+newer deck is silent: multi-piece repos, the on-screen agreement sequence, and
+Sign or download PDF. It does not
+replace the 2022 information architecture, dark/light chrome, or Logo-FF. Rewrite
+all 2021 financing and loan language to the sale-and-repurchase vocabulary above.
+
 ## Appearance
 
 Account → Settings has Dark and Light. Both are first-class, as in the deck. The admin desk stays dark.

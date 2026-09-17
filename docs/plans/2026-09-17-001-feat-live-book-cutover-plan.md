@@ -51,13 +51,13 @@ Staff on another machine cannot see the vault because the live book is one brows
 - R7. After **bought back**, **liquidated**, or **renewed**, those pieces are free unless the renewal moved them to the successor.
 - R8. Admin may renew a live repo: close it as **renewed** on the close date, amount = that month’s Scenario 60 repurchase dollars (`repurchaseDollars` for months held, last term month if past due). `(session-settled: user-directed — chosen over bought-back or original sale amount: old word is renewed; new repo starts at the scheduled price)`
 - R9. The successor is a new 12-month repo. It starts with the same pieces and that scheduled amount. The collector may add free pieces so desk LTV still covers the sale amount. They may raise the sale amount only up to that LTV cap.
-- R10. Renewal is staff/admin only. It does not post cash or inventory.
+- R10. Renewal is admin-only. It does not post cash or inventory.
 
 #### Agreement surfaces
 
 - R11. Collector and desk keep an on-screen repo and a downloadable PDF. Official filed copies stay outside the app.
 - R12. Visual chrome follows the 14 November 2022 Limus deck (`docs/design-reference.md`): dark/light pair, Logo-FF, two-column collection, application fields, account tiles. Do not use the MB&F mark.
-- R13. Product detail the 2022 deck omits comes from the 2021 App Screenshots folder: multi-piece repo, on-screen agreement pages, Sign or download PDF, appraisal PDF export, guided photos. Keep those behaviors. Do not copy 2021 “financing” words.
+- R13. Product detail the 2022 deck omits comes from the 2021 App Screenshots folder: multi-piece repo, on-screen agreement pages, and Sign or download PDF. Keep those behaviors. Do not copy 2021 “financing” words.
 
 #### Persistence cutover
 
@@ -70,7 +70,7 @@ Staff on another machine cannot see the vault because the live book is one brows
 ### Actors
 
 - A1. Collector — own rows only; cannot record an end or renew.
-- A2. Staff — desk book, ends, renewal, import (with admin).
+- A2. Staff — desk book, generic ends, and import (with admin).
 - A3. Admin — staff verbs plus owner switch is not a desk toy; the switch is a Doppler flag the owner sets.
 
 ### Key Flows
@@ -115,7 +115,7 @@ Desk on a second machine can, after import and flag, see the same book the colle
 
 ### Key Technical Decisions
 
-- KTD1. New focused plan file. `(session-settled: user-directed — chosen over rewriting docs/plans/2026-09-15-production-persistence.md: that file still holds Milestone A and leftover dual-write wording)`
+- KTD1. New focused plan file. `(session-settled: user-directed — chosen over replacing docs/plans/2026-09-15-production-persistence.md: that living roadmap retains Milestone A while this plan governs the live-book cutover)`
 - KTD2. Sixth end kind `renewed` on `AgreementEnd`. Persist kind, date, amount only. Derive open / past due in `lib/contract/repo-book.mjs`. Governs R3, R8.
 - KTD3. Exclusive live set = agreements whose `bookLabel` is open, past due, or in liquidation. Check on `createAgreement` and on renewal piece move. Governs R6.
 - KTD4. Renewal amount is `repurchaseDollars` for months from `createdAt` to the close date, clamped to `1..termMonths`. After term, use `termMonths`. New repo `termMonths` is 12. New `scale` from `agreementScaleFromDesk`. Governs R8, R9.
@@ -372,7 +372,7 @@ Confirmed against Next.js 16 (closest pin 16.2.9) and Drizzle ORM 0.45 / kit 0.3
 
 **Files:**
 - Modify: `docs/business-logic.md`, `docs/architecture.md`, `docs/api.md`, `docs/design-reference.md` (pointer to 2021 agreement/PDF detail only)
-- Modify: `docs/plans/2026-09-15-production-persistence.md` only to strike dual-write as an allowed holding pattern and point at this plan
+- Modify: `docs/plans/2026-09-15-production-persistence.md` to remove dual-write as an allowed holding pattern, point at this plan, and align its status, capability, milestone, acceptance, and verification sections
 - Modify: `docs/README.md` router line for this plan
 
 **Approach:**
@@ -444,5 +444,5 @@ Confirmed against Next.js 16 (closest pin 16.2.9) and Drizzle ORM 0.45 / kit 0.3
 - Limus deck 14 November 2022 (visual chrome). Dropbox: `Cidale Interests/Companies/Mechanical Art Capital/Vladimir/MechanicalArt_MB&F_Presentation_11-14-22.pdf`
 - 2021 App Screenshots folder (agreement/PDF/multi-piece detail). Dropbox: `Cidale Interests/Companies/Mechanical Art Capital/App/App Screenshots`
 - `docs/plans/2026-09-16-001-feat-repo-operations-book-plan.md` (completed five-label book; dual-write rejected)
-- `docs/plans/2026-09-15-production-persistence.md` (living status; browser → server incomplete)
+- `docs/plans/2026-09-15-production-persistence.md` (living status; development cutover ready and default off)
 - `lib/store.tsx`, `lib/contract/repo-book.mjs`, `lib/contract/repo-scale.mjs`, `lib/db/schema.ts`
