@@ -19,7 +19,7 @@ Keep the slide layouts. Rewrite the loan words.
 
 1. **Splash** — “Unbiased appraisals of premium timepieces.” Get Started (filled) + Sign In (navy). Official Logo-FF lockup, never the MB&F mark.
 2. **Splash options** — same screen in dark and light.
-3. **Add a timepiece** — at least four photos (front / back / left / more), optional video, manufacturer, missing-a-brand, model, reference, condition, box and papers, case metal / type / diameter, dial, buckle, strap or metal bracelet, Save + Appraise. After Appraise, only the desk can edit.
+3. **Add a timepiece** — guided required photos (front, back, left side of barrel, right side of barrel, clasp), optional box and papers photos, collector statements that they have the box and original documentation, optional video, manufacturer, missing-a-brand, model, reference, condition, box and papers, case metal / type / diameter, dial, buckle, strap or metal bracelet, Save + Appraise. After Appraise, only the desk can edit.
 4. **My Timepieces** — two-column grid, Appraised / Reviewing, PDF export, membership banner, `+` FAB. Tabs: Timepieces, Repurchase, Contact us, Account.
 5. **Sale & repurchase application** — hero photo, term (months), amount up to the appraisal purchase cap, delivery method, email, owner name, 18+, submit. No % scale or vault until the application is in.
 6. **Account** — Edit Profile / Log Out on the navy header, avatar, name, email, phone, then Membership / Promo Codes / Partners / Settings.

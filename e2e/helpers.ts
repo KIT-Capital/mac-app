@@ -47,3 +47,29 @@ export async function signOutFromMenu(page: Page) {
   }
   await expect(page.getByRole("heading", { name: "Sign In to Your Collection" })).toBeVisible();
 }
+
+const INTAKE_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+const REQUIRED_SHOT_PROMPTS = [
+  "Take a photo of the front of the timepiece",
+  "Take a photo of the back of the timepiece",
+  "Take a photo of the left side of the barrel",
+  "Take a photo of the right side of the barrel",
+  "Take a photo of the clasp",
+] as const;
+
+export async function completeTimepieceIntakePhotos(page: Page) {
+  for (const prompt of REQUIRED_SHOT_PROMPTS) {
+    await page.getByLabel(prompt, { exact: true }).setInputFiles({
+      name: `${prompt}.png`,
+      mimeType: "image/png",
+      buffer: INTAKE_PNG,
+    });
+    await expect(page.getByRole("img", { name: prompt })).toBeVisible();
+  }
+  await page.getByRole("checkbox", { name: "I have the box" }).check();
+  await page.getByRole("checkbox", { name: "I have the original documentation" }).check();
+}
