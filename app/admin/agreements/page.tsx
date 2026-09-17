@@ -95,8 +95,25 @@ function LiveBookImportPanel() {
         setReport(body.error || "Import could not run.");
         return;
       }
+      let previewCount = 0;
+      if (commit) {
+        for (const watch of store.timepieces) {
+          const previewUrl = (watch.images ?? []).find((image) => String(image).startsWith("data:"));
+          if (!previewUrl) continue;
+          const preview = await fetch("/api/desk/live-book-preview", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ timepieceId: watch.id, previewUrl, kind: "legacy_preview" }),
+          });
+          if (preview.ok) previewCount += 1;
+        }
+      }
       setReport(
-        `${commit ? "Imported" : "Dry-run"}: ${body.plan?.customers?.length ?? 0} people, ${body.plan?.timepieces?.length ?? 0} pieces, ${body.plan?.agreements?.length ?? 0} repos. The collector screen still reads this browser.`,
+        `${commit ? "Imported" : "Dry-run"}: ${body.plan?.customers?.length ?? 0} people, ${body.plan?.timepieces?.length ?? 0} pieces, ${body.plan?.agreements?.length ?? 0} repos${
+          commit && previewCount ? `, ${previewCount} previews` : ""
+        }. The collector screen still reads this browser.`,
       );
     } catch {
       setReport("Import could not run.");
@@ -109,8 +126,9 @@ function LiveBookImportPanel() {
     <section className="mt-10 space-y-3 border border-white/25 bg-[#222] p-4">
       <h2 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">Development book import</h2>
       <p className="text-[12px] text-white/55">
-        Staff can copy this browser book onto Neon development. Preview photos that are still data URLs stay
-        off this request. The owner flag stays off.
+        Staff can copy this browser book onto Neon development. Preview photos that are still data URLs
+        stay off the main request and follow one at a time after a successful import. The owner flag stays
+        off.
       </p>
       <label className="flex items-center gap-2 text-[12px] text-white/70">
         <input

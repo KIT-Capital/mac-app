@@ -30,8 +30,16 @@ export async function commitLiveBookImport(
     throw new Error("LIVE_BOOK_FLAG_ON");
   }
   const existingCustomers = await db.select({ id: customers.id, email: customers.email }).from(customers);
+  const existingTimepieces = await db
+    .select({ id: timepieces.id, customerId: timepieces.customerId })
+    .from(timepieces);
+  const existingAgreements = await db
+    .select({ id: liveAgreements.id, customerId: liveAgreements.customerId })
+    .from(liveAgreements);
   const plan = planLiveBookImport(payload, {
     existingCustomers,
+    existingTimepieces,
+    existingAgreements,
     confirmLiveImport: options.confirmLiveImport,
     env: options.env,
   });
@@ -89,6 +97,17 @@ export async function commitLiveBookImport(
             reference: watch.reference,
             status: watch.status,
             financeable: watch.financeable,
+            condition: watch.condition,
+            boxPapers: watch.boxPapers,
+            caseMetal: watch.caseMetal,
+            caseType: watch.caseType,
+            caseDiameter: watch.caseDiameter,
+            dialColor: watch.dialColor,
+            buckle: watch.buckle,
+            band: watch.band === "bracelet" ? "bracelet" : "strap",
+            bandMaterial: watch.bandMaterial,
+            complication: watch.complication,
+            assetCode: watch.assetCode,
             valueLowCents: dollarsToCents(watch.valueLow),
             valueHighCents: dollarsToCents(watch.valueHigh),
             updatedAt: new Date(),
@@ -145,7 +164,9 @@ export async function commitLiveBookImport(
           })),
         );
       }
-      if (agreement.bookEnd) {
+      if (!agreement.bookEnd) {
+        await tx.delete(liveAgreementEnds).where(eq(liveAgreementEnds.agreementId, agreement.id));
+      } else {
         const endCents = dollarsToCents(agreement.bookEnd.amount);
         if (endCents === null) {
           throw new Error("INVALID_DOLLAR_AMOUNT");

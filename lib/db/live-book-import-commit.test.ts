@@ -84,11 +84,47 @@ describe("commitLiveBookImport", { skip }, () => {
     assert.equal(loaded?.bookEnd, null);
     assert.deepEqual(loaded?.watchIds.sort(), haleExport.timepieces.map((watch) => watch.id).sort());
 
-    const second = await commitLiveBookImport(db, desk, haleExport, { confirmLiveImport: true });
+    const second = await commitLiveBookImport(
+      db,
+      desk,
+      {
+        ...haleExport,
+        timepieces: haleExport.timepieces.map((watch, index) =>
+          index === 0 ? { ...watch, condition: "Serviced", boxPapers: "Box only" } : watch,
+        ),
+      },
+      { confirmLiveImport: true },
+    );
     assert.equal(second.ok, true);
     const again = await getLiveAgreement(db, desk, haleExport.agreements[0].id);
     assert.equal(again?.id, loaded?.id);
     assert.equal(again?.amountCents, 20000000);
+    const [piece] = await db.select().from(timepieces).where(inArray(timepieces.id, [haleExport.timepieces[0].id]));
+    assert.equal(piece?.condition, "Serviced");
+    assert.equal(piece?.boxPapers, "Box only");
+
+    const ended = await commitLiveBookImport(
+      db,
+      desk,
+      {
+        ...haleExport,
+        agreements: [
+          {
+            ...haleExport.agreements[0],
+            bookEnd: { kind: "bought_back", date: "2022-01-15", amount: 220000 },
+          },
+        ],
+      },
+      { confirmLiveImport: true },
+    );
+    assert.equal(ended.ok, true);
+    const withEnd = await getLiveAgreement(db, desk, haleExport.agreements[0].id);
+    assert.equal(withEnd?.bookEnd?.kind, "bought_back");
+
+    const cleared = await commitLiveBookImport(db, desk, haleExport, { confirmLiveImport: true });
+    assert.equal(cleared.ok, true);
+    const withoutEnd = await getLiveAgreement(db, desk, haleExport.agreements[0].id);
+    assert.equal(withoutEnd?.bookEnd, null);
   });
 
   it("refuses commit after the owner flag", async () => {

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { createDb } from "@/lib/db/client";
 import { commitLiveBookImport } from "@/lib/db/live-book-import-commit";
 import { liveBookFlagOn, planLiveBookImport } from "@/lib/db/live-book-import.mjs";
-import { customers } from "@/lib/db/schema";
+import { customers, liveAgreements, timepieces } from "@/lib/db/schema";
 import { deskActor } from "@/lib/db/records";
 import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
@@ -36,7 +36,18 @@ export async function POST(request: Request) {
   const confirmLiveImport = Boolean(body?.confirmLiveImport);
   const db = createDb();
   const existingCustomers = await db.select({ id: customers.id, email: customers.email }).from(customers);
-  const plan = planLiveBookImport(payload, { existingCustomers, confirmLiveImport });
+  const existingTimepieces = await db
+    .select({ id: timepieces.id, customerId: timepieces.customerId })
+    .from(timepieces);
+  const existingAgreements = await db
+    .select({ id: liveAgreements.id, customerId: liveAgreements.customerId })
+    .from(liveAgreements);
+  const plan = planLiveBookImport(payload, {
+    existingCustomers,
+    existingTimepieces,
+    existingAgreements,
+    confirmLiveImport,
+  });
 
   if (!body?.commit) {
     return json({ dryRun: true, plan });
