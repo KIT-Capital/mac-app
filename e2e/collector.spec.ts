@@ -241,6 +241,23 @@ test.describe("collector app", () => {
     await expect(page.getByRole("link", { name: /MAC-31419/ }).getByText("past due")).toBeVisible();
   });
 
+  test("Hale agreement preview is pending counsel and is not a stored document", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 810 });
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await page.getByRole("link", { name: /MAC-31419/ }).click();
+    await expect(page.getByText(/pending legal approval/i).first()).toBeVisible();
+    await expect(page.getByText(/not for signature/i).first()).toBeVisible();
+    await expect(page.getByText(/not a loan/i)).toBeVisible();
+    await expect(page.getByText(/\bstored document\b/i)).toHaveCount(0);
+    await expect(page.getByText(/\bofficial\b/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /delete/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "View preview" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Download contract PDF" })).toBeVisible();
+    await expect(page.getByText(/Temporary preview — not stored/i)).toBeVisible();
+    await expect(page.getByText(/Electronic signing is not available/i)).toBeVisible();
+  });
+
   test("new collector agreements list keeps the empty sale-and-repurchase copy", async ({ page }) => {
     await page.goto("/signup");
     await page.getByLabel("Full Legal Name").fill("Ada Locke");

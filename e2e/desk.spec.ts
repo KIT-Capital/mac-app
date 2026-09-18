@@ -59,6 +59,14 @@ test.describe("desk", () => {
     await expect(outbox.json()).resolves.toEqual({ error: "Desk session required." });
   });
 
+  test("desk repo detail does not claim a stored document in browser mode", async ({ page }) => {
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).first().click();
+    await expect(page.getByText(/No stored document in browser mode/i)).toBeVisible();
+    await expect(page.getByText(/\bofficial\b/i)).toHaveCount(0);
+  });
+
   test("desk login opens overview and client assets", async ({ page }) => {
     await signInDesk(page);
     await expect(page.getByText("Assets", { exact: true })).toBeVisible();
@@ -194,8 +202,8 @@ test.describe("desk", () => {
     await expect(page.getByRole("button", { name: "Renew" })).toHaveCount(0);
     await successor.click();
     await expect(page.getByText(/Book:\s*open/i)).toBeVisible();
-    await expect(page.getByText(/Richard Mille/)).toBeVisible();
-    await expect(page.getByText(/Nautilus/)).toBeVisible();
+    await expect(page.getByText(/Richard Mille/).first()).toBeVisible();
+    await expect(page.getByText(/Nautilus/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Download contract PDF" })).toBeVisible();
   });
 
