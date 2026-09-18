@@ -74,8 +74,8 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 |---|---|---|---|
 | `APP_ENV` | Mapping guard | Doppler + Railway production/Development | `development` · `staging` · `preview` · `production`. Required when any database URL is set |
 | `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Production/Development `https://mechart.app` · staging Railway host |
-| `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default applies only when `APP_ENV=development`; elsewhere a missing value fails closed (`DESK_SESSION_SECRET_REQUIRED`). Replaced by `DESK_SESSION_KEYS` in U4 |
-| `DESK_SESSION_KEYS` | Desk key set | Readiness check only | Staging and production must set a non-empty value or the app reports `DESK_SESSION_KEYS_REQUIRED`; format and verification arrive in U4 |
+| `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default applies only when `APP_ENV=development`; elsewhere a missing value fails closed (`DESK_SESSION_SECRET_REQUIRED`). Staging and production live mode reports unavailable without it. Replaced by `DESK_SESSION_KEYS` in U4 |
+| `DESK_SESSION_KEYS` | Desk key set | U4 | Format and verification arrive in U4; U1 readiness checks `DESK_SESSION_SECRET` because that is what tokens consume today |
 | `MAC_LIVE_BOOK` | Live-book mode | Implemented, default off | Only `1`, `true`, or `on`. Off is browser mode for development and Playwright. May be on in development, staging, and production; **production requires it** and exits with `PRODUCTION_REQUIRES_LIVE_BOOK` otherwise |
 | `COLLECTOR_SESSION_SECRET` | Collector verification and session HMAC | Required when live book is on | No committed or runtime fallback |
 | `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin outside development; development may use HTTP localhost. Missing is `COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED`, malformed is `..._INVALID` |
@@ -102,7 +102,7 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | Class | Condition | Effect |
 |---|---|---|
 | Exit | `APP_ENV=production` with `MAC_LIVE_BOOK` off (`PRODUCTION_REQUIRES_LIVE_BOOK`), or the database mapping fails | The process exits before serving. Railway restarts it; nothing is served |
-| Unavailable | Staging or production with the flag on and any of `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, `RESEND_API_KEY`, `DESK_SESSION_KEYS`, the R2 names, or `DATABASE_URL` missing | The process stays up. Every live route answers `503 { mode: "unavailable", error }` and the app renders one unavailable page in place of every route |
+| Unavailable | Staging or production with the flag on and any of `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, `RESEND_API_KEY`, `DESK_SESSION_SECRET`, the R2 names, or `DATABASE_URL` missing | The process stays up. Every live route answers `503 { mode: "unavailable", error }` and the app renders one unavailable page in place of every route |
 
 Development is not governed: flag off is browser mode; flag on with a missing prerequisite behaves as before (`503` with the code, store mode `unknown`). Staging with the flag off is browser mode.
 

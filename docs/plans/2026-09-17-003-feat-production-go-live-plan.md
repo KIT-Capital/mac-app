@@ -316,7 +316,7 @@ After U13, U3 ships before U4 because U4 reuses U3's `access_rate_limits` table 
 
 **Approach:**
 1. Widen `evaluateLiveBookConfig` per KTD2; keep the HTTP-localhost allowance for development only.
-2. Add `evaluateProductionReadiness` per KTD1 and call it from the startup guard and `instrumentation.ts`; only flag-off in production and a failed database mapping exit the process; the rest report as unavailable. U1 checks only that `DESK_SESSION_KEYS` is non-empty; parsing, `kid` verification, and the development alias arrive in U4 (KTD8). No database import at module top.
+2. Add `evaluateProductionReadiness` per KTD1 and call it from the startup guard and `instrumentation.ts`; only flag-off in production and a failed database mapping exit the process; the rest report as unavailable. U1 checks only that `DESK_SESSION_SECRET` is non-empty (that is what desk tokens consume today); `DESK_SESSION_KEYS` parsing, `kid` verification, and the development alias arrive in U4 (KTD8). No database import at module top.
 3. Add `unavailableResponse()` and use it in every live route listed above when the live evaluator fails in staging or production.
 4. Store: add the distinct `unavailable` mode per KTD1; `components/app-frame.tsx` renders the unavailable page (content per KTD1) for every route and suppresses page fetches; the agreement page treats a non-live body as unavailable when the server says so.
 5. Import route and `evaluatePdfMintPolicy` refuse when `APP_ENV=production` with a named error before body parsing.

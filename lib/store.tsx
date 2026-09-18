@@ -23,6 +23,7 @@ import { nextId } from "@/lib/ids";
 import {
   mergeLocalDataPreviews,
   liveBookFailureState,
+  liveDeskOverlay,
   operationDisposition,
   parseLiveBookResponse,
   parseLiveBookMutationResponse,
@@ -45,6 +46,7 @@ import {
   validateRecordedEndKind,
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
+import { DEFAULT_SETTINGS } from "@/lib/theme";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
   browserSessionStorage,
@@ -186,7 +188,7 @@ function enterUnavailableMode(base: AppState) {
 }
 
 function mergeBook(
-  base: AppState,
+  _base: AppState,
   book: BookState,
   viewer: { role: string; email: string; customerId?: string },
 ): AppState {
@@ -200,9 +202,12 @@ function mergeBook(
     : authenticated as Profile | null;
   const counts = ownedCounts(sessionUser?.email, mergedBook.timepieces, mergedBook.agreements);
   if (sessionUser) writeSessionUser(storage, sessionUser);
+  const desk = liveDeskOverlay(mergedBook);
   return {
-    ...base,
     ...mergedBook,
+    catalog: desk.catalog,
+    shells: desk.shells,
+    settings: desk.settings ?? DEFAULT_SETTINGS,
     hydrated: true,
     user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
   };

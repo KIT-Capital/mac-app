@@ -5,6 +5,7 @@ import {
 } from "@/lib/collector-access.mjs";
 import { verifyCollectorAccess } from "@/lib/collector-access.server";
 import { DESK_COOKIE } from "@/lib/desk-session";
+import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 function errorStatus(message: string) {
   if (message === "COLLECTOR_INACTIVE") return 403;
@@ -23,6 +24,8 @@ function errorStatus(message: string) {
 }
 
 export async function GET(request: Request) {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   const token = new URL(request.url).searchParams.get("token");
   if (!token) {
     return Response.json({ error: "TOKEN_REQUIRED" }, { status: 400 });

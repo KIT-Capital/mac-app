@@ -43,9 +43,9 @@ Production never serves the browser or demo store (R1). `lib/env/production-read
 exits the process before serving when `APP_ENV=production` and `MAC_LIVE_BOOK` is off
 (`PRODUCTION_REQUIRES_LIVE_BOOK`) or the database mapping fails. Any other missing live
 prerequisite in staging or production (session secret, origin, Resend key,
-`DESK_SESSION_KEYS`, R2 names, `DATABASE_URL`) keeps the process up but puts the app in
+`DESK_SESSION_SECRET`, R2 names, `DATABASE_URL`) keeps the process up but puts the app in
 the **unavailable** state: every live route (`/api/live-book`, `/api/collector-session`,
-`/api/agreement-documents`, `/api/desk-session`, `/api/mail`, `/api/desk/*`) answers
+`/api/collector-session/verify`, `/api/agreement-documents`, `/api/desk-session`, `/api/mail`, `/api/desk/*`) answers
 `503 { mode: "unavailable", error }` through one `unavailableResponse()` helper, the
 store stops re-checking, and `components/app-frame.tsx` renders one unavailable page
 (lockup, one sentence, `info@mechartcap.com`, "Try again" full reload) in place of every
