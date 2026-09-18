@@ -21,7 +21,7 @@ Key **names** only. Values belong in Doppler or Railway variables. See `.env.exa
 | PR / ephemeral Railway envs | none observed | No PR preview environments |
 | Doppler workplace | KIT Capital | Project `mac-app` |
 | Doppler configs | `dev`, `prd`, `stg`, `dev_personal` | None inherit; `stg` has staging Neon URLs |
-| Local Doppler | `doppler.yaml` → `dev` | `npm run dev`, `db:ping`, `db:guard`, `db:migrate`, `db:drizzle-ping`, `r2:ping` |
+| Local Doppler | `doppler.yaml` → `dev` | `npm run dev`, `db:ping`, `db:guard`, `db:migrate`, `db:migrate:staging`, `db:migrate:production`, `db:generate`, `db:drizzle-ping`, `r2:ping` |
 | Neon org | KIT Capital / `org-snowy-silence-89826884` | Do not create another project |
 | Neon project | MAC App / `withered-lake-05570428` | `aws-us-east-2` · Postgres 18 · database `neondb` |
 | Neon `development` | `br-summer-truth-a52brhnv` | Schema-only · endpoint `ep-red-union-a5fze04l` |
@@ -53,7 +53,7 @@ The Next.js runtime still does not open a database connection. The live checks u
 |---|---|---|
 | App / startup | pooled + unpooled if they match | `start-mac-app.mjs` and `instrumentation.ts`. Unpooled on the app service is a follow-up |
 | Guard / ping | pooled + unpooled if they match | `npm run db:guard` · `npm run db:ping` |
-| Migrate | `DATABASE_URL_UNPOOLED` only | `npm run db:migrate` · development only · production and staging rejected |
+| Migrate | `DATABASE_URL_UNPOOLED` only | `npm run db:migrate` · development default · `db:migrate:staging` · `db:migrate:production --confirm-production` |
 
 `DATABASE_URL_UNPOOLED` is in Doppler only. It is not on the Railway `mac-app` service in Development, staging, or production.
 
@@ -110,6 +110,6 @@ Development is not governed: flag off is browser mode; flag on with a missing pr
 
 `GET /api/health` is the Railway health check (`railway.json`). It is `force-dynamic`, `Cache-Control: no-store`, and returns `{ ok, appEnv, checks: { database, liveBook } }` with codes only: `database` is `ok`, `NOT_CONFIGURED` (no `DATABASE_URL`), a mapping code, or `DATABASE_UNREACHABLE` (any driver error or a 3-second timeout); `liveBook` is `ok`, `browser`, or the first missing prerequisite by name. Status is `200` when `ok`, else `503`. No URL, hostname, secret, or driver message appears in the body.
 
-Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. `npm run r2:ping` puts, HEADs, and deletes a `dev-probes/` object; it runs only when `APP_ENV` is `development` and prints no secrets. GitHub `quality` runs `lint`, `test:unit`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
+Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` by default. Staging and production apply only through `db:migrate:staging` and `db:migrate:production --confirm-production` over `DATABASE_URL_UNPOOLED`. `npm run db:schema-check` fails CI on snapshot drift. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. `npm run r2:ping` puts, HEADs, and deletes a `dev-probes/` object; it runs only when `APP_ENV` is `development` and prints no secrets. GitHub `quality` runs `lint`, `test:unit`, `db:schema-check`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
 
 Do not move mail or demo logins to `@mechart.app`.
