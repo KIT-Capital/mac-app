@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { maxPurchaseAmount } from "@/lib/catalog";
 import {
   applyAgreementEnd,
@@ -9,11 +9,17 @@ import {
 } from "@/lib/contract/repo-book.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { parseLiveBookOperation } from "@/lib/live-book-operation.mjs";
+import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import type { Agreement } from "@/lib/types";
 import type { Database } from "./client";
 import { liveAgreementHasDocuments } from "./agreement-documents";
 import { dollarsToCents } from "./money.mjs";
+import {
+  lockStaffForDeskMutation,
+  writeDeskAudit,
+} from "./staff-accounts";
 import type { Actor } from "./records";
+import { deskActor } from "./records";
 import {
   agreements as preparedAgreements,
   allocations,
@@ -25,12 +31,15 @@ import {
   liveAgreements,
   livePreviews,
   photoObjects,
+  staffAccounts,
   timepieces,
 } from "./schema";
 
 type Operation = ReturnType<typeof parseLiveBookOperation>;
 
-function isDesk(actor: Actor) {
+function isDesk(
+  actor: Actor,
+): actor is Extract<Actor, { role: "staff" | "admin" }> {
   return actor.role === "staff" || actor.role === "admin";
 }
 
@@ -51,7 +60,7 @@ async function ownedAgreement(db: Database, actor: Actor, id: string) {
   const where = actor.role === "collector"
     ? and(eq(liveAgreements.id, id), eq(liveAgreements.customerId, actor.customerId))
     : eq(liveAgreements.id, id);
-  const [agreement] = await db.select().from(liveAgreements).where(where).limit(1);
+  const [agreement] = await db.select().from(liveAgreements).where(where).for("update").limit(1);
   if (!agreement) throw new Error("AGREEMENT_NOT_FOUND");
   const [members, ends] = await Promise.all([
     db.select().from(liveAgreementMembers).where(eq(liveAgreementMembers.agreementId, id)),
@@ -100,7 +109,81 @@ function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
   };
 }
 
+const AUDITED_DESK_ACTIONS = new Set([
+  "customer.update",
+  "customer.remove",
+  "customer.invite",
+  "timepiece.update",
+  "timepiece.deskUpdate",
+  "timepiece.remove",
+  "agreement.updateScale",
+  "agreement.markSigned",
+  "agreement.recordEnd",
+  "agreement.clearEnd",
+  "agreement.renew",
+  "agreement.remove",
+  "preview.remove",
+]);
+const LOCKED_AGREEMENT_ACTIONS = new Set([
+  "agreement.create",
+  "agreement.updateScale",
+  "agreement.signCollector",
+  "agreement.markSigned",
+  "agreement.recordEnd",
+  "agreement.clearEnd",
+  "agreement.renew",
+  "agreement.addWatches",
+  "agreement.setAmount",
+  "agreement.remove",
+]);
+
 export async function executeLiveBookOperation(
+  db: Database,
+  actor: Actor,
+  input: unknown,
+  options: { clientAddress?: string; env?: NodeJS.ProcessEnv } = {},
+) {
+  const operation = parseLiveBookOperation(input) as Operation & Record<string, unknown>;
+  if (
+    isDesk(actor) &&
+    isLiveBookEnabled((options.env ?? process.env).MAC_LIVE_BOOK) &&
+    AUDITED_DESK_ACTIONS.has(operation.action)
+  ) {
+    if (!actor.staffId) throw new Error("SESSION_INVALID");
+    const staffId = actor.staffId;
+    return db.transaction(async (tx) => {
+      const staff = await lockStaffForDeskMutation(tx, {
+        id: staffId,
+        email: actor.email,
+        role: actor.role,
+      });
+      const trusted = deskActor(staff.role, staff.email, staff.id);
+      await executeLiveBookOperationCore(tx as unknown as Database, trusted, operation);
+      const targetId = typeof operation.id === "string"
+        ? operation.id
+        : typeof operation.timepiece === "object" && operation.timepiece
+          ? String((operation.timepiece as Record<string, unknown>).id ?? "")
+          : typeof operation.customer === "object" && operation.customer
+            ? String((operation.customer as Record<string, unknown>).id ?? "")
+            : null;
+      await writeDeskAudit(
+        tx,
+        staff,
+        operation.action,
+        targetId ?? "",
+        options.clientAddress ?? "unknown",
+      );
+    });
+  }
+  if (LOCKED_AGREEMENT_ACTIONS.has(operation.action)) {
+    return db.transaction((tx) =>
+      executeLiveBookOperationCore(tx as unknown as Database, actor, operation)
+    );
+  }
+  return executeLiveBookOperationCore(db, actor, operation);
+}
+
+async function executeLiveBookOperationCore(
   db: Database,
   actor: Actor,
   input: unknown,
@@ -157,11 +240,18 @@ export async function executeLiveBookOperation(
     const customer = operation.customer as Record<string, unknown>;
     const id = String(customer.id);
     const email = String(customer.email);
-    const [collision] = await db.select({ id: customers.id, email: customers.email })
-      .from(customers)
-      .where(or(eq(customers.id, id), eq(customers.email, email)))
-      .limit(1);
-    if (collision) throw new Error("ID_COLLISION");
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
+    const [customerCollision, staffCollision] = await Promise.all([
+      db.select({ id: customers.id, email: customers.email })
+        .from(customers)
+        .where(or(eq(customers.id, id), eq(customers.email, email)))
+        .limit(1),
+      db.select({ id: staffAccounts.id }).from(staffAccounts)
+        .where(eq(staffAccounts.email, email))
+        .limit(1),
+    ]);
+    if (customerCollision[0]) throw new Error("ID_COLLISION");
+    if (staffCollision[0]) throw new Error("RESERVED_DESK_EMAIL");
     await db.insert(customers).values({
       id,
       email,
@@ -257,7 +347,10 @@ export async function executeLiveBookOperation(
       .where(eq(liveAgreements.id, agreement.id))
       .limit(1);
     if (existingAgreement) throw new Error("ID_COLLISION");
-    const pieces = await db.select().from(timepieces).where(inArray(timepieces.id, agreement.watchIds));
+    const pieces = await db.select().from(timepieces)
+      .where(inArray(timepieces.id, agreement.watchIds))
+      .orderBy(timepieces.id)
+      .for("update");
     if (pieces.length !== new Set(agreement.watchIds).size || pieces.some((row) => row.customerId !== actor.customerId)) {
       throw new Error("TIMEPIECE_NOT_OWNED");
     }

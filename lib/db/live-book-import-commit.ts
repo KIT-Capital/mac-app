@@ -1,7 +1,11 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { liveBookFlagOn, planLiveBookImport } from "./live-book-import.mjs";
 import { dollarsToCents } from "./money.mjs";
+import {
+  lockStaffForDeskMutation,
+  writeDeskAudit,
+} from "./staff-accounts";
 import type { Actor } from "./records";
 import { assertIsolation, isDeskActor } from "./isolation.mjs";
 import {
@@ -10,6 +14,7 @@ import {
   liveAgreementMembers,
   liveAgreements,
   livePreviews,
+  staffAccounts,
   timepieces,
 } from "./schema";
 
@@ -23,32 +28,59 @@ export async function commitLiveBookImport(
   db: Database,
   actor: Actor,
   payload: ImportPayload,
-  options: { confirmLiveImport?: boolean; env?: NodeJS.ProcessEnv } = {},
+  options: {
+    confirmLiveImport?: boolean;
+    env?: NodeJS.ProcessEnv;
+    clientAddress?: string;
+  } = {},
 ) {
   assertIsolation(isDeskActor(actor), "DESK_REQUIRED");
   if (liveBookFlagOn(options.env)) {
     throw new Error("LIVE_BOOK_FLAG_ON");
   }
-  const existingCustomers = await db.select({ id: customers.id, email: customers.email }).from(customers);
-  const existingTimepieces = await db
-    .select({ id: timepieces.id, customerId: timepieces.customerId })
-    .from(timepieces);
-  const existingAgreements = await db
-    .select({ id: liveAgreements.id, customerId: liveAgreements.customerId })
-    .from(liveAgreements);
-  const plan = planLiveBookImport(payload, {
-    existingCustomers,
-    existingTimepieces,
-    existingAgreements,
-    confirmLiveImport: options.confirmLiveImport,
-    env: options.env,
-  });
-  if (!plan.ok) {
-    throw new Error(plan.error || "IMPORT_REJECTED");
-  }
-
-  await db.transaction(async (tx) => {
-    for (const person of plan.customers) {
+  const plan = await db.transaction(async (tx) => {
+    const auditActor = actor.role !== "collector" && actor.staffId
+      ? await lockStaffForDeskMutation(tx, {
+        id: actor.staffId,
+        email: actor.email,
+        role: actor.role,
+      })
+      : null;
+    if (!auditActor && (options.env ?? process.env).APP_ENV?.trim() !== "development") {
+      throw new Error("SESSION_INVALID");
+    }
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mac-live-book-import'))`);
+    const existingCustomers = await tx.select({ id: customers.id, email: customers.email }).from(customers);
+    const existingTimepieces = await tx
+      .select({ id: timepieces.id, customerId: timepieces.customerId })
+      .from(timepieces);
+    const existingAgreements = await tx
+      .select({ id: liveAgreements.id, customerId: liveAgreements.customerId })
+      .from(liveAgreements);
+    const transactionPlan = planLiveBookImport(payload, {
+      existingCustomers,
+      existingTimepieces,
+      existingAgreements,
+      confirmLiveImport: options.confirmLiveImport,
+      env: options.env,
+    });
+    if (!transactionPlan.ok) {
+      throw new Error(transactionPlan.error || "IMPORT_REJECTED");
+    }
+    const importedEmails = [...new Set(
+      transactionPlan.customers.map((customer) => customer.email),
+    )].sort();
+    for (const email of importedEmails) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
+    }
+    if (importedEmails.length) {
+      const staffCollision = await tx.select({ id: staffAccounts.id })
+        .from(staffAccounts)
+        .where(inArray(staffAccounts.email, importedEmails))
+        .limit(1);
+      if (staffCollision.length) throw new Error("RESERVED_DESK_EMAIL");
+    }
+    for (const person of transactionPlan.customers) {
       await tx
         .insert(customers)
         .values({
@@ -63,7 +95,7 @@ export async function commitLiveBookImport(
         });
     }
 
-    for (const watch of plan.timepieces) {
+    for (const watch of transactionPlan.timepieces) {
       await tx
         .insert(timepieces)
         .values({
@@ -115,16 +147,16 @@ export async function commitLiveBookImport(
         });
     }
 
-    if (plan.agreements.length) {
+    if (transactionPlan.agreements.length) {
       await tx.delete(liveAgreementMembers).where(
         inArray(
           liveAgreementMembers.agreementId,
-          plan.agreements.map((agreement) => agreement.id),
+          transactionPlan.agreements.map((agreement) => agreement.id),
         ),
       );
     }
 
-    for (const agreement of plan.agreements) {
+    for (const agreement of transactionPlan.agreements) {
       const amountCents = dollarsToCents(agreement.amount);
       if (amountCents === null) {
         throw new Error("INVALID_DOLLAR_AMOUNT");
@@ -198,7 +230,7 @@ export async function commitLiveBookImport(
       }
     }
 
-    for (const preview of plan.previews) {
+    for (const preview of transactionPlan.previews) {
       await tx
         .insert(livePreviews)
         .values({
@@ -212,6 +244,18 @@ export async function commitLiveBookImport(
           set: { previewUrl: preview.previewUrl, kind: preview.kind },
         });
     }
+    await writeDeskAudit(
+      tx,
+      auditActor ?? {
+        id: `development:${actor.email}`,
+        email: actor.email,
+        role: actor.role === "admin" ? "admin" : "staff",
+      },
+      "live-book.import",
+      "live-book",
+      options.clientAddress ?? "unknown",
+    );
+    return transactionPlan;
   });
 
   return plan;
@@ -221,6 +265,7 @@ export async function commitLivePreview(
   db: Database,
   actor: Actor,
   input: { timepieceId: string; previewUrl: string; kind?: string },
+  options: { clientAddress?: string; env?: NodeJS.ProcessEnv } = {},
 ) {
   assertIsolation(isDeskActor(actor), "DESK_REQUIRED");
   if (liveBookFlagOn()) {
@@ -230,18 +275,42 @@ export async function commitLivePreview(
     throw new Error("PREVIEW_REQUIRED");
   }
   const id = `preview-${input.timepieceId}-legacy`;
-  const [row] = await db
-    .insert(livePreviews)
-    .values({
-      id,
-      timepieceId: input.timepieceId,
-      kind: input.kind ?? "legacy_preview",
-      previewUrl: input.previewUrl,
-    })
-    .onConflictDoUpdate({
-      target: livePreviews.id,
-      set: { previewUrl: input.previewUrl, kind: input.kind ?? "legacy_preview" },
-    })
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    const auditActor = actor.role !== "collector" && actor.staffId
+      ? await lockStaffForDeskMutation(tx, {
+        id: actor.staffId,
+        email: actor.email,
+        role: actor.role,
+      })
+      : null;
+    if (!auditActor && (options.env ?? process.env).APP_ENV?.trim() !== "development") {
+      throw new Error("SESSION_INVALID");
+    }
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mac-live-book-import'))`);
+    const [row] = await tx
+      .insert(livePreviews)
+      .values({
+        id,
+        timepieceId: input.timepieceId,
+        kind: input.kind ?? "legacy_preview",
+        previewUrl: input.previewUrl,
+      })
+      .onConflictDoUpdate({
+        target: livePreviews.id,
+        set: { previewUrl: input.previewUrl, kind: input.kind ?? "legacy_preview" },
+      })
+      .returning();
+    await writeDeskAudit(
+      tx,
+      auditActor ?? {
+        id: `development:${actor.email}`,
+        email: actor.email,
+        role: actor.role === "admin" ? "admin" : "staff",
+      },
+      "live-preview.import",
+      input.timepieceId,
+      options.clientAddress ?? "unknown",
+    );
+    return row;
+  });
 }

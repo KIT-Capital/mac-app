@@ -119,6 +119,64 @@ export const accessRateLimits = pgTable(
   ],
 );
 
+export const staffAccounts = pgTable(
+  "staff_accounts",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    passwordHash: text("password_hash").notNull(),
+    passwordSalt: text("password_salt").notNull(),
+    passwordParams: jsonb("password_params").notNull(),
+    role: text("role").notNull(),
+    mustRotate: boolean("must_rotate").notNull().default(true),
+    passwordSetAt: timestamp("password_set_at", { withTimezone: true }).notNull().defaultNow(),
+    sessionValidAfter: timestamp("session_valid_after", { withTimezone: true })
+      .notNull()
+      .default(sql`'epoch'::timestamptz`),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("staff_accounts_role_check", sql`${table.role} in ('staff', 'admin')`),
+    check("staff_accounts_email_lower_check", sql`${table.email} = lower(${table.email})`),
+    check("staff_accounts_name_check", sql`length(${table.name}) > 0`),
+    check("staff_accounts_hash_check", sql`length(${table.passwordHash}) > 0`),
+    check("staff_accounts_salt_check", sql`length(${table.passwordSalt}) > 0`),
+    check(
+      "staff_accounts_params_check",
+      sql`
+        (${table.passwordParams}->>'N')::integer = 131072
+        and (${table.passwordParams}->>'r')::integer = 8
+        and (${table.passwordParams}->>'p')::integer = 1
+        and (${table.passwordParams}->>'keyLength')::integer = 64
+      `,
+    ),
+    index("staff_accounts_disabled_at_idx").on(table.disabledAt),
+  ],
+);
+
+export const deskAuditLog = pgTable(
+  "desk_audit_log",
+  {
+    id: text("id").primaryKey(),
+    actorEmail: text("actor_email").notNull(),
+    actorRole: text("actor_role").notNull(),
+    action: text("action").notNull(),
+    targetId: text("target_id"),
+    clientAddress: text("client_address").notNull(),
+    detail: jsonb("detail").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("desk_audit_log_created_at_idx").on(table.createdAt),
+    index("desk_audit_log_actor_email_idx").on(table.actorEmail),
+    check("desk_audit_log_actor_role_check", sql`${table.actorRole} in ('staff', 'admin')`),
+    check("desk_audit_log_client_address_check", sql`length(${table.clientAddress}) > 0`),
+  ],
+);
+
 /** Timepiece identity. Preview data URLs stay in the browser store until Stage 3. */
 export const timepieces = pgTable(
   "timepieces",

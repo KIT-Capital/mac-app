@@ -63,12 +63,14 @@ The collector app is one plane on every device: phone (burger + 2-column vault),
 
 ### Demo accounts
 
-| Account | Password | Opens |
+| Account | Sign-in | Opens |
 | --- | --- | --- |
-| `jonathan.hale@mechartcap.com` | any collector password | Collection |
+| `jonathan.hale@mechartcap.com` | Email only in browser mode | Collection |
 | New email via Get started | — | Empty vault |
 
-The admin desk is not linked from the collector app. It opens only when the preset desk email and password are entered on Sign In: `admin@mechartcap.com` / `MAC-Desk-2022`.
+The admin desk is not linked from the collector app. Development uses the
+runtime-only `DESK_DEVELOPMENT_PASSWORD`; live environments use Neon staff
+accounts and forced password rotation. No desk password is stored in source.
 
 **Restore demo collection** on Account reloads the sample watches.
 

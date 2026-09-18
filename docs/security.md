@@ -64,22 +64,50 @@ before any body is read (R4).
 
 ## Desk session
 
-`lib/desk-session.ts` signs cookie `mac_desk` with `DESK_SESSION_SECRET`. The `mac-desk-local` default applies only when `APP_ENV=development`; in staging and production a missing secret fails closed with `DESK_SESSION_SECRET_REQUIRED` — no token is issued and no token verifies, so `/admin` and desk APIs answer 403 and `POST /api/desk-session` answers the unavailable body. Moving to `DESK_SESSION_KEYS` with expiry and key ids is U4 of the go-live plan. The cookie is session-only: do not set `maxAge` or `expires`. Do not add a persistent collector cookie.
+Staff accounts live in `staff_accounts` with an async scrypt hash (N=2^17,
+r=8, p=1, 256 MiB maximum), a per-row salt, role, disabled time, and forced
+rotation flag. Unknown and disabled emails verify against a fixed dummy hash.
+Failed password attempts atomically reserve both per-email and per-address
+Postgres windows before scrypt, limiting concurrent memory use; successful
+verification releases both reservations.
+The development fixture reads its password only from
+`DESK_DEVELOPMENT_PASSWORD` and is unavailable outside development.
+
+`mac_desk` is signed with the first `DESK_SESSION_KEYS` entry and verified
+against every configured key. It contains email, role, key id, issued/expiry
+times (at most 12 hours), and the forced-rotation flag. Proxy validates the
+token without a database call; every desk API then re-reads the staff row so a
+disable, demotion, or password reset takes effect on the next request.
+Disable and reset advance the staff row’s session-valid-after time, so old
+tokens remain invalid after re-enable or password rotation.
+`DESK_SESSION_SECRET` is a development-only single-key alias. The cookie remains
+session-only: no `maxAge` or `expires`.
+
+The first live admin may be inserted from the two `DESK_BOOTSTRAP_*` values only
+while the staff table is empty. The temporary password must be changed on
+`/admin/password`; the bootstrap values are removed afterward. Staff add,
+disable, enable, reset, password rotation, and covered desk operations append an
+immutable `desk_audit_log` row in the same transaction.
+Disabling administrators is serialized and the last active administrator
+cannot be disabled; recovery never silently re-runs bootstrap.
 
 ## Data
 
-Collection state and photos still live in the browser. Neon `development` has synthetic customer, timepiece, photo, agreement, and archive rows for repository tests. The UI does not read them. Mail payloads go to Resend or the in-memory outbox. Do not log secrets or cookie tokens.
+Browser-mode collection state and photos still live in the browser. Live
+collector and staff identity rows live in Neon. Neon `development` also has
+synthetic product rows for repository tests. Mail payloads go to Resend or the
+in-memory outbox. Do not log secrets, temporary passwords, or cookie tokens.
 
 ## Authorization
 
 Every cookie-authenticated mutation checks request origin before reading the
 body. Same-origin browser calls pass. A cross-site `Origin` is **403**
 `REQUEST_ORIGIN_FORBIDDEN`; `Host` and `X-Forwarded-Host` are never the
-allowlist. Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; the client redirect in `components/app-frame.tsx` is not the gate. Collector page routes stay client-gated. When the development live-book switch is on, `/api/live-book` opens the verified collector session with the configured secret, confirms immutable customer ID and email against Neon, and scopes reads and operation-level mutations to that customer. Desk and collector cookies are mutually exclusive; a request carrying both is rejected. Existing repository isolation still applies. WorkOS is not wired. Do not rotate `DESK_SESSION_SECRET` here.
+allowlist. Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; a forced-rotation token redirects only to `/admin/password`, while desk APIs return `PASSWORD_ROTATION_REQUIRED`. Collector page routes stay client-gated. In live mode, `/api/live-book` resolves collectors from revocable session rows and desk actors from enabled staff rows; the row role overrides the token role. Desk and collector cookies are mutually exclusive. Existing repository isolation still applies. WorkOS is not wired.
 
 ## Secrets
 
-Key names only in `docs/config-and-env-map.md` and `.env.example`. Neon connection values for `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and `NEON_BRANCH` live in Doppler (`mac-app` / `dev`, `stg`, and `prd`). `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, and `RESEND_API_KEY` are mandatory prerequisites for enabled collector live-book access; the first two have no runtime fallback. Desk password and `DESK_SESSION_SECRET` remain on the **separate desk-security plan** — do not fold them into this Neon setup. Never commit `.env.local`. Never print connection strings.
+Key names only in `docs/config-and-env-map.md` and `.env.example`. Neon connection values for `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and `NEON_BRANCH` live in Doppler (`mac-app` / `dev`, `stg`, and `prd`). `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, `RESEND_API_KEY`, and `DESK_SESSION_KEYS` are mandatory live prerequisites. Bootstrap values are temporary owner gates, never committed values. Never commit `.env.local` or print connection strings.
 
 ## Identity (proposed)
 

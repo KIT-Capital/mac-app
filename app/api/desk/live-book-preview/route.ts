@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
+import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { createDb } from "@/lib/db/client";
 import { commitLivePreview } from "@/lib/db/live-book-import-commit";
 import { liveBookFlagOn } from "@/lib/db/live-book-import.mjs";
-import { deskActor } from "@/lib/db/records";
-import { deskApiStatus } from "@/lib/desk-guard.mjs";
-import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
+import { requestActor } from "@/lib/server/request-actor";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +20,14 @@ export async function POST(request: Request) {
   if (origin) return origin;
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
-  const session = readDeskToken((await cookies()).get(DESK_COOKIE)?.value);
-  const status = deskApiStatus(session);
-  if (status !== 200 || !session || (session.role !== "admin" && session.role !== "staff")) {
+  const resolved = await requestActor();
+  if ("error" in resolved) {
+    return json(
+      { error: resolved.error === "PASSWORD_ROTATION_REQUIRED" ? resolved.error : "Desk session required." },
+      resolved.error === "PASSWORD_ROTATION_REQUIRED" ? 409 : 403,
+    );
+  }
+  if (resolved.actor.role !== "admin" && resolved.actor.role !== "staff") {
     return json({ error: "Desk session required." }, 403);
   }
   if (liveBookFlagOn()) {
@@ -38,10 +41,10 @@ export async function POST(request: Request) {
   if (!body?.timepieceId || !body.previewUrl) {
     return json({ error: "PREVIEW_REQUIRED" }, 400);
   }
-  const row = await commitLivePreview(createDb(), deskActor(session.role, session.email), {
+  const row = await commitLivePreview(createDb(), resolved.actor, {
     timepieceId: body.timepieceId,
     previewUrl: body.previewUrl,
     kind: body.kind,
-  });
+  }, { clientAddress: clientAddress(request.headers) });
   return json({ preview: row });
 }

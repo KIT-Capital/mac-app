@@ -1,25 +1,30 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createDb } from "./client";
 import { commitLiveBookImport } from "./live-book-import-commit";
+import { createStaffAccount } from "./staff-accounts";
 import { getLiveAgreement } from "./live-book";
 import { deskActor } from "./records";
 import {
   customers,
+  deskAuditLog,
   liveAgreementEnds,
   liveAgreementMembers,
   liveAgreements,
   livePreviews,
+  staffAccounts,
   timepieces,
 } from "./schema";
+import { hashStaffPassword } from "../staff-password.mjs";
 
 const skip = !process.env.DATABASE_URL;
 const suffix = Date.now();
 const createdCustomerIds: string[] = [];
 const createdAgreementIds: string[] = [];
 const createdPieceIds: string[] = [];
-const desk = deskActor("staff", "desk@mechartcap.com");
+const createdStaffIds: string[] = [];
+const desk = deskActor("staff", `desk.import.${suffix}@mac.test`);
 const email = `hale.import.${suffix}@mac.test`;
 const customerId = `cust-${email}`;
 const haleExport = {
@@ -75,6 +80,9 @@ describe("commitLiveBookImport", { skip }, () => {
     await db.delete(liveAgreements).where(inArray(liveAgreements.id, agreementIds));
     await db.delete(timepieces).where(inArray(timepieces.id, pieceIds));
     await db.delete(customers).where(inArray(customers.id, createdCustomerIds));
+    if (createdStaffIds.length) {
+      await db.delete(staffAccounts).where(inArray(staffAccounts.id, createdStaffIds));
+    }
   });
 
   it("commits Hale-shaped book twice with the same ids while the flag stays off", async () => {
@@ -129,6 +137,10 @@ describe("commitLiveBookImport", { skip }, () => {
     assert.equal(cleared.ok, true);
     const withoutEnd = await getLiveAgreement(db, desk, haleExport.agreements[0].id);
     assert.equal(withoutEnd?.bookEnd, null);
+    const audits = await db.select().from(deskAuditLog)
+      .where(eq(deskAuditLog.actorEmail, desk.email));
+    assert.equal(audits.length, 4);
+    assert.ok(audits.every((row) => row.action === "live-book.import"));
   });
 
   it("imports a renewed repo and successor that share the same pieces", async () => {
@@ -187,4 +199,93 @@ describe("commitLiveBookImport", { skip }, () => {
       { message: "LIVE_BOOK_FLAG_ON" },
     );
   });
+
+  it("refuses an import email already held by staff", async () => {
+    const staffEmail = `staff-import.${suffix}@mac.test`;
+    const staff = await createStaffAccount(db, {
+      name: "Import Staff",
+      email: staffEmail,
+      role: "staff",
+      passwordHash: await hashStaffPassword("temporary password 123"),
+    });
+    createdStaffIds.push(staff.id);
+    const collisionPieceIds = haleExport.timepieces.map((watch) => `${watch.id}-staff`);
+    const payload = {
+      ...haleExport,
+      timepieces: haleExport.timepieces.map((watch, index) => ({
+        ...watch,
+        id: collisionPieceIds[index],
+        ownerEmail: staffEmail,
+      })),
+      agreements: haleExport.agreements.map((agreement) => ({
+        ...agreement,
+        id: `${agreement.id}-staff`,
+        watchIds: collisionPieceIds,
+        email: staffEmail,
+      })),
+    };
+    await assert.rejects(
+      () => commitLiveBookImport(db, desk, payload, { confirmLiveImport: true }),
+      /RESERVED_DESK_EMAIL/,
+    );
+  });
+
+  it("attributes staged imports to locked staff and rolls back on audit failure", async () => {
+    const staff = await createStaffAccount(db, {
+      name: "Authenticated Import Staff",
+      email: `authenticated-import.${suffix}@mac.test`,
+      role: "staff",
+      passwordHash: await hashStaffPassword("temporary password 123"),
+      mustRotate: false,
+    });
+    createdStaffIds.push(staff.id);
+    const actor = deskActor("staff", staff.email, staff.id);
+    const payload = remappedImport(`import-owner.${suffix}@mac.test`, "authenticated");
+    const committed = await commitLiveBookImport(db, actor, payload, {
+      confirmLiveImport: true,
+      env: { APP_ENV: "staging", MAC_LIVE_BOOK: "off" } as NodeJS.ProcessEnv,
+      clientAddress: "198.51.100.9",
+    });
+    createdCustomerIds.push(...committed.customers.map((row) => row.id));
+    createdPieceIds.push(...committed.timepieces.map((row) => row.id));
+    createdAgreementIds.push(...committed.agreements.map((row) => row.id));
+    const [audit] = await db.select().from(deskAuditLog).where(eq(
+      deskAuditLog.actorEmail,
+      staff.email,
+    ));
+    assert.equal(audit.action, "live-book.import");
+    assert.equal(audit.clientAddress, "198.51.100.9");
+
+    const failedEmail = `failed-import.${suffix}@mac.test`;
+    await assert.rejects(() => commitLiveBookImport(
+      db,
+      actor,
+      remappedImport(failedEmail, "failed-audit"),
+      {
+        confirmLiveImport: true,
+        env: { APP_ENV: "staging", MAC_LIVE_BOOK: "off" } as NodeJS.ProcessEnv,
+        clientAddress: "",
+      },
+    ));
+    assert.equal((await db.select({ id: customers.id }).from(customers)
+      .where(eq(customers.email, failedEmail))).length, 0);
+  });
 });
+
+function remappedImport(ownerEmail: string, label: string) {
+  const ids = haleExport.timepieces.map((watch) => `${watch.id}-${label}`);
+  return {
+    ...haleExport,
+    timepieces: haleExport.timepieces.map((watch, index) => ({
+      ...watch,
+      id: ids[index],
+      ownerEmail,
+    })),
+    agreements: haleExport.agreements.map((agreement) => ({
+      ...agreement,
+      id: `${agreement.id}-${label}`,
+      watchIds: ids,
+      email: ownerEmail,
+    })),
+  };
+}

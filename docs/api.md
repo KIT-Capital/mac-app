@@ -62,17 +62,33 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - Desk session required. Missing or invalid session is **403**.
 - JSON body: `{ payload, confirmLiveImport, commit }`. `payload` is a `persistableState` export. Preview `data:` URLs are not accepted on this request.
 - `commit: false` (default) returns a dry-run report. `commit: true` writes Neon `development` live-book tables in one transaction when the plan is clean.
+- Commit replans under an advisory lock and appends its audit row in the same transaction.
 - In-memory Hale demo requires `confirmLiveImport: true`. Reserved desk emails are not customers. Email or ID collisions fail closed.
 - After the owner live-book flag is on, this handler returns **409** and does not write. The flag stays off in this unit. Path is outside `/admin` so the desk matcher does not truncate the body.
 
 ## `POST` `/api/desk/live-book-preview`
 
 - Desk session required. **403** without it. One preview URL per request. Used after import when a piece still has a `data:` JPEG in the browser.
+- Preview import shares the import lock and transactionally appends an audit row.
 
-## `POST` / `DELETE` `/api/desk-session`
+## `POST` / `PATCH` / `DELETE` `/api/desk-session`
 
-- `POST` sets the HMAC-signed `mac_desk` cookie after desk credentials are accepted.
-- `DELETE` clears it.
+- `POST` verifies the development runtime fixture only in browser-mode
+  development, otherwise a live Neon staff row. Unknown and disabled emails share
+  the same **401**. Success sets a session-only `mac_desk` token with key id,
+  role, 12-hour expiry, and forced-rotation flag.
+- `PATCH` is the forced-password-rotation exception. It accepts current, new,
+  and confirmed passwords, writes the hash and audit row transactionally, and
+  reissues the token without the rotation flag.
+- `DELETE` clears both desk and collector cookies and revokes a collector row.
+
+## `GET` / `POST` `/api/desk/staff`
+
+- Admin-only in live mode. `GET` lists staff identity and status fields only;
+  hashes, salts, and parameters never leave the server.
+- `POST` supports `add`, `disable`, `enable`, and `reset`. Add/reset return a
+  generated temporary password exactly once; invite mail never contains it.
+- Every write appends an immutable audit row in the same transaction.
 
 ## Collector sessions
 

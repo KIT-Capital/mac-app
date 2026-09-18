@@ -50,7 +50,10 @@ export async function GET(request: Request) {
     const context = await liveContext();
     if (context.mode === "browser") return json({ mode: "browser" });
     if (context.mode === "error") return json({ mode: "live", error: context.error }, 503);
-    if (context.mode === "unauthorized") return json({ mode: "live", error: context.error }, 401);
+    if (context.mode === "unauthorized") {
+      const failure = liveBookErrorResponse(new Error(context.error));
+      return json({ mode: "live", error: failure.error }, failure.status);
+    }
     const url = new URL(request.url);
     const documents = await listAgreementDocuments(getDb(), context.actor, {
       liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
@@ -81,7 +84,10 @@ export async function POST(request: Request) {
     const context = await liveContext();
     if (context.mode === "browser") return json({ mode: "browser" });
     if (context.mode === "error") return json({ mode: "live", error: context.error }, 503);
-    if (context.mode === "unauthorized") return json({ mode: "live", error: context.error }, 401);
+    if (context.mode === "unauthorized") {
+      const failure = liveBookErrorResponse(new Error(context.error));
+      return json({ mode: "live", error: failure.error }, failure.status);
+    }
     const input = await request.json().catch(() => null);
     if (input == null || typeof input !== "object" || Array.isArray(input)) {
       return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);

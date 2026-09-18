@@ -193,10 +193,15 @@ export default function AdminAgreementsPage() {
       .then(async (response) => {
         const body = (await response.json().catch(() => null)) as {
           mode?: string;
+          error?: string;
           documents?: { version?: number; status?: string; checksum?: string | null }[];
           sends?: { actorKind?: string; recipientKind?: string; result?: string }[];
         } | null;
         if (cancelled) return;
+        if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+          window.location.replace("/admin/password");
+          return;
+        }
         if (!response.ok) {
           setDocumentNote({ id, text: "Could not check this document." });
           setSendHistory({ id, rows: [] });

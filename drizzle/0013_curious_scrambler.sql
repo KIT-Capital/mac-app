@@ -1,0 +1,1 @@
+ALTER TABLE "desk_audit_log" ADD CONSTRAINT "desk_audit_log_client_address_check" CHECK (length("desk_audit_log"."client_address") > 0);

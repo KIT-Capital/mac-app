@@ -1,12 +1,10 @@
-import { cookies } from "next/headers";
 import { createDb } from "@/lib/db/client";
+import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { commitLiveBookImport } from "@/lib/db/live-book-import-commit";
 import { liveBookFlagOn, planLiveBookImport } from "@/lib/db/live-book-import.mjs";
 import { customers, liveAgreements, timepieces } from "@/lib/db/schema";
-import { deskActor } from "@/lib/db/records";
-import { deskApiStatus } from "@/lib/desk-guard.mjs";
-import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
+import { requestActor } from "@/lib/server/request-actor";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +25,14 @@ export async function POST(request: Request) {
   }
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
-  const session = readDeskToken((await cookies()).get(DESK_COOKIE)?.value);
-  const status = deskApiStatus(session);
-  if (status !== 200 || !session || (session.role !== "admin" && session.role !== "staff")) {
+  const resolved = await requestActor();
+  if ("error" in resolved) {
+    return json(
+      { error: resolved.error === "PASSWORD_ROTATION_REQUIRED" ? resolved.error : "Desk session required." },
+      resolved.error === "PASSWORD_ROTATION_REQUIRED" ? 409 : 403,
+    );
+  }
+  if (resolved.actor.role !== "admin" && resolved.actor.role !== "staff") {
     return json({ error: "Desk session required." }, 403);
   }
   if (liveBookFlagOn()) {
@@ -67,9 +70,9 @@ export async function POST(request: Request) {
   }
   const applied = await commitLiveBookImport(
     db,
-    deskActor(session.role, session.email),
+    resolved.actor,
     payload,
-    { confirmLiveImport },
+    { confirmLiveImport, clientAddress: clientAddress(request.headers) },
   );
   return json({ committed: true, plan: applied });
 }

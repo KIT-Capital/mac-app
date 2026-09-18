@@ -1,57 +1,100 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { authenticate } from "@/lib/auth";
+import {
+  DESK_SESSION_KEYS_INVALID,
+  parseDeskSessionKeys,
+} from "@/lib/desk-session-keys.mjs";
 
 export const DESK_COOKIE = "mac_desk";
-export const DESK_SESSION_SECRET_REQUIRED = "DESK_SESSION_SECRET_REQUIRED";
-
-const DEVELOPMENT_DEFAULT_SECRET = "mac-desk-local";
-
-/**
- * The `mac-desk-local` default exists for development only. Everywhere else a
- * missing `DESK_SESSION_SECRET` fails closed: no token is issued and no token
- * verifies. Resolved per call so `next build` (no APP_ENV) can import this
- * module. U4 replaces the single secret with `DESK_SESSION_KEYS`.
- */
-export function deskSessionSecret(
-  env: Record<string, string | undefined> = process.env,
-): { ok: true; secret: string } | { ok: false; error: typeof DESK_SESSION_SECRET_REQUIRED } {
-  const configured = env.DESK_SESSION_SECRET?.trim();
-  if (configured) return { ok: true, secret: configured };
-  if (env.APP_ENV?.trim() === "development") return { ok: true, secret: DEVELOPMENT_DEFAULT_SECRET };
-  return { ok: false, error: DESK_SESSION_SECRET_REQUIRED };
-}
+export { DESK_SESSION_KEYS_INVALID, parseDeskSessionKeys };
+const MAX_TOKEN_LENGTH = 4096;
+const MAX_TTL_MS = 12 * 60 * 60_000;
 
 function sign(payload: string, secret: string) {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-export function issueDeskToken(email: string, role: "admin" | "staff") {
-  const resolved = deskSessionSecret();
+type DeskSession = {
+  email: string;
+  role: "admin" | "staff";
+  kid: string;
+  iat: number;
+  exp: number;
+  rot: boolean;
+};
+
+export function issueDeskToken(
+  email: string,
+  role: "admin" | "staff",
+  options: {
+    env?: Record<string, string | undefined>;
+    now?: number;
+    ttlMs?: number;
+    mustRotate?: boolean;
+  } = {},
+) {
+  const resolved = parseDeskSessionKeys(options.env);
   if (!resolved.ok) throw new Error(resolved.error);
-  const payload = Buffer.from(JSON.stringify({ email, role, v: 1 })).toString("base64url");
-  return `${payload}.${sign(payload, resolved.secret)}`;
+  const active = resolved.keys[0];
+  const now = options.now ?? Date.now();
+  const ttlMs = Math.min(options.ttlMs ?? MAX_TTL_MS, MAX_TTL_MS);
+  const payload = Buffer.from(JSON.stringify({
+    email: email.trim().toLowerCase(),
+    role,
+    kid: active.kid,
+    iat: now,
+    exp: now + ttlMs,
+    rot: Boolean(options.mustRotate),
+    v: 2,
+  })).toString("base64url");
+  return `${payload}.${sign(payload, active.secret)}`;
 }
 
-export function readDeskToken(token?: string | null): { email: string; role: "admin" | "staff" } | null {
-  if (!token) return null;
-  const resolved = deskSessionSecret();
+export function readDeskToken(
+  token?: string | null,
+  options: {
+    env?: Record<string, string | undefined>;
+    now?: number;
+  } = {},
+): DeskSession | null {
+  if (!token || token.length > MAX_TOKEN_LENGTH) return null;
+  const resolved = parseDeskSessionKeys(options.env);
   if (!resolved.ok) return null;
   const dot = token.lastIndexOf(".");
   if (dot < 1) return null;
   const payload = token.slice(0, dot);
   const sig = token.slice(dot + 1);
-  const expected = sign(payload, resolved.secret);
-  const left = Buffer.from(sig);
-  const right = Buffer.from(expected);
-  if (left.length !== right.length || !timingSafeEqual(left, right)) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
-      email?: string;
-      role?: string;
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as Partial<DeskSession> & {
+      v?: number;
     };
+    const key = resolved.keys.find((candidate) => candidate.kid === parsed.kid);
+    if (!key) return null;
+    const expected = sign(payload, key.secret);
+    const left = Buffer.from(sig);
+    const right = Buffer.from(expected);
+    if (left.length !== right.length || !timingSafeEqual(left, right)) return null;
+    const now = options.now ?? Date.now();
+    if (
+      parsed.v !== 2 ||
+      !Number.isSafeInteger(parsed.iat) ||
+      !Number.isSafeInteger(parsed.exp) ||
+      Number(parsed.iat) > now + 60_000 ||
+      Number(parsed.exp) <= now ||
+      Number(parsed.exp) - Number(parsed.iat) > MAX_TTL_MS ||
+      typeof parsed.rot !== "boolean"
+    ) {
+      return null;
+    }
     if (parsed.role !== "admin" && parsed.role !== "staff") return null;
     if (!parsed.email) return null;
-    return { email: parsed.email, role: parsed.role };
+    return {
+      email: parsed.email,
+      role: parsed.role,
+      kid: key.kid,
+      iat: Number(parsed.iat),
+      exp: Number(parsed.exp),
+      rot: parsed.rot,
+    };
   } catch {
     return null;
   }
@@ -65,12 +108,4 @@ export function deskCookieOptions() {
     secure: process.env.NODE_ENV === "production",
     // Session cookie: omit maxAge and expires so the desk login dies with the browser.
   };
-}
-
-export function openDeskSession(email: string, password: string) {
-  const result = authenticate(email, password);
-  if (!result.ok || (result.role !== "admin" && result.role !== "staff")) {
-    return null;
-  }
-  return issueDeskToken(email.trim().toLowerCase(), result.role);
 }

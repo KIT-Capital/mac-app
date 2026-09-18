@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { WatchStatus } from "../types";
+import { isReservedDeskEmail } from "../desk-identities.mjs";
 import type { Database } from "./client";
 import {
   assertIsolation,
@@ -14,9 +15,7 @@ import { customers, timepieces } from "./schema";
 
 export type Actor =
   | { role: "collector"; customerId: string; email: string }
-  | { role: "staff" | "admin"; email: string };
-
-const DESK_EMAILS = new Set(["admin@mechartcap.com", "desk@mechartcap.com"]);
+  | { role: "staff" | "admin"; email: string; staffId?: string };
 
 const DEFAULT_PREFERENCES = {
   appearance: "dark",
@@ -83,7 +82,7 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
   if (!email.includes("@")) {
     throw new Error("INVALID_EMAIL");
   }
-  if (DESK_EMAILS.has(email)) {
+  if (isReservedDeskEmail(email)) {
     throw new Error("RESERVED_DESK_EMAIL");
   }
   try {
@@ -148,7 +147,7 @@ export async function registerVerifiedCollector(
   const name = input.name.trim();
   const phone = input.phone?.trim() ?? "";
   if (!email.includes("@")) throw new Error("INVALID_EMAIL");
-  if (DESK_EMAILS.has(email)) throw new Error("RESERVED_DESK_EMAIL");
+  if (isReservedDeskEmail(email)) throw new Error("RESERVED_DESK_EMAIL");
   if (!name) throw new Error("NAME_REQUIRED");
 
   const [created] = await db
@@ -240,11 +239,11 @@ export function toCollectorActor(customer: typeof customers.$inferSelect): Actor
   return collectorActor(customer);
 }
 
-export function deskActor(role: "staff" | "admin", email: string): Actor {
+export function deskActor(role: "staff" | "admin", email: string, staffId?: string): Actor {
   if (!isDeskActor({ role, email })) {
     throw new Error("INVALID_DESK_ACTOR");
   }
-  return { role, email };
+  return { role, email, staffId };
 }
 
 export function timepieceDollars(row: typeof timepieces.$inferSelect) {
