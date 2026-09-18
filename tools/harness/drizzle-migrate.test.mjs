@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
@@ -77,6 +78,12 @@ describe("drizzle-migrate CLI", () => {
     );
     assert.notEqual(result.status, 0);
     assert.ok(stderrBody(result).errors.includes("PRODUCTION_ENV_WRONG_ENDPOINT"));
+  });
+
+  it("does not bake --confirm-production into the production npm script", () => {
+    const scripts = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).scripts;
+    assert.equal(scripts["db:migrate:production"].includes("--confirm-production"), false);
+    assert.ok(scripts["db:migrate:production"].includes("--target production"));
   });
 
   it("refuses an unknown target", () => {

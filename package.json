@@ -10,7 +10,7 @@
     "db:guard": "doppler run -- node tools/harness/neon-env-guard.mjs",
     "db:migrate": "doppler run -- node tools/harness/drizzle-migrate.mjs",
     "db:migrate:staging": "doppler run --config stg -- node tools/harness/drizzle-migrate.mjs --target staging",
-    "db:migrate:production": "doppler run --config prd -- node tools/harness/drizzle-migrate.mjs --target production --confirm-production",
+    "db:migrate:production": "doppler run --config prd -- node tools/harness/drizzle-migrate.mjs --target production",
     "db:generate": "doppler run -- node tools/harness/drizzle-migrate.mjs --generate",
     "db:schema-check": "node tools/harness/drizzle-migrate.mjs --schema-check",
     "db:drizzle-ping": "doppler run -- node tools/harness/drizzle-ping.mjs",
