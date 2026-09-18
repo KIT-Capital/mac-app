@@ -18,6 +18,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | Repo desk, repurchase, appraisal language | `business-logic.md` · `design-reference.md` |
 | Repo operations book (open / past due / ends) | `business-logic.md` · `api.md` · `plans/2026-09-16-001-feat-repo-operations-book-plan.md` |
 | Live book exclusive piece, **renewed**, development cutover | `business-logic.md` · `plans/2026-09-17-001-feat-live-book-cutover-plan.md` |
+| Stored sale-and-repurchase PDFs (live mode) | `business-logic.md` · `api.md` · `plans/2026-09-17-002-feat-immutable-repo-agreements-plan.md` · `superpowers/specs/2026-09-17-immutable-repo-agreements-design.md` |
 | Secrets, env key names | `config-and-env-map.md` |
 | Neon, Doppler, server persistence | `architecture.md` · `config-and-env-map.md` · `plans/2026-09-15-production-persistence.md` · `plans/2026-09-15-neon-railway-env-separation.md` · `decisions/0002-neon-mac-app-project.md` |
 | Anything that contradicts a decision | `decisions/` — surface the conflict |

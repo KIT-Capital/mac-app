@@ -1,9 +1,10 @@
 ---
 title: Immutable repo agreements
 type: feat
-status: revised-design — pending owner re-approval
+status: approved-design
 date: 2026-09-17
 revised: 2026-09-17 after independent cross-model review (Claude, Codex)
+approved: 2026-09-17 owner
 origin: owner brief 2026-09-17 and uploaded Sale and Repurchase Agreement Template 2.1
 ---
 
