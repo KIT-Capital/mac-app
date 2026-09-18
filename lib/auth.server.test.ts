@@ -21,6 +21,7 @@ describe("development desk fixture", () => {
         name: "Development Admin",
         role: "admin",
         mustRotate: false,
+        sessionValidAfter: new Date(0),
         disabledAt: null,
       },
     );

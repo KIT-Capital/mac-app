@@ -34,6 +34,7 @@ export async function POST(request: Request) {
   try {
     token = issueDeskToken(staff.email, staff.role, {
       mustRotate: staff.mustRotate,
+      now: Math.max(Date.now(), staff.sessionValidAfter.getTime() + 1),
     });
   } catch (error) {
     if (error instanceof Error && error.message === DESK_SESSION_KEYS_INVALID) {

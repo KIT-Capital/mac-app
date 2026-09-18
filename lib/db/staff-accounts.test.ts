@@ -11,6 +11,7 @@ import {
   addStaffAccount,
   bootstrapFirstAdmin,
   createStaffAccount,
+  findStaffByEmail,
   listStaffAccounts,
   resetStaffPassword,
   rotateStaffPassword,
@@ -393,7 +394,15 @@ describe("staff accounts repository", { skip }, () => {
       newPassword: "a different secure password 456",
       confirmPassword: "a different secure password 456",
     }, "127.0.0.1", env);
-    assert.equal(readDeskToken(rotated.token, { env })?.rot, false);
+    const oldSession = readDeskToken(token, { env });
+    const newSession = readDeskToken(rotated.token, { env });
+    const updated = await findStaffByEmail(db, member.email);
+    assert.ok(oldSession);
+    assert.ok(newSession);
+    assert.ok(updated);
+    assert.ok(oldSession.iat <= updated.sessionValidAfter.getTime());
+    assert.ok(newSession.iat > updated.sessionValidAfter.getTime());
+    assert.equal(newSession.rot, false);
     assert.equal((await verifyStaffCredentials(
       db,
       member.email,
@@ -495,7 +504,11 @@ describe("staff accounts repository", { skip }, () => {
         await resolveDeskActor(token),
         { error: "DESK_SESSION_INVALID" },
       );
-      const freshToken = issueDeskToken(member.email, "staff");
+      const enabled = await findStaffByEmail(db, member.email);
+      assert.ok(enabled);
+      const freshToken = issueDeskToken(member.email, "staff", {
+        now: enabled.sessionValidAfter.getTime() + 1,
+      });
       const freshActor = await resolveDeskActor(freshToken);
       assert.equal("actor" in (freshActor ?? {}) ? freshActor?.actor.role : null, "staff");
       await resetStaffPassword(db, admin, member.id, "127.0.0.1");

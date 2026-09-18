@@ -128,6 +128,7 @@ test.describe("desk", () => {
   });
 
   test("staff temporary passwords appear once and disappear after dismissal", async ({ page }) => {
+    let postCount = 0;
     await page.route("**/api/desk/staff", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
@@ -137,6 +138,8 @@ test.describe("desk", () => {
         });
         return;
       }
+      postCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -153,7 +156,8 @@ test.describe("desk", () => {
     });
     await staff.getByLabel("Name").fill("New Staff");
     await staff.getByLabel("Email").fill("new.staff@example.com");
-    await staff.getByRole("button", { name: "Add desk account" }).click();
+    await staff.getByRole("button", { name: "Add desk account" }).dblclick();
+    expect(postCount).toBe(1);
     await expect(page.getByText("one-time-password-value")).toBeVisible();
     await page.getByRole("button", { name: "Dismiss" }).click();
     await expect(page.getByText("one-time-password-value")).toHaveCount(0);

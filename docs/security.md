@@ -78,8 +78,9 @@ against every configured key. It contains email, role, key id, issued/expiry
 times (at most 12 hours), and the forced-rotation flag. Proxy validates the
 token without a database call; every desk API then re-reads the staff row so a
 disable, demotion, or password reset takes effect on the next request.
-Disable and reset advance the staff row’s session-valid-after time, so old
-tokens remain invalid after re-enable or password rotation.
+Disable, reset, and password rotation advance the staff row’s
+session-valid-after time, so old tokens remain invalid after re-enable or a
+credential change.
 `DESK_SESSION_SECRET` is a development-only single-key alias. The cookie remains
 session-only: no `maxAge` or `expires`.
 

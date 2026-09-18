@@ -24,7 +24,7 @@ export async function resolveDeskActor(
   ) {
     const staff = await findStaffByEmail(getDb(), desk.email);
     if (!staff || staff.disabledAt) return { error: "DESK_SESSION_INVALID" };
-    if (desk.iat < staff.sessionValidAfter.getTime()) {
+    if (desk.iat <= staff.sessionValidAfter.getTime()) {
       return { error: "DESK_SESSION_INVALID" };
     }
     if (staff.mustRotate) return { error: "PASSWORD_ROTATION_REQUIRED" };

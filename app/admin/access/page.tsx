@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
 import { sendAppEmail } from "@/lib/send-mail";
@@ -53,6 +53,8 @@ export default function AdminAccessPage() {
     role: "staff" as "staff" | "admin",
   });
   const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [staffBusy, setStaffBusy] = useState(false);
+  const staffActionInFlight = useRef(false);
 
   async function loadStaff() {
     if (user?.role !== "admin") return;
@@ -76,30 +78,38 @@ export default function AdminAccessPage() {
   }, [user?.role]);
 
   async function staffAction(body: Record<string, unknown>) {
-    setError("");
-    setTemporaryPassword("");
-    const response = await fetch("/api/desk/staff", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-      credentials: "include",
-    }).catch(() => null);
-    const result = await response?.json().catch(() => null) as {
-      error?: string;
-      temporaryPassword?: string;
-      warning?: string;
-    } | null;
-    if (!response?.ok) {
-      setError(result?.error ?? "Staff account could not be changed.");
-      return;
+    if (staffActionInFlight.current) return;
+    staffActionInFlight.current = true;
+    setStaffBusy(true);
+    try {
+      setError("");
+      setTemporaryPassword("");
+      const response = await fetch("/api/desk/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        credentials: "include",
+      }).catch(() => null);
+      const result = await response?.json().catch(() => null) as {
+        error?: string;
+        temporaryPassword?: string;
+        warning?: string;
+      } | null;
+      if (!response?.ok) {
+        setError(result?.error ?? "Staff account could not be changed.");
+        return;
+      }
+      if (result?.temporaryPassword) setTemporaryPassword(result.temporaryPassword);
+      if (result?.warning === "INVITE_EMAIL_FAILED") {
+        setNotice("Staff account created. Hand over the temporary password; invite email failed.");
+      }
+      setStaffDraft({ name: "", email: "", role: "staff" });
+      await loadStaff();
+    } finally {
+      staffActionInFlight.current = false;
+      setStaffBusy(false);
     }
-    if (result?.temporaryPassword) setTemporaryPassword(result.temporaryPassword);
-    if (result?.warning === "INVITE_EMAIL_FAILED") {
-      setNotice("Staff account created. Hand over the temporary password; invite email failed.");
-    }
-    setStaffDraft({ name: "", email: "", role: "staff" });
-    await loadStaff();
   }
 
   async function addStaff(event: FormEvent) {
@@ -243,7 +253,9 @@ export default function AdminAccessPage() {
                 <option className="bg-black" value="admin">Admin</option>
               </NativeSelect>
             </Field>
-            <PillButton type="submit" variant="gold">Add desk account</PillButton>
+            <PillButton type="submit" variant="gold" disabled={staffBusy}>
+              {staffBusy ? "Saving…" : "Add desk account"}
+            </PillButton>
           </form>
           <AdminTable
             headers={["Name", "Email", "Role", "Status", ""]}
@@ -255,6 +267,7 @@ export default function AdminAccessPage() {
               <div key={member.id} className="flex gap-3 text-[#FCB040]">
                 <button
                   type="button"
+                  disabled={staffBusy}
                   onClick={() => void staffAction({
                     action: member.disabledAt ? "enable" : "disable",
                     id: member.id,
@@ -264,6 +277,7 @@ export default function AdminAccessPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={staffBusy}
                   onClick={() => void staffAction({ action: "reset", id: member.id })}
                 >
                   Reset

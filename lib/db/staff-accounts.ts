@@ -415,11 +415,13 @@ export async function rotateStaffPassword(
     if (!await verifyStaffPassword(input.currentPassword, storedPassword(trusted))) {
       throw new Error("DESK_PASSWORD_INVALID");
     }
+    const changedAt = new Date();
     const [updated] = await tx.update(staffAccounts).set({
       ...passwordColumns(serialized),
       mustRotate: false,
-      passwordSetAt: new Date(),
-      updatedAt: new Date(),
+      passwordSetAt: changedAt,
+      sessionValidAfter: changedAt,
+      updatedAt: changedAt,
     }).where(and(
       eq(staffAccounts.id, actor.id),
       isNull(staffAccounts.disabledAt),

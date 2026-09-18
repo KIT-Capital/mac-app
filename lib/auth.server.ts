@@ -49,6 +49,7 @@ export function developmentDeskFixture(
     name: role === "admin" ? "Development Admin" : "Development Staff",
     role,
     mustRotate: false,
+    sessionValidAfter: new Date(0),
     disabledAt: null,
   };
 }
@@ -99,6 +100,7 @@ export async function rotateDeskPasswordRequest(
     token: issueDeskToken(rotated.email, rotated.role, {
       env,
       mustRotate: false,
+      now: Math.max(Date.now(), rotated.sessionValidAfter.getTime() + 1),
     }),
   };
 }
