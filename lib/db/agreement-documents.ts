@@ -367,11 +367,6 @@ export async function sendAgreementDocument(
   }
   const recipient = resolveSendRecipient(actor, input);
   const now = options.now ?? new Date();
-  const recentDocument = await countRecentSends(db, eq(agreementDocumentSends.documentId, reconciled.id), now);
-  const recentActor = await countRecentSends(db, eq(agreementDocumentSends.actorId, actor.customerId), now);
-  if (recentDocument >= SENDS_PER_HOUR || recentActor >= SENDS_PER_HOUR) {
-    throw new Error("DOCUMENT_SEND_THROTTLED");
-  }
   const sendId = randomUUID();
   await db.insert(agreementDocumentSends).values({
     id: sendId,
@@ -383,6 +378,15 @@ export async function sendAgreementDocument(
     confirmedAt: recipient.recipientKind === "other" ? now : null,
     result: "sending",
   });
+  const recentDocument = await countRecentSends(db, eq(agreementDocumentSends.documentId, reconciled.id), now);
+  const recentActor = await countRecentSends(db, eq(agreementDocumentSends.actorId, actor.customerId), now);
+  if (recentDocument > SENDS_PER_HOUR || recentActor > SENDS_PER_HOUR) {
+    await db
+      .update(agreementDocumentSends)
+      .set({ result: "throttled", failureCode: "DOCUMENT_SEND_THROTTLED" })
+      .where(eq(agreementDocumentSends.id, sendId));
+    throw new Error("DOCUMENT_SEND_THROTTLED");
+  }
   const mail = composeAgreementDocumentMail({
     agreementCode: String((reconciled.snapshot as { contract?: { agreementCode?: string } } | null)?.contract?.agreementCode ?? ""),
     recipientEmail: recipient.recipientEmail,
