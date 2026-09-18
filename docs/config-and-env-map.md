@@ -74,10 +74,11 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 |---|---|---|---|
 | `APP_ENV` | Mapping guard | Doppler + Railway production/Development | `development` · `staging` · `preview` · `production`. Required when any database URL is set |
 | `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Production/Development `https://mechart.app` · staging Railway host |
-| `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default exists; separate security plan |
-| `MAC_LIVE_BOOK` | Collector live-book cutover | Implemented, default off | Only `1`, `true`, or `on`; enabled use is development-only |
+| `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default applies only when `APP_ENV=development`; elsewhere a missing value fails closed (`DESK_SESSION_SECRET_REQUIRED`). Staging and production live mode reports unavailable without it. Replaced by `DESK_SESSION_KEYS` in U4 |
+| `DESK_SESSION_KEYS` | Desk key set | U4 | Format and verification arrive in U4; U1 readiness checks `DESK_SESSION_SECRET` because that is what tokens consume today |
+| `MAC_LIVE_BOOK` | Live-book mode | Implemented, default off | Only `1`, `true`, or `on`. Off is browser mode for development and Playwright. May be on in development, staging, and production; **production requires it** and exits with `PRODUCTION_REQUIRES_LIVE_BOOK` otherwise |
 | `COLLECTOR_SESSION_SECRET` | Collector verification and session HMAC | Required when live book is on | No committed or runtime fallback |
-| `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin; development may use HTTP localhost |
+| `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin outside development; development may use HTTP localhost. Missing is `COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED`, malformed is `..._INVALID` |
 | `MAC_INTERNAL_EMAIL` | Internal MAC recipients | Implemented | Temporary prototype default `ricardo.cidale@norfolkgroup.io`; routes info/finance/financing recipients only |
 | `RESEND_API_KEY` | `/api/mail` + collector access mail | Implemented; required when live book is on | Preview remains available for ordinary mail, never for identity verification |
 | `RESEND_FROM_EMAIL` | Outbound From | Implemented | `info@mechartcap.com`; internal recipient routing does not change From |
@@ -93,6 +94,21 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | `R2_REGION` | R2 S3 region | Verified | `auto`; Doppler + Railway |
 | `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified | Doppler + Railway; never print |
 | `R2_SECRET_ACCESS_KEY` | R2 S3 secret | Verified | Doppler + Railway; never print or commit |
+
+## Production fail-closed rule
+
+`lib/env/production-readiness.mjs` runs from `instrumentation.ts` next to the mapping guard. The kit-managed start script is unchanged. Two classes:
+
+| Class | Condition | Effect |
+|---|---|---|
+| Exit | `APP_ENV=production` with `MAC_LIVE_BOOK` off (`PRODUCTION_REQUIRES_LIVE_BOOK`), or the database mapping fails | The process exits before serving. Railway restarts it; nothing is served |
+| Unavailable | Staging or production with the flag on and any of `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, `RESEND_API_KEY`, `DESK_SESSION_SECRET`, the R2 names, or `DATABASE_URL` missing | The process stays up. Every live route answers `503 { mode: "unavailable", error }` and the app renders one unavailable page in place of every route |
+
+Development is not governed: flag off is browser mode; flag on with a missing prerequisite behaves as before (`503` with the code, store mode `unknown`). Staging with the flag off is browser mode.
+
+## Health check
+
+`GET /api/health` is the Railway health check (`railway.json`). It is `force-dynamic`, `Cache-Control: no-store`, and returns `{ ok, appEnv, checks: { database, liveBook } }` with codes only: `database` is `ok`, `NOT_CONFIGURED` (no `DATABASE_URL`), a mapping code, or `DATABASE_UNREACHABLE` (any driver error or a 3-second timeout); `liveBook` is `ok`, `browser`, or the first missing prerequisite by name. Status is `200` when `ok`, else `503`. No URL, hostname, secret, or driver message appears in the body.
 
 Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` only. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. `npm run r2:ping` puts, HEADs, and deletes a `dev-probes/` object; it runs only when `APP_ENV` is `development` and prints no secrets. GitHub `quality` runs `lint`, `test:unit`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
 

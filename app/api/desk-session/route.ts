@@ -1,10 +1,26 @@
 import { cookies } from "next/headers";
 import { COLLECTOR_COOKIE } from "@/lib/collector-access.mjs";
-import { DESK_COOKIE, deskCookieOptions, openDeskSession } from "@/lib/desk-session";
+import {
+  DESK_COOKIE,
+  DESK_SESSION_SECRET_REQUIRED,
+  deskCookieOptions,
+  openDeskSession,
+} from "@/lib/desk-session";
+import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export async function POST(request: Request) {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   const body = (await request.json().catch(() => null)) as { email?: string; password?: string } | null;
-  const token = openDeskSession(String(body?.email ?? ""), String(body?.password ?? ""));
+  let token: string | null;
+  try {
+    token = openDeskSession(String(body?.email ?? ""), String(body?.password ?? ""));
+  } catch (error) {
+    if (error instanceof Error && error.message === DESK_SESSION_SECRET_REQUIRED) {
+      return unavailableResponse(DESK_SESSION_SECRET_REQUIRED);
+    }
+    throw error;
+  }
   if (!token) {
     return Response.json({ error: "Desk credentials were not recognized." }, { status: 401 });
   }

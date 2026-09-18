@@ -12,6 +12,7 @@ import { customers } from "@/lib/db/schema";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
 import { liveBookErrorResponse } from "@/lib/live-book-errors.mjs";
+import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,8 @@ async function liveContext() {
 }
 
 export async function GET() {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   try {
     const context = await liveContext();
     if (context.mode === "browser") return json({ mode: "browser" });
@@ -83,6 +86,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   try {
     const context = await liveContext();
     if (context.mode === "browser") return json({ mode: "browser" });

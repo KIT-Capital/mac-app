@@ -23,12 +23,14 @@ import { nextId } from "@/lib/ids";
 import {
   mergeLocalDataPreviews,
   liveBookFailureState,
+  liveDeskOverlay,
   operationDisposition,
   parseLiveBookResponse,
   parseLiveBookMutationResponse,
   selectLiveUser,
   shouldApplyReconciliation,
   shouldPersistBrowserBook,
+  shouldRecheckLiveBook,
 } from "@/lib/live-book-mode.mjs";
 import { ownedCounts } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
@@ -44,6 +46,7 @@ import {
   validateRecordedEndKind,
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
+import { DEFAULT_SETTINGS } from "@/lib/theme";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
   browserSessionStorage,
@@ -68,7 +71,11 @@ import type {
 const STORAGE_KEY = "mac-app-state-v3";
 const LIVE_PREVIEW_KEY = "mac-app-live-previews-v1";
 
+export type StoreMode = "unknown" | "browser" | "live" | "unavailable";
+
 type Store = AppState & {
+  /** Server-authoritative book mode. `unavailable` replaces every route with the unavailable page. */
+  bookMode: StoreMode;
   signIn: (profile?: Partial<Profile>) => void;
   signUp: (profile: Pick<Profile, "name" | "email"> & Partial<Profile>) => void;
   signOut: () => void;
@@ -119,7 +126,8 @@ function emptyState(): AppState {
 const SERVER_STATE = emptyState();
 let snapshot: AppState = SERVER_STATE;
 const listeners = new Set<() => void>();
-let storeMode: "unknown" | "browser" | "live" = "unknown";
+let storeMode: StoreMode = "unknown";
+const LIVE_BOOK_UNAVAILABLE = "LIVE_BOOK_UNAVAILABLE";
 type OperationAck = { ok: boolean; error?: string; mode?: "browser" | "live" };
 let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
 let loadStarted = false;
@@ -168,8 +176,19 @@ function isLiveStoreMode() {
   return storeMode === "live";
 }
 
+/**
+ * The server said a live prerequisite is missing. Publish an empty hydrated
+ * state with no user and stop every automatic re-check; only the unavailable
+ * page's "Try again" full reload asks the server again.
+ */
+function enterUnavailableMode(base: AppState) {
+  storeMode = "unavailable";
+  snapshot = liveBookFailureState(base) as AppState;
+  notifyStore();
+}
+
 function mergeBook(
-  base: AppState,
+  _base: AppState,
   book: BookState,
   viewer: { role: string; email: string; customerId?: string },
 ): AppState {
@@ -183,9 +202,12 @@ function mergeBook(
     : authenticated as Profile | null;
   const counts = ownedCounts(sessionUser?.email, mergedBook.timepieces, mergedBook.agreements);
   if (sessionUser) writeSessionUser(storage, sessionUser);
+  const desk = liveDeskOverlay(mergedBook);
   return {
-    ...base,
     ...mergedBook,
+    catalog: desk.catalog,
+    shells: desk.shells,
+    settings: desk.settings ?? DEFAULT_SETTINGS,
     hydrated: true,
     user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
   };
@@ -254,6 +276,9 @@ async function loadAuthoritativeStore() {
       storeMode = "live";
       persistLiveDataPreviews(browser);
       snapshot = mergeBook(browser, result.book, result.viewer);
+    } else if (result.mode === "unavailable") {
+      storeMode = "unavailable";
+      snapshot = liveBookFailureState(browser) as AppState;
     } else {
       storeMode = "unknown";
       snapshot = liveBookFailureState(browser) as AppState;
@@ -282,7 +307,8 @@ function readLiveBookMode() {
           response.status,
           await response.json().catch(() => null),
         );
-        if (parsed.ok) return parsed;
+        // An unavailable body is a definitive answer; never retry it.
+        if (parsed.ok || parsed.mode === "unavailable") return parsed;
       } catch {
         // Retry once below.
       } finally {
@@ -300,8 +326,13 @@ function readLiveBookMode() {
 }
 
 async function reconcileLiveStore(force = false) {
+  if (!shouldRecheckLiveBook(storeMode)) return;
   const generation = optimisticGeneration;
   const result = await readLiveBookMode();
+  if (result.mode === "unavailable") {
+    enterUnavailableMode(snapshot);
+    return;
+  }
   if (!result.ok || !shouldApplyReconciliation(force, generation, optimisticGeneration)) return;
   if (result.mode === "browser") {
     storeMode = "browser";
@@ -317,6 +348,7 @@ async function reconcileLiveStore(force = false) {
 }
 
 async function reloadAfterIdentityChange() {
+  if (!shouldRecheckLiveBook(storeMode)) return;
   if (liveBookReadInFlight) await liveBookReadInFlight;
   await reconcileLiveStore();
 }
@@ -324,8 +356,13 @@ async function reloadAfterIdentityChange() {
 function queueLiveWrite(operation: unknown) {
   liveWriteQueue = liveWriteQueue.catch(() => ({ ok: false, error: "LIVE_BOOK_WRITE_FAILED" })).then(async () => {
     const disposition = operationDisposition(storeMode);
+    if (disposition === "refuse") return { ok: false, error: LIVE_BOOK_UNAVAILABLE };
     if (disposition !== "dispatch") {
       const discovered = await readLiveBookMode();
+      if (discovered.mode === "unavailable") {
+        enterUnavailableMode(snapshot);
+        return { ok: false, error: LIVE_BOOK_UNAVAILABLE };
+      }
       if (!discovered.ok) return { ok: false, error: "LIVE_BOOK_MODE_UNKNOWN" };
       if (discovered.mode === "browser") {
         storeMode = "browser";
@@ -352,6 +389,10 @@ function queueLiveWrite(operation: unknown) {
     }
     const body = await response.json().catch(() => null);
     const result = parseLiveBookMutationResponse(response.status, body);
+    if (result.mode === "unavailable") {
+      enterUnavailableMode(snapshot);
+      return { ok: false, error: LIVE_BOOK_UNAVAILABLE };
+    }
     if (result.ok && result.mode === "browser") {
       storeMode = "browser";
       snapshot = readPersistedState();
@@ -399,6 +440,9 @@ function updateStore(
   recipe: (prev: AppState) => AppState,
   options: { operation?: unknown; deferLive?: boolean } = {},
 ) {
+  if (storeMode === "unavailable") {
+    return Promise.resolve({ ok: false, error: LIVE_BOOK_UNAVAILABLE } as OperationAck);
+  }
   const prev = getStoreSnapshot();
   const next = recipe(prev);
   if (next === prev) return Promise.resolve({ ok: true } as OperationAck);
@@ -580,6 +624,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let lastCheck = 0;
     const recheck = () => {
+      if (!shouldRecheckLiveBook(storeMode)) return;
       const now = Date.now();
       if (now - lastCheck < 5_000) return;
       lastCheck = now;
@@ -599,6 +644,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Store>(
     () => ({
       ...state,
+      bookMode: storeMode,
       signIn: (profile) => {
         updateStore((prev) => {
           const email = (profile?.email ?? prev.user?.email ?? DEMO_PROFILE.email).trim();

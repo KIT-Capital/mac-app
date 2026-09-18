@@ -10,7 +10,9 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 
 - **Collector** — one UI plane on phone, iPad, and desktop (`CollectorShell`). **Implemented.**
 - **Desk** — 16:9 admin console at `/admin/*` (`DeskShell`). Not linked from collector chrome. **Implemented.**
-- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) remains the default and rollback store, with `user` always stored as `null`. The development-only owner switch moves repo-book reads and operation-level writes together to Neon after verified collector or desk access. Catalog, shells, settings, and new data-URL previews remain browser-local. Do not delete or auto-migrate the browser book.
+- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) remains the development and Playwright default and the development rollback store, with `user` always stored as `null`. The `MAC_LIVE_BOOK` owner switch moves repo-book reads and operation-level writes together to Neon after verified collector or desk access; it may be on in development, staging, and production, and production requires it. Catalog, shells, settings, and new data-URL previews remain browser-local. Do not delete or auto-migrate the browser book.
+- **Store modes** — `unknown` (not yet answered), `browser`, `live`, and **`unavailable`**. The server is authoritative. `unavailable` means a staging or production live prerequisite is missing: `/api/live-book` answers `503 { mode: "unavailable", error }`, the store publishes an empty hydrated state with no user, refuses writes without a fetch, and stops every automatic re-check (focus, visibility, new subscribers); `components/app-frame.tsx` renders `components/unavailable-page.tsx` in place of every route so no page-level fetch fires. "Try again" is one full reload. **Implemented.**
+- **Health** — `GET /api/health` (`app/api/health/route.ts`, helper `lib/health.mjs`) is the Railway health check: `force-dynamic`, `no-store`, `{ ok, appEnv, checks: { database, liveBook } }` with codes only. **Implemented.**
 - **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
@@ -20,7 +22,8 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
 - **Verified collector access** — signed email verification and
   `mac_collector` session primitives exist behind default-off `MAC_LIVE_BOOK`.
-  Enabled use is development-only; login and signup request a verification link.
+  Enabled use runs in development, staging, and production with an HTTPS origin
+  outside development; login and signup request a verification link.
 - **Internal mail routing** — `MAC_INTERNAL_EMAIL` is the single recipient for
   MAC desk aliases during the prototype. Collector copies remain addressed to
   collectors and the public From address remains `info@mechartcap.com`.
@@ -33,10 +36,11 @@ app/api/mail         outbound mail
 app/api/desk-session desk cookie
 app/api/collector-session collector email verification
 app/api/live-book scoped repo-book reads and operations
+app/api/health       Railway health check (codes only)
 proxy.ts             server 403 for /admin without desk cookie
-components/          shells + shadcn
-lib/                 auth, store, mail, theme, env mapping, Drizzle schema and repositories
-instrumentation.ts   Neon mapping guard on Node server start
+components/          shells + shadcn + unavailable page
+lib/                 auth, store, mail, theme, env mapping, production readiness, Drizzle schema and repositories
+instrumentation.ts   Neon mapping guard + production readiness on Node server start
 drizzle/             development-only migrations (probe through report snapshots)
 e2e/                 Playwright
 neon.ts              Neon config-as-code (Auth off)
@@ -45,7 +49,7 @@ tools/harness/       structural check, neon-ping, drizzle migrate/ping, start wr
 
 ## Hosting
 
-Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port $PORT`. Intended public host is `mechart.app`. Mail and demo identities stay on `@mechartcap.com`. See `hosting.md`. The mapping guard runs before `next start`. **Do not deploy from this audit.**
+Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port $PORT`; the health check path is `/api/health`. Intended public host is `mechart.app`. Mail and demo identities stay on `@mechartcap.com`. See `hosting.md`. The mapping guard runs in the start script and in `instrumentation.ts`. The production readiness guard runs only in `instrumentation.ts` so the kit-managed start script stays untouched: production exits on flag-off or a failed mapping, and any other missing live prerequisite serves the unavailable page instead of a route. **Do not deploy from this audit.**
 
 ## Proposed platform (partially implemented)
 

@@ -3,6 +3,7 @@ import { COLLECTOR_COOKIE } from "@/lib/collector-access.mjs";
 import { requestCollectorAccess } from "@/lib/collector-access.server";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
 import { allowMailRequest } from "@/lib/mail";
+import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 function clientIp(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -10,9 +11,10 @@ function clientIp(request: Request) {
 }
 
 function errorStatus(message: string) {
-  if (message === "COLLECTOR_LIVE_BOOK_DEVELOPMENT_ONLY") return 403;
   if (
+    message === "COLLECTOR_LIVE_BOOK_APP_ENV_INVALID" ||
     message === "COLLECTOR_SESSION_SECRET_REQUIRED" ||
+    message === "COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED" ||
     message === "COLLECTOR_MAGIC_LINK_ORIGIN_INVALID" ||
     message === "COLLECTOR_ACCESS_EMAIL_REQUIRED"
   ) {
@@ -30,6 +32,8 @@ function errorStatus(message: string) {
 }
 
 export async function POST(request: Request) {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   const config = evaluateLiveBookConfig(process.env);
   if (!config.enabled) {
     return Response.json({ ok: true, mode: "browser" });

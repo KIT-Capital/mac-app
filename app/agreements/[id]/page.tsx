@@ -41,7 +41,7 @@ export default function AgreementDetailPage() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pieceError, setPieceError] = useState("");
   const [raiseAmount, setRaiseAmount] = useState("");
-  const [bookMode, setBookMode] = useState<"browser" | "live">("browser");
+  const [bookMode, setBookMode] = useState<"browser" | "live" | "unavailable">("browser");
   const [documents, setDocuments] = useState<ListedDocument[]>([]);
   const [docError, setDocError] = useState("");
   const [mailBusy, setMailBusy] = useState(false);
@@ -103,6 +103,10 @@ export default function AgreementDetailPage() {
         if (body?.mode === "live") {
           setBookMode("live");
           setDocuments(Array.isArray(body.documents) ? body.documents : []);
+        } else if (body?.mode === "unavailable") {
+          // A missing live prerequisite is not browser mode: no preview mint, no stored list.
+          setBookMode("unavailable");
+          setDocuments([]);
         } else {
           setBookMode("browser");
           setDocuments([]);
@@ -576,6 +580,12 @@ export default function AgreementDetailPage() {
         ) : null}
       </div>
       <div className="border-t border-mac-line bg-mac-card p-4">
+        {bookMode === "unavailable" ? (
+          <p className="mb-3 text-center text-[12px] text-mac-muted">
+            Stored agreements are temporarily unavailable. Your agreement is safe. Try again shortly or
+            write to info@mechartcap.com.
+          </p>
+        ) : null}
         {applied && bookMode === "browser" ? (
           <div className="mb-3 flex flex-col gap-2">
             <PillButton variant="navy" disabled={pdfBusy} onClick={() => void previewPdf("view")}>

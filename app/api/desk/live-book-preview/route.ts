@@ -5,6 +5,7 @@ import { liveBookFlagOn } from "@/lib/db/live-book-import.mjs";
 import { deskActor } from "@/lib/db/records";
 import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
+import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ function json(body: unknown, status = 200) {
 }
 
 export async function POST(request: Request) {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   const session = readDeskToken((await cookies()).get(DESK_COOKIE)?.value);
   const status = deskApiStatus(session);
   if (status !== 200 || !session || (session.role !== "admin" && session.role !== "staff")) {
