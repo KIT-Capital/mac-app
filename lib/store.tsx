@@ -146,7 +146,7 @@ const DESK_DATA_ACTIONS = new Set([
 
 type BookState = Pick<
   AppState,
-  "timepieces" | "agreements" | "users" | "photos" | "profiles" | "catalog" | "shells" | "settings"
+  "timepieces" | "agreements" | "users" | "photos" | "profiles" | "catalog" | "shells" | "settings" | "applicationPurchaseShares"
 >;
 
 function readPersistedState(): AppState {

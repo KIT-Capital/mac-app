@@ -32,7 +32,8 @@ browser mode. If the live settings singleton does not exist, the server returns
 references and agreement shells likewise stay empty until the desk creates them;
 production never receives demo desk data. Appearance and personal notification
 preferences are not desk settings. Before a collector has an application or repo,
-live reads expose only generic Scenario 60 defaults, no shells, and blank custody;
+live reads expose generic Scenario 60 display defaults, no shells, blank custody,
+and only the effective purchase-share cap for each selectable application term;
 after that point the collector sees the authoritative terms used for their repo.
 
 Changing money math needs owner approval and the full review required by

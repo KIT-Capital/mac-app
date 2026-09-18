@@ -359,6 +359,7 @@ test.describe("desk", () => {
             catalog: [],
             shells: [],
             settings: latestSettings,
+            applicationPurchaseShares: { 3: 0.6, 6: 0.6, 8: 0.6, 9: 0.6, 12: 0.6 },
           },
         }),
       });

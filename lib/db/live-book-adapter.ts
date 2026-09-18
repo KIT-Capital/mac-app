@@ -1,4 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
+import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
 import { ownerKey } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
@@ -6,6 +7,7 @@ import type {
   Agreement,
   AgreementEnd,
   AgreementShell,
+  ApplicationPurchaseShares,
   AppSettings,
   AppState,
   CatalogEntry,
@@ -46,7 +48,7 @@ export type LiveBookRows = {
 export type LiveBookState = Pick<
   AppState,
   "timepieces" | "agreements" | "users" | "photos" | "profiles" | "settings" | "catalog" | "shells"
->;
+> & { applicationPurchaseShares: ApplicationPurchaseShares };
 
 const PHOTO_KINDS = new Set(["front", "back", "left", "right", "clasp", "more", "buckle", "box", "papers", "other"]);
 const text = (row: Row, key: string, fallback = "") => typeof row[key] === "string" ? row[key] : fallback;
@@ -271,6 +273,9 @@ export function mapLiveBookRows(
     const value = profile(row);
     return [value.email, value];
   }));
+  const authoritativeSettings = settings(rows.settings ?? []);
+  const authoritativeShells = shells(rows.shells ?? []);
+  const openShell = authoritativeShells.find((shell) => shell.status === "open");
   return {
     timepieces: mappedPieces,
     agreements: mappedAgreements,
@@ -278,10 +283,14 @@ export function mapLiveBookRows(
     photos: mappedPhotos,
     profiles,
     settings: discloseDeskTerms
-      ? settings(rows.settings ?? [])
+      ? authoritativeSettings
       : { ...DEFAULT_SETTINGS, vaultLocation: "" },
     catalog: catalog(rows.catalog ?? []),
-    shells: discloseDeskTerms ? shells(rows.shells ?? []) : [],
+    shells: discloseDeskTerms ? authoritativeShells : [],
+    applicationPurchaseShares: applicationPurchaseShares(
+      authoritativeSettings,
+      openShell,
+    ),
   };
 }
 

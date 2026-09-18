@@ -276,6 +276,44 @@ describe("live-book operation repository", { skip }, () => {
     const replacedShells = await readLiveBookState(db, adminActor);
     assert.equal(replacedShells.shells.find((shell) => shell.id === `shell-u5-${suffix}`)?.status, "assigned");
     assert.equal(replacedShells.shells.find((shell) => shell.id === `shell-u5-nine-${suffix}`)?.status, "open");
+    const firstApplicant = await collector("first-application-cap");
+    const firstApplicantPiece = await createTimepiece(
+      db,
+      firstApplicant.actor,
+      firstApplicant.customer.id,
+      {
+        brand: "Vacheron Constantin",
+        model: "Overseas",
+        status: "appraised",
+        financeable: true,
+        valueLow: 100_000,
+        valueHigh: 120_000,
+      },
+    );
+    const firstApplicantState = await readLiveBookState(db, firstApplicant.actor);
+    assert.equal(firstApplicantState.settings.maxLtv, 0.6);
+    assert.deepEqual(firstApplicantState.shells, []);
+    assert.equal(firstApplicantState.applicationPurchaseShares[9], 0.45);
+    assert.equal(firstApplicantState.applicationPurchaseShares[12], 0.55);
+    const firstApplicantRepoId = `repo-first-application-cap-${suffix}`;
+    await executeLiveBookOperation(db, firstApplicant.actor, {
+      action: "agreement.create",
+      agreement: {
+        id: firstApplicantRepoId,
+        watchIds: [firstApplicantPiece.id],
+        amount: 45_000,
+        termMonths: 9,
+        delivery: "",
+        ownerName: firstApplicant.customer.name,
+        email: firstApplicant.customer.email,
+        createdAt: "2026-09-18",
+        agreementCode: `MAC-U5-FIRST-${suffix}`,
+      },
+    });
+    const [firstApplicantRepo] = await db.select({ scale: liveAgreements.scale })
+      .from(liveAgreements)
+      .where(eq(liveAgreements.id, firstApplicantRepoId));
+    assert.equal((firstApplicantRepo.scale as { purchaseShare: number }).purchaseShare, 0.45);
     await Promise.all([10, 11].map((termMonths) =>
       executeLiveBookOperation(db, adminActor, {
         action: "shell.upsert",

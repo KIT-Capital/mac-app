@@ -239,11 +239,11 @@ describe("live-book adapter mapping", () => {
       catalog: [],
       shells: [{
         id: "shell-1",
-        code: "MAC-OPEN-12",
+        code: "MAC-OPEN-9",
         title: "Open",
-        termMonths: 12,
+        termMonths: 9,
         rateBps: 2000,
-        ltvBps: 5500,
+        ltvBps: 4500,
         setupFeeBps: 150,
         earlyRepurchaseAmountBps: 400,
         brokerFeeBps: 400,
@@ -258,6 +258,16 @@ describe("live-book adapter mapping", () => {
     assert.equal(before.settings.maxLtv, 0.6);
     assert.equal(before.settings.vaultLocation, "");
     assert.deepEqual(before.shells, []);
+    assert.deepEqual(before.applicationPurchaseShares, {
+      3: 0.55,
+      6: 0.55,
+      8: 0.55,
+      9: 0.45,
+      12: 0.55,
+    });
+    assert.equal(JSON.stringify(before.applicationPurchaseShares).includes("rate"), false);
+    assert.equal(JSON.stringify(before.applicationPurchaseShares).includes("fee"), false);
+    assert.equal(JSON.stringify(before.applicationPurchaseShares).includes("vault"), false);
 
     const after = mapLiveBookRows(rows, "cust-a", true);
     assert.equal(after.settings.maxLtv, 0.55);

@@ -132,7 +132,9 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   application defaults without writing a row. Empty catalog and shell tables are
   returned empty; demo rows are never seeded in live mode. Before a collector has
   an application or repo, custom pricing and shells are withheld and custody is
-  blank; the desk always receives the authoritative values.
+  blank; the response exposes only the effective purchase-share cap for each
+  selectable application term so the proposed amount matches server enforcement.
+  The desk always receives the authoritative values.
 - Live reads include the server-authenticated viewer role and identity. The client
   uses that viewer to replace stale tab identity instead of trusting sessionStorage;
   desk viewers are rebuilt from the trusted staff/admin profiles.
