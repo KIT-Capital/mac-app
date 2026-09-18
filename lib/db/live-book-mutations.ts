@@ -11,6 +11,7 @@ import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { parseLiveBookOperation } from "@/lib/live-book-operation.mjs";
 import type { Agreement } from "@/lib/types";
 import type { Database } from "./client";
+import { liveAgreementHasDocuments } from "./agreement-documents";
 import { dollarsToCents } from "./money.mjs";
 import type { Actor } from "./records";
 import {
@@ -317,6 +318,9 @@ export async function executeLiveBookOperation(
     requireDesk(actor);
     const agreement = await ownedAgreement(db, actor, String(operation.id));
     requireMutableAgreement(agreement);
+    if (await liveAgreementHasDocuments(db, agreement.id)) {
+      throw new Error("AGREEMENT_HAS_DOCUMENTS");
+    }
     await db.transaction(async (tx) => {
       await tx.delete(liveAgreementEnds).where(eq(liveAgreementEnds.agreementId, agreement.id));
       await tx.delete(liveAgreementMembers).where(eq(liveAgreementMembers.agreementId, agreement.id));
