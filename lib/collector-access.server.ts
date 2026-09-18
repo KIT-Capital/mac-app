@@ -13,6 +13,7 @@ import {
   resolveCollectorSession,
   revokeCollectorSession,
 } from "@/lib/db/collector-sessions";
+import { findStaffByEmail } from "@/lib/db/staff-accounts";
 import {
   findCustomerByEmail,
 } from "@/lib/db/records";
@@ -33,6 +34,7 @@ export async function requestCollectorAccess(input: unknown, address: string) {
         now: Date;
       }) => consumeAccessRateLimit(db, limit),
       findCustomerByEmail: (email: string) => findCustomerByEmail(db, email),
+      findStaffByEmail: (email: string) => findStaffByEmail(db, email),
       createAccessToken: (token: Parameters<typeof createCollectorAccessToken>[1]) =>
         createCollectorAccessToken(db, token),
       sendAccessEmail: dispatchCollectorAccessMail,

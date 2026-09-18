@@ -1,0 +1,1 @@
+ALTER TABLE "staff_accounts" ADD COLUMN "session_valid_after" timestamp with time zone DEFAULT 'epoch'::timestamptz NOT NULL;

@@ -1,13 +1,11 @@
-import { cookies } from "next/headers";
 import { headers } from "next/headers";
 import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { getDb } from "@/lib/db/client";
 import { consumeAccessRateLimit } from "@/lib/db/collector-sessions";
 import { allowMailRequest, dispatchMail, listOutbox, mailConfigured, mailFrom, parseMailRequest } from "@/lib/mail";
-import { deskApiStatus } from "@/lib/desk-guard.mjs";
-import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
 import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
+import { requestActor } from "@/lib/server/request-actor";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 const DESK_ONLY = new Set(["invite", "test"]);
@@ -18,17 +16,25 @@ function clientIp(headerList: Headers) {
 }
 
 async function deskSession() {
-  const jar = await cookies();
-  return readDeskToken(jar.get(DESK_COOKIE)?.value);
+  const resolved = await requestActor();
+  if ("error" in resolved) return resolved;
+  return resolved.actor.role === "staff" || resolved.actor.role === "admin"
+    ? resolved
+    : { error: "DESK_SESSION_REQUIRED" };
+}
+
+function deskFailure(error: string) {
+  return Response.json(
+    { error: error === "PASSWORD_ROTATION_REQUIRED" ? error : "Desk session required." },
+    { status: error === "PASSWORD_ROTATION_REQUIRED" ? 409 : 403 },
+  );
 }
 
 export async function GET() {
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
-  const status = deskApiStatus(await deskSession());
-  if (status !== 200) {
-    return Response.json({ error: "Desk session required." }, { status });
-  }
+  const desk = await deskSession();
+  if ("error" in desk) return deskFailure(desk.error);
   return Response.json({
     configured: mailConfigured(),
     from: mailFrom(),
@@ -66,10 +72,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Too many emails from this device. Try again in a minute." }, { status: 429 });
     }
     if (DESK_ONLY.has(payload.kind)) {
-      const status = deskApiStatus(await deskSession());
-      if (status !== 200) {
-        return Response.json({ error: "Desk session required." }, { status });
-      }
+      const desk = await deskSession();
+      if ("error" in desk) return deskFailure(desk.error);
     }
 
     const result = await dispatchMail(payload);

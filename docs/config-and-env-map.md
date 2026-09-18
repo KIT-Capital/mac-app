@@ -1,6 +1,6 @@
 # Config and env map
 
-**Tier: REFERENCE** · Last verified: 2026-09-15
+**Tier: REFERENCE** · Last verified: 2026-09-18
 
 Key **names** only. Values belong in Doppler or Railway variables. See `.env.example`. Never print values.
 
@@ -66,7 +66,7 @@ Doppler is authoritative. One path only:
 3. Local processes use `doppler run`. Railway `start` reads Railway variables, not Doppler.
 4. Do not put connection strings in `.env.local`. Use `neon checkout --no-env-pull`.
 
-Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover `RESEND_API` is gone. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler (`dev` / `stg` / `prd` / `dev_personal`) and all three Railway environments. `NEXT_PUBLIC_SITE_URL` is `https://mac-app-staging.up.railway.app` on Doppler `stg` / Railway staging, and `https://mechart.app` on Doppler `prd` / Railway production and Development. Production now also has `RESEND_REPLY_TO` from Doppler `prd`. Development still has `DESK_SESSION_SECRET`.
+Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover `RESEND_API` is gone. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler (`dev` / `stg` / `prd` / `dev_personal`) and all three Railway environments. `NEXT_PUBLIC_SITE_URL` is `https://mac-app-staging.up.railway.app` on Doppler `stg` / Railway staging, and `https://mechart.app` on Doppler `prd` / Railway production and Development. Production now also has `RESEND_REPLY_TO` from Doppler `prd`. Development may retain `DESK_SESSION_SECRET` as the single-key compatibility alias; staging and production use `DESK_SESSION_KEYS`.
 
 ## Key catalog
 
@@ -74,8 +74,11 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 |---|---|---|---|
 | `APP_ENV` | Mapping guard | Doppler + Railway production/Development | `development` · `staging` · `preview` · `production`. Required when any database URL is set |
 | `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Production/Development `https://mechart.app` · staging Railway host |
-| `DESK_SESSION_SECRET` | Desk cookie HMAC | Implemented | Local default applies only when `APP_ENV=development`; elsewhere a missing value fails closed (`DESK_SESSION_SECRET_REQUIRED`). Staging and production live mode reports unavailable without it. Replaced by `DESK_SESSION_KEYS` in U4 |
-| `DESK_SESSION_KEYS` | Desk key set | U4 | Format and verification arrive in U4; U1 readiness checks `DESK_SESSION_SECRET` because that is what tokens consume today |
+| `DESK_SESSION_SECRET` | Development desk cookie alias | Development only | Single-key compatibility alias; ignored in staging and production |
+| `DESK_SESSION_KEYS` | Desk key set | Required outside development | Ordered `kid:secret,kid2:secret2`; each secret is at least 32 characters. Sign with the first, verify all. Malformed or missing is `DESK_SESSION_KEYS_INVALID` |
+| `DESK_DEVELOPMENT_PASSWORD` | Browser-mode desk fixture | Development / Playwright only | Runtime-only password; no source fallback; ignored outside `APP_ENV=development` |
+| `DESK_BOOTSTRAP_ADMIN_EMAIL` | First live admin | Owner go-live gate | Read only while `staff_accounts` is empty; remove after first password rotation |
+| `DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH` | First live admin | Owner go-live gate | Serialized output of `npm run desk:hash-password`; never plaintext; remove after first password rotation |
 | `MAC_LIVE_BOOK` | Live-book mode | Implemented, default off | Only `1`, `true`, or `on`. Off is browser mode for development and Playwright. May be on in development, staging, and production; **production requires it** and exits with `PRODUCTION_REQUIRES_LIVE_BOOK` otherwise |
 | `COLLECTOR_SESSION_SECRET` | Collector verification and session HMAC | Required when live book is on | No committed or runtime fallback |
 | `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin outside development; development may use HTTP localhost. Missing is `COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED`, malformed is `..._INVALID` |

@@ -409,7 +409,9 @@ describe("collector access rows", { skip }, () => {
       now,
     });
 
-    const deleted = await sweepCollectorAccessRows(db, now);
+    const deleted = await sweepCollectorAccessRows(db, now, {
+      rateScopePrefix: `test-${suffix}`,
+    });
     assert.deepEqual(deleted, { tokens: 1, sessions: 1, rateWindows: 1 });
     assert.equal((await db.select().from(collectorAccessTokens)
       .where(eq(collectorAccessTokens.id, oldToken.id))).length, 0);

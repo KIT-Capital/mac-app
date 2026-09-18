@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   DEMO_CATALOG,
   DEMO_SETTINGS,
@@ -15,7 +16,7 @@ import {
   DEMO_USERS,
   photosFromWatches,
 } from "@/lib/admin-seed";
-import { deskRoleForEmail, isReservedDeskEmail } from "@/lib/auth";
+import { isReservedDeskEmail } from "@/lib/auth";
 import { maxPurchaseAmount } from "@/lib/catalog";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
@@ -124,6 +125,7 @@ function emptyState(): AppState {
 }
 
 const SERVER_STATE = emptyState();
+const PASSWORD_STATE = { ...SERVER_STATE, hydrated: true };
 let snapshot: AppState = SERVER_STATE;
 const listeners = new Set<() => void>();
 let storeMode: StoreMode = "unknown";
@@ -279,6 +281,9 @@ async function loadAuthoritativeStore() {
     } else if (result.mode === "unavailable") {
       storeMode = "unavailable";
       snapshot = liveBookFailureState(browser) as AppState;
+    } else if (result.mode === "rotation") {
+      snapshot = { ...browser, hydrated: true };
+      window.location.replace("/admin/password");
     } else {
       storeMode = "unknown";
       snapshot = liveBookFailureState(browser) as AppState;
@@ -331,6 +336,10 @@ async function reconcileLiveStore(force = false) {
   const result = await readLiveBookMode();
   if (result.mode === "unavailable") {
     enterUnavailableMode(snapshot);
+    return;
+  }
+  if (result.mode === "rotation") {
+    window.location.replace("/admin/password");
     return;
   }
   if (!result.ok || !shouldApplyReconciliation(force, generation, optimisticGeneration)) return;
@@ -389,6 +398,10 @@ function queueLiveWrite(operation: unknown) {
     }
     const body = await response.json().catch(() => null);
     const result = parseLiveBookMutationResponse(response.status, body);
+    if (result.mode === "rotation") {
+      window.location.replace("/admin/password");
+      return { ok: false, error: "PASSWORD_ROTATION_REQUIRED" };
+    }
     if (result.mode === "unavailable") {
       enterUnavailableMode(snapshot);
       return { ok: false, error: LIVE_BOOK_UNAVAILABLE };
@@ -422,12 +435,20 @@ function subscribeStore(listener: () => void) {
   };
 }
 
+function subscribeWithoutLoad() {
+  return () => {};
+}
+
 function getStoreSnapshot() {
   return snapshot;
 }
 
 function getServerStoreSnapshot() {
   return SERVER_STATE;
+}
+
+function getPasswordStoreSnapshot() {
+  return PASSWORD_STATE;
 }
 
 function refreshStoreFromDisk() {
@@ -513,16 +534,15 @@ function demoState(): AppState {
   };
 }
 
-function assignedRole(email: string, requested?: Profile["role"]) {
-  const desk = deskRoleForEmail(email);
+function assignedRole(requested?: Profile["role"]) {
   if (requested === "admin" || requested === "staff") {
-    return desk === requested ? requested : "collector";
+    return requested;
   }
   return "collector";
 }
 
 function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
-  const role = assignedRole(email, patch?.role);
+  const role = assignedRole(patch?.role);
   const preferences = mergePreferences(patch?.preferences);
   if (role === "admin") {
     return { ...ADMIN_PROFILE, ...patch, email, role, preferences };
@@ -552,8 +572,7 @@ function normalizeUser(
   agreementCount = 0,
 ): Profile | null {
   if (!user) return null;
-  const desk = deskRoleForEmail(user.email);
-  const role = desk && (user.role === "admin" || user.role === "staff") ? desk : "collector";
+  const role = user.role === "admin" || user.role === "staff" ? user.role : "collector";
   return {
     ...user,
     role,
@@ -620,8 +639,15 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const state = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerStoreSnapshot);
+  const pathname = usePathname();
+  const skipLiveBook = pathname === "/admin/password";
+  const state = useSyncExternalStore(
+    skipLiveBook ? subscribeWithoutLoad : subscribeStore,
+    skipLiveBook ? getPasswordStoreSnapshot : getStoreSnapshot,
+    skipLiveBook ? getPasswordStoreSnapshot : getServerStoreSnapshot,
+  );
   useEffect(() => {
+    if (skipLiveBook) return;
     let lastCheck = 0;
     const recheck = () => {
       if (!shouldRecheckLiveBook(storeMode)) return;
@@ -639,7 +665,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("focus", recheck);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [skipLiveBook]);
 
   const value = useMemo<Store>(
     () => ({
@@ -657,7 +683,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ...base,
               ...profile,
               email,
-              role: assignedRole(email, profile?.role ?? base.role),
+              role: assignedRole(profile?.role ?? base.role),
               preferences: mergePreferences({ ...base.preferences, ...profile?.preferences }),
             },
             counts.pieces,

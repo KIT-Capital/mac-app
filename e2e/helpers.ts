@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 
 export const HALE = "jonathan.hale@mechartcap.com";
 export const DESK = "admin@mechartcap.com";
-export const DESK_PASSWORD = "MAC-Desk-2022";
+export const DESK_PASSWORD = process.env.DESK_DEVELOPMENT_PASSWORD ?? "";
 
 export async function signIn(page: Page, email: string, password: string) {
   await page.goto("/login");

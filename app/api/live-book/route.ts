@@ -1,3 +1,4 @@
+import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { getDb } from "@/lib/db/client";
 import { readLiveBookState } from "@/lib/db/live-book-adapter";
 import { executeLiveBookOperation } from "@/lib/db/live-book-mutations";
@@ -39,7 +40,10 @@ export async function GET() {
     const context = await liveContext();
     if (context.mode === "browser") return json({ mode: "browser" });
     if (context.mode === "error") return json({ mode: "live", error: context.error }, 503);
-    if (context.mode === "unauthorized") return json({ mode: "live", error: context.error }, 401);
+    if (context.mode === "unauthorized") {
+      const failure = liveBookErrorResponse(new Error(context.error));
+      return json({ mode: "live", error: failure.error }, failure.status);
+    }
     return json({
       mode: "live",
       viewer: context.viewer,
@@ -59,9 +63,14 @@ export async function POST(request: Request) {
     const context = await liveContext();
     if (context.mode === "browser") return json({ mode: "browser" });
     if (context.mode === "error") return json({ mode: "live", error: context.error }, 503);
-    if (context.mode === "unauthorized") return json({ mode: "live", error: context.error }, 401);
+    if (context.mode === "unauthorized") {
+      const failure = liveBookErrorResponse(new Error(context.error));
+      return json({ mode: "live", error: failure.error }, failure.status);
+    }
     const input = await request.json().catch(() => null);
-    await executeLiveBookOperation(getDb(), context.actor, input);
+    await executeLiveBookOperation(getDb(), context.actor, input, {
+      clientAddress: clientAddress(request.headers),
+    });
     return json({ mode: "live", acknowledged: true, viewer: context.viewer });
   } catch (error) {
     const failure = liveBookErrorResponse(error);

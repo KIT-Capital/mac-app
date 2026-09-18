@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { issueDeskToken } from "../lib/desk-session";
 import {
   DESK,
   DESK_PASSWORD,
@@ -47,6 +48,31 @@ test.describe("desk", () => {
     const response = await request.get("/admin");
     expect(response.status()).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Desk session required." });
+  });
+
+  test("forced rotation opens only the password page without loading the book", async ({ context, page }) => {
+    const token = issueDeskToken(DESK, "admin", {
+      env: {
+        APP_ENV: "development",
+        DESK_SESSION_SECRET: process.env.DESK_SESSION_SECRET,
+      },
+      mustRotate: true,
+    });
+    await context.addCookies([{
+      name: "mac_desk",
+      value: token,
+      url: "http://127.0.0.1:43173",
+    }]);
+    const liveBookRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/live-book")) liveBookRequests.push(request.url());
+    });
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/admin\/password/);
+    await expect(page.getByRole("heading", { name: "Choose a new desk password" })).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await page.waitForTimeout(100);
+    expect(liveBookRequests).toEqual([]);
   });
 
   test("staff cannot see the Renew control", async ({ page }) => {
@@ -99,6 +125,44 @@ test.describe("desk", () => {
     await page.getByRole("link", { name: "Client Assets" }).click();
     await expect(page.getByText("Richard Mille RM 011")).toBeVisible();
     await expect(page.getByText("Audemars Piguet Royal Oak Selfwinding")).toBeVisible();
+  });
+
+  test("staff temporary passwords appear once and disappear after dismissal", async ({ page }) => {
+    let postCount = 0;
+    await page.route("**/api/desk/staff", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ mode: "live", members: [] }),
+        });
+        return;
+      }
+      postCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          temporaryPassword: "one-time-password-value",
+        }),
+      });
+    });
+    await signInDesk(page);
+    await page.goto("/admin/access");
+    const staff = page.locator("section").filter({
+      has: page.getByRole("heading", { name: "Desk staff" }),
+    });
+    await staff.getByLabel("Name").fill("New Staff");
+    await staff.getByLabel("Email").fill("new.staff@example.com");
+    await staff.getByRole("button", { name: "Add desk account" }).dblclick();
+    expect(postCount).toBe(1);
+    await expect(page.getByText("one-time-password-value")).toBeVisible();
+    await page.getByRole("button", { name: "Dismiss" }).click();
+    await expect(page.getByText("one-time-password-value")).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByText("one-time-password-value")).toHaveCount(0);
   });
 
   test("desk appraises a reviewing piece from the catalog range", async ({ page }) => {

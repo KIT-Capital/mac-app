@@ -97,9 +97,14 @@ export default function AgreementDetailPage() {
       .then(async (response) => {
         const body = (await response.json().catch(() => null)) as {
           mode?: string;
+          error?: string;
           documents?: ListedDocument[];
         } | null;
         if (cancelled) return;
+        if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+          window.location.replace("/admin/password");
+          return;
+        }
         if (body?.mode === "live") {
           setBookMode("live");
           setDocuments(Array.isArray(body.documents) ? body.documents : []);
@@ -135,6 +140,11 @@ export default function AgreementDetailPage() {
       body: JSON.stringify({ action: "url", documentId }),
     });
     const body = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+    if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+      tab?.close();
+      window.location.replace("/admin/password");
+      return;
+    }
     if (!response.ok || !body?.url) {
       tab?.close();
       setDocError(body?.error === "DOCUMENT_NOT_FOUND" ? "That document is not available." : "Could not open the stored PDF.");
@@ -173,6 +183,10 @@ export default function AgreementDetailPage() {
         }),
       });
       const body = (await response.json().catch(() => null)) as { send?: { result?: string }; error?: string } | null;
+      if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+        window.location.replace("/admin/password");
+        return;
+      }
       if (!response.ok || body?.send?.result !== "accepted") {
         setDocError(
           body?.error === "DOCUMENT_RECIPIENT_UNCONFIRMED"

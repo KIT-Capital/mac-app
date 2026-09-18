@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, like, lt, sql } from "drizzle-orm";
 import { hashRateLimitKey, rateWindowStart } from "../access-rate-limit.mjs";
 import type { Database } from "./client";
 import {
@@ -8,6 +8,7 @@ import {
   collectorAccessTokens,
   collectorSessions,
   customers,
+  staffAccounts,
 } from "./schema";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60_000;
@@ -113,6 +114,11 @@ export async function redeemCollectorAccessToken(
     } else if (access.purpose === "register") {
       const registration = candidate.registrationPayload as RegistrationPayload | null;
       if (!registration) throw new Error("ACCESS_TOKEN_INVALID");
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${registration.email}))`);
+      const [staff] = await tx.select({ id: staffAccounts.id }).from(staffAccounts)
+        .where(eq(staffAccounts.email, registration.email))
+        .limit(1);
+      if (staff) throw new Error("ACCESS_TOKEN_INVALID");
       [customer] = await tx
         .insert(customers)
         .values({
@@ -247,7 +253,73 @@ export async function consumeAccessRateLimit(
   return { allowed: row.hits <= input.limit, hits: row.hits, windowStart };
 }
 
-export async function sweepCollectorAccessRows(db: Database, now = new Date()) {
+export async function clearAccessRateLimit(db: Database, scope: string, key: string) {
+  await db.delete(accessRateLimits).where(and(
+    eq(accessRateLimits.scope, scope),
+    eq(accessRateLimits.keyHash, hashRateLimitKey(key)),
+  ));
+}
+
+export async function releaseAccessRateLimit(
+  db: Database,
+  input: {
+    scope: string;
+    key: string;
+    windowMs: number;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  const windowStart = rateWindowStart(now, input.windowMs);
+  const where = and(
+    eq(accessRateLimits.scope, input.scope),
+    eq(accessRateLimits.keyHash, hashRateLimitKey(input.key)),
+    eq(accessRateLimits.windowStart, windowStart),
+  );
+  const decremented = await db.update(accessRateLimits)
+    .set({
+      hits: sql`${accessRateLimits.hits} - 1`,
+      updatedAt: now,
+    })
+    .where(and(where, gt(accessRateLimits.hits, 1)))
+    .returning({ hits: accessRateLimits.hits });
+  if (!decremented.length) {
+    await db.delete(accessRateLimits).where(and(
+      where,
+      eq(accessRateLimits.hits, 1),
+    ));
+  }
+}
+
+export async function peekAccessRateLimit(
+  db: Database,
+  input: {
+    scope: string;
+    key: string;
+    limit: number;
+    windowMs: number;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  const windowStart = rateWindowStart(now, input.windowMs);
+  const [row] = await db.select({ hits: accessRateLimits.hits })
+    .from(accessRateLimits)
+    .where(and(
+      eq(accessRateLimits.scope, input.scope),
+      eq(accessRateLimits.keyHash, hashRateLimitKey(input.key)),
+      eq(accessRateLimits.windowStart, windowStart),
+    ))
+    .limit(1);
+  const hits = row?.hits ?? 0;
+  return { allowed: hits < input.limit, hits, windowStart };
+}
+
+export async function sweepCollectorAccessRows(
+  db: Database,
+  now = new Date(),
+  options: { rateScopePrefix?: string } = {},
+) {
   const tokenCutoff = new Date(now.getTime() - 24 * 60 * 60_000);
   const rateCutoff = new Date(now.getTime() - 2 * 60 * 60_000);
   const deletedTokens = await db
@@ -260,7 +332,12 @@ export async function sweepCollectorAccessRows(db: Database, now = new Date()) {
     .returning({ id: collectorSessions.id });
   const deletedRateWindows = await db
     .delete(accessRateLimits)
-    .where(lt(accessRateLimits.windowStart, rateCutoff))
+    .where(and(
+      lt(accessRateLimits.windowStart, rateCutoff),
+      options.rateScopePrefix
+        ? like(accessRateLimits.scope, `${options.rateScopePrefix}%`)
+        : sql`true`,
+    ))
     .returning({ scope: accessRateLimits.scope });
   return {
     tokens: deletedTokens.length,

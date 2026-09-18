@@ -8,7 +8,7 @@ import { UnavailablePage } from "@/components/unavailable-page";
 import { isDesk } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
-const PUBLIC = ["/", "/login", "/signup", "/privacy", "/verify"];
+const PUBLIC = ["/", "/login", "/signup", "/privacy", "/verify", "/admin/password"];
 const ONBOARDING = ["/collection/setup", "/collection/add", "/collection/continue"];
 
 export function AppFrame({ children }: { children: ReactNode }) {
@@ -62,7 +62,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
     </div>
   );
 
-  if (isAdmin) {
+  if (isAdmin && pathname !== "/admin/password") {
     return <DeskShell>{body}</DeskShell>;
   }
 

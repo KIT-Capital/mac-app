@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { MacLockup } from "@/components/mac-logo";
-import { authenticate } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
 export default function LoginPage() {
@@ -26,12 +25,6 @@ export default function LoginPage() {
     setNotice("");
     setBusy(true);
     if (deskMode) {
-      const result = authenticate(email, password);
-      if (!result.ok || result.role === "collector") {
-        setError(result.ok ? "That address is not a desk account." : result.error);
-        setBusy(false);
-        return;
-      }
       const session = await fetch("/api/desk-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -44,7 +37,15 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      signIn({ email: email.trim(), role: result.role });
+      const authenticated = await session.json() as {
+        role: "admin" | "staff";
+        mustRotate?: boolean;
+      };
+      if (authenticated.mustRotate) {
+        router.replace("/admin/password");
+        return;
+      }
+      signIn({ email: email.trim(), role: authenticated.role });
       router.replace("/admin");
       return;
     }
