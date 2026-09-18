@@ -1,8 +1,16 @@
 # API
 
-**Tier: CONTRACT** · Last verified: 2026-09-17
+**Tier: CONTRACT** · Last verified: 2026-09-18
 
 There is no tRPC router. Server surface is App Router handlers. Everything else is client state.
+
+Cookie-authenticated mutations (`POST` / `DELETE` on `/api/live-book`,
+`/api/agreement-documents`, `/api/mail`, `/api/desk-session`, and
+`/api/desk/*`) refuse a cross-site caller **403** `REQUEST_ORIGIN_FORBIDDEN`
+before reading the body. Same-origin (`Sec-Fetch-Site: same-origin`) or
+`Origin` exactly equal to `COLLECTOR_MAGIC_LINK_ORIGIN` is allowed. `GET`
+handlers are not origin-gated. `/api/contracts/pdf` keeps the same rule and
+still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 
 ## `POST` / `GET` `/api/mail`
 

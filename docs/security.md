@@ -1,6 +1,6 @@
 # Security
 
-**Tier: CONTRACT** · Last verified: 2026-09-17
+**Tier: CONTRACT** · Last verified: 2026-09-18
 
 ## Authentication (current)
 
@@ -65,7 +65,10 @@ Collection state and photos still live in the browser. Neon `development` has sy
 
 ## Authorization
 
-Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; the client redirect in `components/app-frame.tsx` is not the gate. Collector page routes stay client-gated. When the development live-book switch is on, `/api/live-book` opens the verified collector session with the configured secret, confirms immutable customer ID and email against Neon, and scopes reads and operation-level mutations to that customer. Desk and collector cookies are mutually exclusive; a request carrying both is rejected. Existing repository isolation still applies. WorkOS is not wired. Do not rotate `DESK_SESSION_SECRET` here.
+Every cookie-authenticated mutation checks request origin before reading the
+body. Same-origin browser calls pass. A cross-site `Origin` is **403**
+`REQUEST_ORIGIN_FORBIDDEN`; `Host` and `X-Forwarded-Host` are never the
+allowlist. Desk-only mail kinds and outbox `GET` require the desk cookie and return **403** without it. `/admin` is refused on the server by `proxy.ts` (403 JSON) using the same cookie; the client redirect in `components/app-frame.tsx` is not the gate. Collector page routes stay client-gated. When the development live-book switch is on, `/api/live-book` opens the verified collector session with the configured secret, confirms immutable customer ID and email against Neon, and scopes reads and operation-level mutations to that customer. Desk and collector cookies are mutually exclusive; a request carrying both is rejected. Existing repository isolation still applies. WorkOS is not wired. Do not rotate `DESK_SESSION_SECRET` here.
 
 ## Secrets
 

@@ -6,6 +6,7 @@ import { customers, liveAgreements, timepieces } from "@/lib/db/schema";
 import { deskActor } from "@/lib/db/records";
 import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
+import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ function json(body: unknown, status = 200) {
 }
 
 export async function POST(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   // Production starts empty (R4): the browser-book import never runs there, flag or not.
   if (process.env.APP_ENV?.trim() === "production") {
     return json({ error: "IMPORT_REFUSED_IN_PRODUCTION" }, 403);
