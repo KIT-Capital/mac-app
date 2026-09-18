@@ -1,17 +1,10 @@
-import { cookies } from "next/headers";
-import { and, eq } from "drizzle-orm";
-import {
-  COLLECTOR_COOKIE,
-  openCollectorSession,
-} from "@/lib/collector-access.mjs";
 import { getDb } from "@/lib/db/client";
 import { readLiveBookState } from "@/lib/db/live-book-adapter";
 import { executeLiveBookOperation } from "@/lib/db/live-book-mutations";
-import { deskActor, toCollectorActor, type Actor } from "@/lib/db/records";
-import { customers } from "@/lib/db/schema";
-import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
 import { liveBookErrorResponse } from "@/lib/live-book-errors.mjs";
+import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
+import { requestActor } from "@/lib/server/request-actor";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
@@ -21,34 +14,6 @@ function json(body: unknown, status = 200) {
     status,
     headers: { "Cache-Control": "private, no-store" },
   });
-}
-
-async function requestActor(): Promise<{ actor: Actor } | { error: string }> {
-  const jar = await cookies();
-  const deskToken = jar.get(DESK_COOKIE)?.value;
-  const collectorToken = jar.get(COLLECTOR_COOKIE)?.value;
-  if (deskToken && collectorToken) return { error: "AMBIGUOUS_SESSION" };
-
-  const desk = readDeskToken(deskToken);
-  if (desk) return { actor: deskActor(desk.role, desk.email) };
-  if (!collectorToken) return { error: "SESSION_REQUIRED" };
-
-  const config = evaluateLiveBookConfig(process.env);
-  if (!config.enabled || !config.ok) return { error: "LIVE_BOOK_CONFIG_INVALID" };
-  let session;
-  try {
-    session = openCollectorSession(collectorToken, config.secret);
-  } catch {
-    return { error: "SESSION_INVALID" };
-  }
-  const db = getDb();
-  const [customer] = await db.select().from(customers).where(and(
-    eq(customers.id, session.customerId),
-    eq(customers.email, session.email),
-    eq(customers.status, "active"),
-  )).limit(1);
-  if (!customer) return { error: "SESSION_INVALID" };
-  return { actor: toCollectorActor(customer) };
 }
 
 async function liveContext() {
@@ -86,6 +51,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
   try {

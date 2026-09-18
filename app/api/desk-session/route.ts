@@ -6,9 +6,12 @@ import {
   deskCookieOptions,
   openDeskSession,
 } from "@/lib/desk-session";
+import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export async function POST(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
   const body = (await request.json().catch(() => null)) as { email?: string; password?: string } | null;
@@ -30,7 +33,9 @@ export async function POST(request: Request) {
   return Response.json({ ok: true });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   const jar = await cookies();
   jar.delete(DESK_COOKIE);
   return Response.json({ ok: true });

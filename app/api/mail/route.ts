@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { allowMailRequest, dispatchMail, listOutbox, mailConfigured, mailFrom, parseMailRequest } from "@/lib/mail";
 import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
+import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 const DESK_ONLY = new Set(["invite", "test"]);
@@ -32,6 +33,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
   try {

@@ -12,6 +12,9 @@ import {
   signOutFromMenu,
 } from "./helpers";
 
+const sameOrigin = { "Sec-Fetch-Site": "same-origin" };
+const crossSite = { Origin: "https://evil.example" };
+
 test.describe("desk", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 810 });
@@ -24,9 +27,20 @@ test.describe("desk", () => {
 
   test("live-book import requires a desk session and does not change the store", async ({ request }) => {
     const response = await request.post("/api/desk/live-book-import", {
+      headers: sameOrigin,
       data: { payload: { agreements: [], timepieces: [] }, commit: true, confirmLiveImport: true },
     });
     expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Desk session required." });
+  });
+
+  test("a cross-site live-book import is refused before the body is read", async ({ request }) => {
+    const response = await request.post("/api/desk/live-book-import", {
+      headers: crossSite,
+      data: { payload: { agreements: [], timepieces: [] }, commit: true, confirmLiveImport: true },
+    });
+    expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "REQUEST_ORIGIN_FORBIDDEN" });
   });
 
   test("desk pages require a desk session", async ({ request }) => {
@@ -45,9 +59,20 @@ test.describe("desk", () => {
 
   test("desk-only mail kinds require a desk session", async ({ request }) => {
     const response = await request.post("/api/mail", {
+      headers: sameOrigin,
       data: { kind: "invite", name: "Guest", email: "guest@mac.test" },
     });
     expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Desk session required." });
+  });
+
+  test("a cross-site mail mutation is refused before the body is read", async ({ request }) => {
+    const response = await request.post("/api/mail", {
+      headers: crossSite,
+      data: { kind: "invite", name: "Guest", email: "guest@mac.test" },
+    });
+    expect(response.status()).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ code: "REQUEST_ORIGIN_FORBIDDEN" });
   });
 
   test("a forged desk cookie does not open the desk or the outbox", async ({ request }) => {
