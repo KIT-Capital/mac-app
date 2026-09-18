@@ -55,7 +55,7 @@ Staff on another machine cannot see the vault because the live book is one brows
 
 #### Agreement surfaces
 
-- R11. Collector and desk keep an on-screen repo and a downloadable PDF. Official filed copies stay outside the app.
+- R11. Collector and desk keep an on-screen repo and a stored, checksummed unsigned PDF in live mode. Executed or signed official copies stay outside until a signing design.
 - R12. Visual chrome follows the 14 November 2022 Limus deck (`docs/design-reference.md`): dark/light pair, Logo-FF, two-column collection, application fields, account tiles. Do not use the MB&F mark.
 - R13. Product detail the 2022 deck omits comes from the 2021 App Screenshots folder: multi-piece repo, on-screen agreement pages, and Sign or download PDF. Keep those behaviors. Do not copy 2021 “financing” words.
 

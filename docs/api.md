@@ -16,11 +16,31 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
 
 ## `POST` `/api/contracts/pdf`
 
-- Accepts a JSON `ContractInput` (`lib/types.ts`): seller, sale amount, term, start date, optional delivery/code/scale, and timepieces.
-- Returns a branded sale-and-repurchase PDF. Copy is rejected if it uses loan/interest/lender language.
-- This handler does **not** read browser store state. Collectors assemble the payload in `/agreements/[id]` after application.
-- Unauthenticated by design so the collector download can call it with an explicit payload. Rate-limit and session policy are still open.
-- Validation errors are JSON `{ error, code, errors }` with 400. Render failures are 400 or 500 with `CONTRACT_PDF_FAILED`.
+- Browser mode (`MAC_LIVE_BOOK` unset): same-origin or `Origin` exactly equal to
+  `COLLECTOR_MAGIC_LINK_ORIGIN`. Missing both, a mismatch, or an unset allowlist
+  is **403**. `Host` and `X-Forwarded-Host` are never the allowlist. The request
+  is rate-limited with `allowMailRequest`, Scenario 60 floor-checked, and the PDF
+  is watermarked as a temporary preview. It is never labeled stored or official.
+- Live mode (`MAC_LIVE_BOOK` on): request-body JSON does **not** mint a
+  MAC-branded PDF (**403** `LIVE_PDF_JSON_REFUSED`). Use `/api/agreement-documents`.
+- Validation errors are JSON `{ error, code, errors }` with 400. Render failures
+  are 400 or 500 with `CONTRACT_PDF_FAILED`.
+
+## `GET` / `POST` `/api/agreement-documents`
+
+- Flag off returns `{ mode: "browser" }` and opens neither Neon nor R2.
+- Live mode requires exactly one valid desk or collector session. Unauthenticated
+  is **401** before any ID lookup. Collector reads are scoped by `customer_id`;
+  a foreign ID returns the same `DOCUMENT_NOT_FOUND` body as a missing ID.
+- `GET` lists documents (`liveAgreementId`, optional desk `customerId`).
+- `POST` `{ action: "build", liveAgreementId }` freezes the stored live repo and
+  conditionally writes the PDF. Extra contract fields are **400**.
+- `POST` `{ action: "url", documentId }` verifies checksum and bytes, then returns
+  only `{ url, expiresAt }` with `Cache-Control: private, no-store`. Never returns
+  object key, bucket, or credentials.
+- There is no tRPC or MCP procedure. These HTTP handlers are the shared human
+  path; an agent tool adapter remains an explicit parity exception.
+- Email of a stored PDF is a later unit on this same route.
 
 ## `POST` `/api/desk/live-book-import`
 

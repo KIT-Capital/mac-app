@@ -10,6 +10,7 @@ import {
 } from "@/lib/mail-types";
 import { routeInternalRecipients } from "@/lib/internal-mail.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
+import { allowMailRequest as allowKeyedMailRequest } from "@/lib/mail-rate.mjs";
 
 export type { MailKind, MailRequest, OutboxItem };
 export { MAIL_KINDS };
@@ -43,7 +44,6 @@ type MailDeliveryOptions = {
 
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const outbox: OutboxItem[] = [];
-const hits = new Map<string, { n: number; reset: number }>();
 
 export function isMailKind(value: unknown): value is RequestMailKind {
   return typeof value === "string" && (MAIL_KINDS as readonly string[]).includes(value);
@@ -71,16 +71,7 @@ export function listOutbox() {
 }
 
 export function allowMailRequest(ip: string) {
-  const now = Date.now();
-  const limit = mailConfigured() ? 8 : 80;
-  const slot = hits.get(ip);
-  if (!slot || now > slot.reset) {
-    hits.set(ip, { n: 1, reset: now + 60_000 });
-    return true;
-  }
-  if (slot.n >= limit) return false;
-  slot.n += 1;
-  return true;
+  return allowKeyedMailRequest(ip);
 }
 
 export function parseMailRequest(input: unknown): MailRequest {

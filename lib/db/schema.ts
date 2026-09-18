@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -321,4 +322,58 @@ export const livePreviews = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("live_previews_timepiece_id_idx").on(table.timepieceId)],
+);
+
+/** Frozen unsigned agreement PDF metadata. Not the signed archive table. */
+export const agreementDocuments = pgTable(
+  "agreement_documents",
+  {
+    id: text("id").primaryKey(),
+    liveAgreementId: text("live_agreement_id")
+      .notNull()
+      .references(() => liveAgreements.id),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    version: integer("version").notNull(),
+    supersedesDocumentId: text("supersedes_document_id").references((): AnyPgColumn => agreementDocuments.id),
+    templateVersion: text("template_version").notNull(),
+    status: text("status").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    snapshotHash: text("snapshot_hash").notNull(),
+    objectKey: text("object_key"),
+    checksum: text("checksum"),
+    bytes: integer("bytes"),
+    failureCode: text("failure_code"),
+    createdByKind: text("created_by_kind").notNull(),
+    createdById: text("created_by_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    storedAt: timestamp("stored_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("agreement_documents_live_version_uidx").on(table.liveAgreementId, table.version),
+    index("agreement_documents_customer_id_idx").on(table.customerId),
+    index("agreement_documents_live_agreement_id_idx").on(table.liveAgreementId),
+  ],
+);
+
+/** Email attempts for a stored agreement PDF. Filled in the mail unit. */
+export const agreementDocumentSends = pgTable(
+  "agreement_document_sends",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => agreementDocuments.id),
+    actorKind: text("actor_kind").notNull(),
+    actorId: text("actor_id").notNull(),
+    recipientEmail: text("recipient_email").notNull(),
+    recipientKind: text("recipient_kind").notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    providerMessageId: text("provider_message_id"),
+    result: text("result").notNull(),
+    failureCode: text("failure_code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("agreement_document_sends_document_id_idx").on(table.documentId)],
 );

@@ -88,7 +88,7 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | `DATABASE_URL_UNPOOLED` | Neon direct URL | Verified | Same endpoint as pooled; migrate process only (later) |
 | `NEON_BRANCH` | Branch label | Verified | Must match `APP_ENV` for development/production |
 | `R2_ACCOUNT_ID` | R2 S3 account | Verified | Norfolk AI Cloudflare account; Doppler + Railway |
-| `R2_BUCKET` | R2 bucket name | Verified | `mac-app`; private (no r2.dev); Doppler + Railway |
+| `R2_BUCKET` | R2 bucket name | Verified | `mac-app`; private (no r2.dev); Doppler + Railway. Owner applies a Cloudflare bucket lock on `{app_env}/agreements/` so stored PDFs cannot be overwritten or deleted in-app. Code does not apply the lock. |
 | `R2_S3_ENDPOINT` | R2 S3 API host | Verified | `https://<account>.r2.cloudflarestorage.com`; adapter can also derive this from `R2_ACCOUNT_ID` |
 | `R2_REGION` | R2 S3 region | Verified | `auto`; Doppler + Railway |
 | `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified | Doppler + Railway; never print |

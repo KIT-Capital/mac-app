@@ -50,6 +50,13 @@
       "when": 1789670243797,
       "tag": "0006_live_book",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789734000000,
+      "tag": "0007_agreement_documents",
+      "breakpoints": true
     }
   ]
 }

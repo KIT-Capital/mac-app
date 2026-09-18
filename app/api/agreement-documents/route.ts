@@ -1,0 +1,135 @@
+import { cookies } from "next/headers";
+import { and, eq } from "drizzle-orm";
+import {
+  COLLECTOR_COOKIE,
+  openCollectorSession,
+} from "@/lib/collector-access.mjs";
+import {
+  buildAgreementDocument,
+  listAgreementDocuments,
+  mintAgreementDocumentUrl,
+} from "@/lib/db/agreement-documents";
+import { getDb } from "@/lib/db/client";
+import { deskActor, toCollectorActor, type Actor } from "@/lib/db/records";
+import { customers } from "@/lib/db/schema";
+import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
+import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
+import { liveBookErrorResponse } from "@/lib/live-book-errors.mjs";
+import { agreementDocumentStore } from "@/lib/storage/object-store.mjs";
+import { createObjectStore } from "@/lib/storage/r2-object-store.mjs";
+
+export const dynamic = "force-dynamic";
+
+function publicDocument(row: Record<string, unknown>) {
+  const { objectKey: _objectKey, ...safe } = row;
+  return safe;
+}
+
+function json(body: unknown, status = 200) {
+  return Response.json(body, {
+    status,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
+
+async function requestActor(): Promise<{ actor: Actor } | { error: string }> {
+  const jar = await cookies();
+  const deskToken = jar.get(DESK_COOKIE)?.value;
+  const collectorToken = jar.get(COLLECTOR_COOKIE)?.value;
+  if (deskToken && collectorToken) return { error: "AMBIGUOUS_SESSION" };
+
+  const desk = readDeskToken(deskToken);
+  if (desk) return { actor: deskActor(desk.role, desk.email) };
+  if (!collectorToken) return { error: "SESSION_REQUIRED" };
+
+  const config = evaluateLiveBookConfig(process.env);
+  if (!config.enabled || !config.ok) return { error: "LIVE_BOOK_CONFIG_INVALID" };
+  let session;
+  try {
+    session = openCollectorSession(collectorToken, config.secret);
+  } catch {
+    return { error: "SESSION_INVALID" };
+  }
+  const db = getDb();
+  const [customer] = await db.select().from(customers).where(and(
+    eq(customers.id, session.customerId),
+    eq(customers.email, session.email),
+    eq(customers.status, "active"),
+  )).limit(1);
+  if (!customer) return { error: "SESSION_INVALID" };
+  return { actor: toCollectorActor(customer) };
+}
+
+async function liveContext() {
+  const config = evaluateLiveBookConfig(process.env);
+  if (!config.enabled) return { mode: "browser" as const };
+  if (!config.ok) return { mode: "error" as const, error: config.errors[0] };
+  const resolved = await requestActor();
+  if ("error" in resolved) return { mode: "unauthorized" as const, error: resolved.error };
+  return { mode: "live" as const, actor: resolved.actor };
+}
+
+function documentStore() {
+  return agreementDocumentStore(createObjectStore());
+}
+
+export async function GET(request: Request) {
+  try {
+    const context = await liveContext();
+    if (context.mode === "browser") return json({ mode: "browser" });
+    if (context.mode === "error") return json({ mode: "live", error: context.error }, 503);
+    if (context.mode === "unauthorized") return json({ mode: "live", error: context.error }, 401);
+    const url = new URL(request.url);
+    const documents = await listAgreementDocuments(getDb(), context.actor, {
+      liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
+      customerId: url.searchParams.get("customerId") ?? undefined,
+    });
+    return json({ mode: "live", documents: documents.map((row) => publicDocument(row as Record<string, unknown>)) });
+  } catch (error) {
+    const failure = liveBookErrorResponse(error);
+    return json({ mode: "live", error: failure.error }, failure.status);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const context = await liveContext();
+    if (context.mode === "browser") return json({ mode: "browser" });
+    if (context.mode === "error") return json({ mode: "live", error: context.error }, 503);
+    if (context.mode === "unauthorized") return json({ mode: "live", error: context.error }, 401);
+    const input = await request.json().catch(() => null);
+    if (input == null || typeof input !== "object" || Array.isArray(input)) {
+      return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);
+    }
+    const body = input as Record<string, unknown>;
+    const action = String(body.action ?? "build");
+    if (action === "url") {
+      if (Object.keys(body).some((key) => key !== "action" && key !== "documentId")) {
+        return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);
+      }
+      const minted = await mintAgreementDocumentUrl(
+        getDb(),
+        context.actor,
+        { documentId: String(body.documentId ?? "") },
+        documentStore(),
+      );
+      return json({ mode: "live", ...minted });
+    }
+    if (action !== "build") {
+      return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);
+    }
+    if (Object.keys(body).some((key) => key !== "action" && key !== "liveAgreementId")) {
+      return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);
+    }
+    const document = await buildAgreementDocument(
+      getDb(),
+      context.actor,
+      { liveAgreementId: String(body.liveAgreementId ?? "") },
+      documentStore(),
+    );
+    return json({ mode: "live", document: publicDocument(document as Record<string, unknown>) });
+  } catch (error) {
+    const failure = liveBookErrorResponse(error);
+    return json({ mode: "live", error: failure.error }, failure.status);
+  }
+}
