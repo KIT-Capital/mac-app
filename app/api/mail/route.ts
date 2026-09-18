@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { allowMailRequest, dispatchMail, listOutbox, mailConfigured, mailFrom, parseMailRequest } from "@/lib/mail";
 import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
+import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 const DESK_ONLY = new Set(["invite", "test"]);
 
@@ -17,6 +18,8 @@ async function deskSession() {
 }
 
 export async function GET() {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   const status = deskApiStatus(await deskSession());
   if (status !== 200) {
     return Response.json({ error: "Desk session required." }, { status });
@@ -29,6 +32,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
   try {
     const headerList = await headers();
     if (!allowMailRequest(clientIp(headerList))) {

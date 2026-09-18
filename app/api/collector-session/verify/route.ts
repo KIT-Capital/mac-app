@@ -7,11 +7,12 @@ import { verifyCollectorAccess } from "@/lib/collector-access.server";
 import { DESK_COOKIE } from "@/lib/desk-session";
 
 function errorStatus(message: string) {
-  if (message === "COLLECTOR_LIVE_BOOK_DEVELOPMENT_ONLY") return 403;
   if (message === "COLLECTOR_INACTIVE") return 403;
   if (
     message === "COLLECTOR_LIVE_BOOK_DISABLED" ||
+    message === "COLLECTOR_LIVE_BOOK_APP_ENV_INVALID" ||
     message === "COLLECTOR_SESSION_SECRET_REQUIRED" ||
+    message === "COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED" ||
     message === "COLLECTOR_MAGIC_LINK_ORIGIN_INVALID" ||
     message === "COLLECTOR_ACCESS_EMAIL_REQUIRED"
   ) {

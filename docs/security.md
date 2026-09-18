@@ -17,8 +17,9 @@ Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 `POST /api/collector-session` returns browser mode before opening Neon, sending
 mail, or setting a cookie, so the existing browser login remains unchanged.
 
-When enabled, collector access is development-only and fails closed unless
-`COLLECTOR_SESSION_SECRET`, a valid fixed `COLLECTOR_MAGIC_LINK_ORIGIN`, and
+When enabled, collector access runs in development, staging, or production and
+fails closed unless `COLLECTOR_SESSION_SECRET`, a valid fixed HTTPS
+`COLLECTOR_MAGIC_LINK_ORIGIN` (HTTP localhost is development-only), and
 `RESEND_API_KEY` are present. Preview mail cannot prove identity. Login links are
 issued only for an existing Neon customer, but valid unknown emails receive the
 same generic accepted response. Suspended collectors receive that same response
@@ -36,9 +37,27 @@ An invited collector may request the same non-enumerating login link. Successful
 verification atomically activates that exact customer ID and email before issuing
 the session. Suspended collectors remain blocked.
 
+### Production runs live only
+
+Production never serves the browser or demo store (R1). `lib/env/production-readiness.mjs`
+exits the process before serving when `APP_ENV=production` and `MAC_LIVE_BOOK` is off
+(`PRODUCTION_REQUIRES_LIVE_BOOK`) or the database mapping fails. Any other missing live
+prerequisite in staging or production (session secret, origin, Resend key,
+`DESK_SESSION_KEYS`, R2 names, `DATABASE_URL`) keeps the process up but puts the app in
+the **unavailable** state: every live route (`/api/live-book`, `/api/collector-session`,
+`/api/agreement-documents`, `/api/desk-session`, `/api/mail`, `/api/desk/*`) answers
+`503 { mode: "unavailable", error }` through one `unavailableResponse()` helper, the
+store stops re-checking, and `components/app-frame.tsx` renders one unavailable page
+(lockup, one sentence, `info@mechartcap.com`, "Try again" full reload) in place of every
+route with no sign-in form and no navigation chrome. Rollback in production is that page
+or a Neon restore; flag-off browser mode is a development rollback only (R3).
+`/api/desk/live-book-import` (`IMPORT_REFUSED_IN_PRODUCTION`) and JSON PDF minting on
+`/api/contracts/pdf` (`LIVE_PDF_JSON_REFUSED`) refuse in production regardless of the flag,
+before any body is read (R4).
+
 ## Desk session
 
-`lib/desk-session.ts` signs cookie `mac_desk` with `DESK_SESSION_SECRET` (local default exists for prototype use). Treat the default as unsafe for production. Changing the secret or cookie format is part of the separate security PR, not Phase 1. The cookie is session-only: do not set `maxAge` or `expires`. Do not add a persistent collector cookie.
+`lib/desk-session.ts` signs cookie `mac_desk` with `DESK_SESSION_SECRET`. The `mac-desk-local` default applies only when `APP_ENV=development`; in staging and production a missing secret fails closed with `DESK_SESSION_SECRET_REQUIRED` — no token is issued and no token verifies, so `/admin` and desk APIs answer 403 and `POST /api/desk-session` answers the unavailable body. Moving to `DESK_SESSION_KEYS` with expiry and key ids is U4 of the go-live plan. The cookie is session-only: do not set `maxAge` or `expires`. Do not add a persistent collector cookie.
 
 ## Data
 
