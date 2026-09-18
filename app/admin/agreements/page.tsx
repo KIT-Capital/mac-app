@@ -179,6 +179,7 @@ export default function AdminAgreementsPage() {
   const [endDraft, setEndDraft] = useState({ kind: "bought_back" as BookEndKind, date: "", amount: "" });
   const [endError, setEndError] = useState("");
   const [documentNote, setDocumentNote] = useState<{ id: string; text: string } | null>(null);
+  const [sendHistory, setSendHistory] = useState<{ id: string; rows: { actorKind: string; recipientKind: string; result: string }[] } | null>(null);
   const selected = agreements.find((item) => item.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -193,14 +194,17 @@ export default function AdminAgreementsPage() {
         const body = (await response.json().catch(() => null)) as {
           mode?: string;
           documents?: { version?: number; status?: string; checksum?: string | null }[];
+          sends?: { actorKind?: string; recipientKind?: string; result?: string }[];
         } | null;
         if (cancelled) return;
         if (!response.ok) {
           setDocumentNote({ id, text: "Could not check this document." });
+          setSendHistory({ id, rows: [] });
           return;
         }
         if (body?.mode !== "live") {
           setDocumentNote({ id, text: "No stored document in browser mode." });
+          setSendHistory({ id, rows: [] });
           return;
         }
         const newest = body.documents?.find((row) => row.status === "stored") ?? body.documents?.[0];
@@ -210,9 +214,20 @@ export default function AdminAgreementsPage() {
             ? `Version ${newest.version} · ${newest.status}${newest.checksum ? ` · ${newest.checksum.slice(0, 8)}` : ""}`
             : "No stored document for this repo.",
         });
+        setSendHistory({
+          id,
+          rows: (body.sends ?? []).map((row) => ({
+            actorKind: row.actorKind ?? "collector",
+            recipientKind: row.recipientKind ?? "self",
+            result: row.result ?? "",
+          })),
+        });
       })
       .catch(() => {
-        if (!cancelled) setDocumentNote({ id, text: "Could not check this document." });
+        if (!cancelled) {
+          setDocumentNote({ id, text: "Could not check this document." });
+          setSendHistory({ id, rows: [] });
+        }
       });
     return () => {
       cancelled = true;
@@ -458,6 +473,15 @@ export default function AdminAgreementsPage() {
           <p className="text-[12px] text-white/60">
             {documentNote?.id === selected.id ? documentNote.text : "Checking document…"}
           </p>
+          {sendHistory?.id === selected.id && sendHistory.rows.length ? (
+            <ul className="space-y-1 text-[12px] text-white/55">
+              {sendHistory.rows.map((row, index) => (
+                <li key={`${row.actorKind}-${row.recipientKind}-${row.result}-${index}`}>
+                  {row.actorKind} · {row.recipientKind} · {row.result}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       ) : null}
       {selected && selected.status !== "signed" && !selected.bookEnd ? (

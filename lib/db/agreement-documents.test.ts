@@ -6,8 +6,10 @@ import { memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
 import { createDb } from "./client";
 import {
   buildAgreementDocument,
+  listAgreementDocumentSends,
   listAgreementDocuments,
   mintAgreementDocumentUrl,
+  sendAgreementDocument,
 } from "./agreement-documents";
 import { insertLiveAgreement } from "./live-book";
 import { executeLiveBookOperation } from "./live-book-mutations";
@@ -177,5 +179,109 @@ describe("agreement documents repository", { skip }, () => {
       APP_ENV: "development",
     });
     assert.ok(again.version >= 1);
+  });
+
+  it("emails self after checksum verify and hides desk and foreign sends", async () => {
+    const owner = await collector("mail-self");
+    const other = await collector("mail-other");
+    const { id } = await repo(owner);
+    const store = memoryObjectStore();
+    const built = await buildAgreementDocument(db, owner.actor, { liveAgreementId: id }, store, {
+      APP_ENV: "development",
+    });
+    let sentBytes = 0;
+    const sent = await sendAgreementDocument(
+      db,
+      owner.actor,
+      { documentId: built.id, recipientKind: "self", address: "ignored@example.com" },
+      store,
+      {
+        env: {},
+        sendEmail: async (message) => {
+          sentBytes = (message.attachments as { content: Buffer }[])[0].content.byteLength;
+          return { data: { id: "re_should_not" }, error: null };
+        },
+      },
+    );
+    assert.equal(sent.result, "accepted");
+    assert.equal(sent.recipientKind, "self");
+    assert.equal(sentBytes, 0);
+    await assert.rejects(
+      () => sendAgreementDocument(db, deskActor("staff", "desk@mechartcap.com"), {
+        documentId: built.id,
+        recipientKind: "self",
+      }, store, { env: {} }),
+      { message: "DOCUMENT_NOT_FOUND" },
+    );
+    await assert.rejects(
+      () => sendAgreementDocument(db, other.actor, { documentId: built.id, recipientKind: "self" }, store, { env: {} }),
+      { message: "DOCUMENT_NOT_FOUND" },
+    );
+    const history = await listAgreementDocumentSends(db, deskActor("admin", "admin@mechartcap.com"), {
+      liveAgreementId: id,
+    });
+    assert.equal(history.length, 1);
+    assert.equal(history[0].recipientKind, "self");
+    assert.equal(history[0].result, "accepted");
+    assert.equal(Object.hasOwn(history[0], "recipientEmail"), false);
+  });
+
+  it("does not send a checksum-mismatched object", async () => {
+    const owner = await collector("mail-bad");
+    const { id } = await repo(owner);
+    const store = memoryObjectStore();
+    const built = await buildAgreementDocument(db, owner.actor, { liveAgreementId: id }, store, {
+      APP_ENV: "development",
+    });
+    store.objects.set(built.objectKey ?? "", new Uint8Array([1, 2, 3]));
+    let called = 0;
+    await assert.rejects(
+      () => sendAgreementDocument(
+        db,
+        owner.actor,
+        { documentId: built.id, recipientKind: "self" },
+        store,
+        {
+          env: { RESEND_API_KEY: "re_test" },
+          sendEmail: async () => {
+            called += 1;
+            return { data: { id: "re_no" }, error: null };
+          },
+        },
+      ),
+      { message: "DOCUMENT_UNAVAILABLE" },
+    );
+    assert.equal(called, 0);
+  });
+
+  it("throttles a sixth send in one hour", async () => {
+    const owner = await collector("mail-throttle");
+    const { id } = await repo(owner);
+    const store = memoryObjectStore();
+    const built = await buildAgreementDocument(db, owner.actor, { liveAgreementId: id }, store, {
+      APP_ENV: "development",
+    });
+    const now = new Date();
+    for (let index = 0; index < 5; index += 1) {
+      await sendAgreementDocument(
+        db,
+        owner.actor,
+        { documentId: built.id, recipientKind: "self" },
+        store,
+        { env: {}, now },
+      );
+    }
+    await assert.rejects(
+      () => sendAgreementDocument(
+        db,
+        owner.actor,
+        { documentId: built.id, recipientKind: "self" },
+        store,
+        { env: {}, now },
+      ),
+      { message: "DOCUMENT_SEND_THROTTLED" },
+    );
+    const listed = await listAgreementDocuments(db, owner.actor, { liveAgreementId: id });
+    assert.equal(listed[0].status, "stored");
   });
 });

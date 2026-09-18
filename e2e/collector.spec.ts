@@ -256,6 +256,8 @@ test.describe("collector app", () => {
     await expect(page.getByRole("button", { name: "Download contract PDF" })).toBeVisible();
     await expect(page.getByText(/Temporary preview — not stored/i)).toBeVisible();
     await expect(page.getByText(/Electronic signing is not available/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Email me/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Email this address/i })).toHaveCount(0);
   });
 
   test("new collector agreements list keeps the empty sale-and-repurchase copy", async ({ page }) => {

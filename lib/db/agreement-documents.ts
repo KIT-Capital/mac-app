@@ -1,12 +1,19 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, max } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, max } from "drizzle-orm";
+import {
+  SENDS_PER_HOUR,
+  SEND_WINDOW_MS,
+  composeAgreementDocumentMail,
+  dispatchAgreementDocumentMail,
+  resolveSendRecipient,
+} from "@/lib/agreement-document-mail.mjs";
 import { buildAgreementSnapshot, renderAgreementSnapshotPdf } from "@/lib/contract/repo-agreement-snapshot.mjs";
 import { agreementObjectKey } from "@/lib/storage/agreement-object-key.mjs";
 import { sha256Hex } from "@/lib/storage/object-store.mjs";
 import type { Database } from "./client";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
-import { agreementDocuments, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
+import { agreementDocumentSends, agreementDocuments, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
 
 type QueryDb = Pick<Database, "select" | "insert" | "update">;
 
@@ -292,4 +299,116 @@ export async function mintAgreementDocumentUrl(
   }
   const minted = await store.presignGet(reconciled.objectKey, 300);
   return { url: minted.url, expiresAt: minted.expiresAt };
+}
+
+export async function listAgreementDocumentSends(
+  db: QueryDb,
+  actor: Actor,
+  filter: { liveAgreementId?: string; documentId?: string } = {},
+) {
+  if (actor.role === "collector") return [];
+  const docs = await listAgreementDocuments(db as Database, actor, {
+    liveAgreementId: filter.liveAgreementId,
+  });
+  const ids = docs.map((row) => row.id).filter((id) => !filter.documentId || id === filter.documentId);
+  if (!ids.length) return [];
+  return db
+    .select({
+      id: agreementDocumentSends.id,
+      documentId: agreementDocumentSends.documentId,
+      actorKind: agreementDocumentSends.actorKind,
+      recipientKind: agreementDocumentSends.recipientKind,
+      result: agreementDocumentSends.result,
+      createdAt: agreementDocumentSends.createdAt,
+    })
+    .from(agreementDocumentSends)
+    .where(inArray(agreementDocumentSends.documentId, ids))
+    .orderBy(desc(agreementDocumentSends.createdAt));
+}
+
+async function countRecentSends(
+  db: QueryDb,
+  where: ReturnType<typeof and>,
+  now: Date,
+) {
+  const cutoff = new Date(now.getTime() - SEND_WINDOW_MS);
+  const rows = await db
+    .select({ id: agreementDocumentSends.id })
+    .from(agreementDocumentSends)
+    .where(and(where, gte(agreementDocumentSends.createdAt, cutoff)));
+  return rows.length;
+}
+
+export async function sendAgreementDocument(
+  db: Database,
+  actor: Actor,
+  input: {
+    documentId: string;
+    recipientKind?: string;
+    address?: string;
+    confirmAddress?: string;
+  },
+  store: DocumentStore,
+  options: {
+    env?: NodeJS.ProcessEnv;
+    sendEmail?: (message: Record<string, unknown>) => Promise<{ data: { id?: string } | null; error: unknown }>;
+    now?: Date;
+  } = {},
+) {
+  if (actor.role !== "collector") throw new Error("DOCUMENT_NOT_FOUND");
+  const row = await scopedDocument(db, actor, input.documentId);
+  const reconciled = await reconcileBuilding(db, store, row);
+  if (reconciled.status !== "stored" || !reconciled.objectKey || !reconciled.checksum || reconciled.bytes == null) {
+    throw new Error("DOCUMENT_NOT_FOUND");
+  }
+  const bytes = await store.get(reconciled.objectKey);
+  if (sha256Hex(bytes) !== reconciled.checksum || bytes.byteLength !== reconciled.bytes) {
+    throw new Error("DOCUMENT_UNAVAILABLE");
+  }
+  const recipient = resolveSendRecipient(actor, input);
+  const now = options.now ?? new Date();
+  const sendId = randomUUID();
+  await db.insert(agreementDocumentSends).values({
+    id: sendId,
+    documentId: reconciled.id,
+    actorKind: "collector",
+    actorId: actor.customerId,
+    recipientEmail: recipient.recipientEmail,
+    recipientKind: recipient.recipientKind,
+    confirmedAt: recipient.recipientKind === "other" ? now : null,
+    result: "sending",
+  });
+  const recentDocument = await countRecentSends(db, eq(agreementDocumentSends.documentId, reconciled.id), now);
+  const recentActor = await countRecentSends(db, eq(agreementDocumentSends.actorId, actor.customerId), now);
+  if (recentDocument > SENDS_PER_HOUR || recentActor > SENDS_PER_HOUR) {
+    await db
+      .update(agreementDocumentSends)
+      .set({ result: "throttled", failureCode: "DOCUMENT_SEND_THROTTLED" })
+      .where(eq(agreementDocumentSends.id, sendId));
+    throw new Error("DOCUMENT_SEND_THROTTLED");
+  }
+  const mail = composeAgreementDocumentMail({
+    agreementCode: String((reconciled.snapshot as { contract?: { agreementCode?: string } } | null)?.contract?.agreementCode ?? ""),
+    recipientEmail: recipient.recipientEmail,
+  });
+  try {
+    const delivered = await dispatchAgreementDocumentMail(
+      { ...mail, bytes },
+      { env: options.env ?? process.env, sendEmail: options.sendEmail },
+    );
+    const result = "accepted";
+    await db
+      .update(agreementDocumentSends)
+      .set({ result, providerMessageId: delivered.id })
+      .where(eq(agreementDocumentSends.id, sendId));
+    return { id: sendId, result, recipientKind: recipient.recipientKind };
+  } catch (error) {
+    const failureCode = error instanceof Error ? error.message : "DOCUMENT_SEND_FAILED";
+    const result = failureCode === "DOCUMENT_SEND_TIMEOUT" ? "timeout" : "failed";
+    await db
+      .update(agreementDocumentSends)
+      .set({ result, failureCode: failureCode.slice(0, 80) })
+      .where(eq(agreementDocumentSends.id, sendId));
+    throw new Error(failureCode);
+  }
 }
