@@ -49,7 +49,7 @@ tools/harness/       structural check, neon-ping, drizzle migrate/ping, start wr
 
 ## Hosting
 
-Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port $PORT`; the health check path is `/api/health`. Intended public host is `mechart.app`. Mail and demo identities stay on `@mechartcap.com`. See `hosting.md`. The mapping guard and the production readiness guard run before `next start`: production exits on flag-off or a failed mapping, and any other missing live prerequisite serves the unavailable page instead of a route. **Do not deploy from this audit.**
+Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 0.0.0.0 --port $PORT`; the health check path is `/api/health`. Intended public host is `mechart.app`. Mail and demo identities stay on `@mechartcap.com`. See `hosting.md`. The mapping guard runs in the start script and in `instrumentation.ts`. The production readiness guard runs only in `instrumentation.ts` so the kit-managed start script stays untouched: production exits on flag-off or a failed mapping, and any other missing live prerequisite serves the unavailable page instead of a route. **Do not deploy from this audit.**
 
 ## Proposed platform (partially implemented)
 

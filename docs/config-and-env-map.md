@@ -97,7 +97,7 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 
 ## Production fail-closed rule
 
-`lib/env/production-readiness.mjs` runs next to the mapping guard in `tools/harness/start-mac-app.mjs` and `instrumentation.ts`. Two classes:
+`lib/env/production-readiness.mjs` runs from `instrumentation.ts` next to the mapping guard. The kit-managed start script is unchanged. Two classes:
 
 | Class | Condition | Effect |
 |---|---|---|
