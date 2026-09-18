@@ -123,6 +123,7 @@ export async function writeDeskAudit(
   targetId: string,
   clientAddress: string,
 ) {
+  if (!clientAddress.trim()) throw new Error("CLIENT_ADDRESS_REQUIRED");
   await tx.insert(deskAuditLog).values({
     id: randomUUID(),
     actorEmail: actor.email,

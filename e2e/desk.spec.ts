@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { issueDeskToken } from "../lib/desk-session";
+import { DEFAULT_SETTINGS } from "../lib/theme";
 import {
   DESK,
   DESK_PASSWORD,
@@ -308,5 +309,83 @@ test.describe("desk", () => {
     await page.getByLabel("Company name").fill("Mechanical Art Capital LLC");
     await page.getByRole("button", { name: "Save Configuration" }).click();
     await expect(page.getByText("Configuration saved to this device.")).toBeVisible();
+  });
+
+  test("live config hydrates, preserves dirty fields, and submits only changes", async ({ context, page }) => {
+    const token = issueDeskToken(DESK, "admin", {
+      env: {
+        APP_ENV: "development",
+        DESK_SESSION_SECRET: process.env.DESK_SESSION_SECRET,
+      },
+    });
+    await context.addCookies([{
+      name: "mac_desk",
+      value: token,
+      url: "http://127.0.0.1:43173",
+    }]);
+    let latestSettings = {
+      ...DEFAULT_SETTINGS,
+      startingRate: 0.2,
+      vaultLocation: "Server Vault A",
+    };
+    let submitted: Record<string, unknown> | null = null;
+    let releaseSave = () => {};
+    const saveGate = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    await page.route("**/api/live-book", async (route) => {
+      if (route.request().method() === "POST") {
+        submitted = route.request().postDataJSON();
+        await saveGate;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ mode: "live", acknowledged: true }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          viewer: { role: "admin", email: DESK },
+          book: {
+            timepieces: [],
+            agreements: [],
+            users: [],
+            photos: [],
+            profiles: {},
+            catalog: [],
+            shells: [],
+            settings: latestSettings,
+          },
+        }),
+      });
+    });
+    await page.goto("/admin/config");
+    await expect(page.getByLabel("Custody location")).toHaveValue("Server Vault A");
+    await expect(page.getByLabel("Company name")).toHaveCount(0);
+    await expect(page.getByLabel("Min purchase")).toHaveCount(0);
+    await page.getByLabel("Custody location").fill("Locally Edited Vault");
+
+    latestSettings = {
+      ...latestSettings,
+      startingRate: 0.25,
+      vaultLocation: "Server Vault B",
+    };
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect(page.getByLabel("Monthly-add annual %")).toHaveValue("25");
+    await expect(page.getByLabel("Custody location")).toHaveValue("Locally Edited Vault");
+
+    await page.getByRole("button", { name: "Save Configuration" }).click();
+    await expect(page.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    await expect(page.getByLabel("Custody location")).toBeDisabled();
+    releaseSave();
+    await expect(page.getByText("Pricing and custody settings saved on the MAC server.")).toBeVisible();
+    expect(submitted).toEqual({
+      action: "settings.update",
+      patch: { vaultLocation: "Locally Edited Vault" },
+    });
   });
 });

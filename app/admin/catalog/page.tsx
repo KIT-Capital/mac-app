@@ -23,12 +23,24 @@ const BLANK: CatalogEntry = {
 export default function AdminCatalogPage() {
   const { catalog, upsertCatalog, removeCatalog } = useStore();
   const [draft, setDraft] = useState<CatalogEntry>(BLANK);
+  const [error, setError] = useState("");
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!draft.brand || !draft.model) return;
-    upsertCatalog({ ...draft, id: draft.id || `cat-${Date.now()}` });
+    setError("");
+    const result = await upsertCatalog({ ...draft, id: draft.id || `cat-${Date.now()}` });
+    if (!result.ok) {
+      setError("The catalog reference could not be saved.");
+      return;
+    }
     setDraft(BLANK);
+  }
+
+  async function onRemove(id: string) {
+    setError("");
+    const result = await removeCatalog(id);
+    if (!result.ok) setError("The catalog reference could not be removed.");
   }
 
   return (
@@ -60,6 +72,7 @@ export default function AdminCatalogPage() {
           {draft.id ? "Update Reference" : "Add Reference"}
         </PillButton>
       </form>
+      {error ? <p className="mb-4 text-sm text-red-300">{error}</p> : null}
       <AdminTable
         headers={["Brand", "Model", "Reference", "Range", ""]}
         rows={catalog.map((c) => [
@@ -69,7 +82,7 @@ export default function AdminCatalogPage() {
           `${money(c.typicalLow)} – ${money(c.typicalHigh)}`,
           <div key={c.id} className="flex gap-3 text-[#FCB040]">
             <button type="button" onClick={() => setDraft(c)}>Edit</button>
-            <button type="button" onClick={() => removeCatalog(c.id)}>Remove</button>
+            <button type="button" onClick={() => void onRemove(c.id)}>Remove</button>
           </div>,
         ])}
       />

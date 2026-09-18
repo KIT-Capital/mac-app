@@ -106,6 +106,27 @@
       "when": 1789766449835,
       "tag": "0014_oval_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789769114382,
+      "tag": "0015_quick_slayback",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789771575244,
+      "tag": "0016_oval_gorilla_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789772529619,
+      "tag": "0017_cold_runaways",
+      "breakpoints": true
     }
   ]
 }

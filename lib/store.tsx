@@ -23,6 +23,7 @@ import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
 import {
   mergeLocalDataPreviews,
+  mergeLiveSettings,
   liveBookFailureState,
   liveDeskOverlay,
   operationDisposition,
@@ -95,13 +96,13 @@ type Store = AppState & {
   addAgreementWatches: (id: string, watchIds: string[]) => Promise<{ ok: true } | { ok: false; error: string }>;
   setAgreementAmount: (id: string, amount: number) => Promise<{ ok: true } | { ok: false; error: string }>;
   clearAgreementEnd: (id: string) => Promise<boolean>;
-  updateSettings: (patch: Partial<AppSettings>) => void;
+  updateSettings: (patch: Partial<AppSettings>) => Promise<OperationAck>;
   upsertUser: (user: ManagedUser) => Promise<OperationAck>;
   removeUser: (id: string) => Promise<OperationAck>;
-  upsertCatalog: (entry: CatalogEntry) => void;
-  removeCatalog: (id: string) => void;
-  upsertShell: (shell: AgreementShell) => void;
-  removeShell: (id: string) => void;
+  upsertCatalog: (entry: CatalogEntry) => Promise<OperationAck>;
+  removeCatalog: (id: string) => Promise<OperationAck>;
+  upsertShell: (shell: AgreementShell) => Promise<OperationAck>;
+  removeShell: (id: string) => Promise<OperationAck>;
   upsertPhoto: (photo: PhotoRecord) => void;
   removePhoto: (id: string) => Promise<OperationAck>;
   resetDemo: () => void;
@@ -135,10 +136,17 @@ let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
 let loadStarted = false;
 let optimisticGeneration = 0;
 let liveBookReadInFlight: Promise<ReturnType<typeof parseLiveBookResponse>> | null = null;
+const DESK_DATA_ACTIONS = new Set([
+  "settings.update",
+  "catalog.upsert",
+  "catalog.remove",
+  "shell.upsert",
+  "shell.remove",
+]);
 
 type BookState = Pick<
   AppState,
-  "timepieces" | "agreements" | "users" | "photos" | "profiles"
+  "timepieces" | "agreements" | "users" | "photos" | "profiles" | "catalog" | "shells" | "settings"
 >;
 
 function readPersistedState(): AppState {
@@ -203,13 +211,21 @@ function mergeBook(
     ? profileForEmail(viewer.email, { role: authenticated.role })
     : authenticated as Profile | null;
   const counts = ownedCounts(sessionUser?.email, mergedBook.timepieces, mergedBook.agreements);
-  if (sessionUser) writeSessionUser(storage, sessionUser);
+  try {
+    if (sessionUser) writeSessionUser(storage, sessionUser);
+  } catch {
+    // The authoritative response still reconciles when browser storage is unavailable.
+  }
   const desk = liveDeskOverlay(mergedBook);
   return {
     ...mergedBook,
     catalog: desk.catalog,
     shells: desk.shells,
-    settings: desk.settings ?? DEFAULT_SETTINGS,
+    settings: mergeLiveSettings(
+      desk.settings,
+      _base.settings,
+      sessionUser,
+    ) as AppSettings,
     hydrated: true,
     user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
   };
@@ -228,19 +244,23 @@ function readLiveDataPreviews() {
 }
 
 function persistLiveDataPreviews(state: AppState) {
-  const timepieces = state.timepieces
-    .map((piece) => {
-      const indexes = piece.images.map((url, index) => ({ url, kind: piece.photoKinds?.[index] }))
-        .filter((item) => item.url.startsWith("data:"));
-      return {
-        id: piece.id,
-        images: indexes.map((item) => item.url),
-        photoKinds: indexes.map((item) => item.kind ?? "other"),
-      };
-    })
-    .filter((piece) => piece.images.length > 0);
-  const photos = state.photos.filter((photo) => photo.url.startsWith("data:"));
-  localStorage.setItem(LIVE_PREVIEW_KEY, JSON.stringify({ timepieces, photos }));
+  try {
+    const timepieces = state.timepieces
+      .map((piece) => {
+        const indexes = piece.images.map((url, index) => ({ url, kind: piece.photoKinds?.[index] }))
+          .filter((item) => item.url.startsWith("data:"));
+        return {
+          id: piece.id,
+          images: indexes.map((item) => item.url),
+          photoKinds: indexes.map((item) => item.kind ?? "other"),
+        };
+      })
+      .filter((piece) => piece.images.length > 0);
+    const photos = state.photos.filter((photo) => photo.url.startsWith("data:"));
+    localStorage.setItem(LIVE_PREVIEW_KEY, JSON.stringify({ timepieces, photos }));
+  } catch {
+    // Live server state committed successfully; local preview caching is best-effort.
+  }
 }
 
 function persistLiveSafeState(next: AppState) {
@@ -251,7 +271,8 @@ function persistLiveSafeState(next: AppState) {
   } catch {
     browser = {};
   }
-  const safe: AppState = {
+  const safe: Partial<AppState> = {
+    ...browser,
     hydrated: true,
     user: null,
     timepieces: browser.timepieces ?? [],
@@ -259,12 +280,21 @@ function persistLiveSafeState(next: AppState) {
     users: browser.users ?? [],
     photos: browser.photos ?? [],
     profiles: browser.profiles ?? {},
-    catalog: next.catalog,
-    shells: next.shells,
-    settings: next.settings,
+    settings: {
+      ...(browser.settings ?? {}),
+      appearance: next.settings.appearance,
+    } as AppSettings,
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableState(safe)));
-  writeSessionUser(browserSessionStorage(), next.user);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableState(safe)));
+  } catch {
+    // Live server state remains authoritative when browser storage is unavailable.
+  }
+  try {
+    writeSessionUser(browserSessionStorage(), next.user);
+  } catch {
+    // A local session hint must not turn a committed mutation into a failure.
+  }
 }
 
 async function loadAuthoritativeStore() {
@@ -497,7 +527,8 @@ function updateStore(
       if (result.ok && storeMode === "live") {
         snapshot = next;
         persistLiveSafeState(next);
-        persistLiveDataPreviews(next);
+        const action = (options.operation as { action?: string }).action;
+        if (!action || !DESK_DATA_ACTIONS.has(action)) persistLiveDataPreviews(next);
         notifyStore();
         void reconcileLiveStore().catch(() => undefined);
       }
@@ -620,20 +651,23 @@ function rememberUser(users: ManagedUser[], user: Profile) {
 function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): AppState {
   const profiles = { ...seedProfiles(state.user), ...state.profiles };
   if (state.user) profiles[profileKey(state.user.email)] = state.user;
+  const seedDeskDefaults = storeMode !== "live";
   return {
     hydrated: true,
     user: state.user ?? null,
     timepieces,
     agreements: state.agreements ?? [],
     users: state.users?.length ? state.users : DEMO_USERS,
-    catalog: state.catalog?.length ? state.catalog : DEMO_CATALOG,
-    shells: state.shells?.length ? state.shells : DEMO_SHELLS,
+    catalog: state.catalog?.length ? state.catalog : seedDeskDefaults ? DEMO_CATALOG : [],
+    shells: state.shells?.length ? state.shells : seedDeskDefaults ? DEMO_SHELLS : [],
     photos: state.photos?.length ? state.photos : photosFromWatches(timepieces),
-    settings: {
-      ...DEMO_SETTINGS,
-      ...state.settings,
-      appearance: state.settings?.appearance ?? DEMO_SETTINGS.appearance,
-    },
+    settings: seedDeskDefaults
+      ? {
+          ...DEMO_SETTINGS,
+          ...state.settings,
+          appearance: state.settings?.appearance ?? DEMO_SETTINGS.appearance,
+        }
+      : state.settings ?? { ...DEFAULT_SETTINGS },
     profiles,
   };
 }
@@ -869,6 +903,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }, { operation: { action: "agreement.create", agreement }, deferLive: true });
         if (!acknowledgement.ok) throw new Error(acknowledgement.error);
+        if (acknowledgement.mode === "live") {
+          await reconcileLiveStore(true);
+          return snapshot.agreements.find((item) => item.id === agreement.id) ?? agreement;
+        }
         return agreement;
       },
       updateAgreement: (id, patch) =>
@@ -961,11 +999,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             closeDate,
             successorId: successor.id,
             agreementCode: successor.agreementCode,
-            scale: successorScale,
           },
           deferLive: true,
         });
         if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
+        if (acknowledgement.mode === "live") {
+          await reconcileLiveStore(true);
+          return {
+            ok: true,
+            successor: snapshot.agreements.find((item) => item.id === successor.id) ?? successor,
+          };
+        }
         return { ok: true, successor };
       },
       addAgreementWatches: async (id, watchIds) => {
@@ -1031,8 +1075,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }), { operation: { action: "agreement.clearEnd", id }, deferLive: true });
         return acknowledgement.ok;
       },
-      updateSettings: (patch) =>
-        updateStore((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
+      updateSettings: (patch) => {
+        const serverPatch = Object.fromEntries(
+          [
+            "maxLtv",
+            "startingRate",
+            "setupFee",
+            "earlyRepurchaseAmount",
+            "brokerFee",
+            "minMonths",
+            "earlyStartMonth",
+            "earlyUntilMonth",
+            "typicalTerm",
+            "membershipMonthly",
+            "vaultLocation",
+          ]
+            .filter((key) => patch[key as keyof AppSettings] !== undefined)
+            .map((key) => [key, patch[key as keyof AppSettings]]),
+        );
+        return updateStore(
+          (prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }),
+          {
+            operation: Object.keys(serverPatch).length
+              ? { action: "settings.update", patch: serverPatch }
+              : undefined,
+            deferLive: Object.keys(serverPatch).length > 0,
+          },
+        );
+      },
       upsertUser: async (user) =>
         updateStore((prev) => {
           const exists = prev.users.some((u) => u.id === user.id);
@@ -1062,9 +1132,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             catalog: exists ? prev.catalog.map((c) => (c.id === entry.id ? entry : c)) : [entry, ...prev.catalog],
           };
-        }),
+        }, { operation: { action: "catalog.upsert", entry }, deferLive: true }),
       removeCatalog: (id) =>
-        updateStore((prev) => ({ ...prev, catalog: prev.catalog.filter((c) => c.id !== id) })),
+        updateStore(
+          (prev) => ({ ...prev, catalog: prev.catalog.filter((c) => c.id !== id) }),
+          { operation: { action: "catalog.remove", id }, deferLive: true },
+        ),
       upsertShell: (shell) =>
         updateStore((prev) => {
           const exists = prev.shells.some((s) => s.id === shell.id);
@@ -1072,9 +1145,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev,
             shells: exists ? prev.shells.map((s) => (s.id === shell.id ? shell : s)) : [shell, ...prev.shells],
           };
-        }),
+        }, { operation: { action: "shell.upsert", shell }, deferLive: true }),
       removeShell: (id) =>
-        updateStore((prev) => ({ ...prev, shells: prev.shells.filter((s) => s.id !== id) })),
+        updateStore(
+          (prev) => ({ ...prev, shells: prev.shells.filter((s) => s.id !== id) }),
+          { operation: { action: "shell.remove", id }, deferLive: true },
+        ),
       upsertPhoto: (photo) =>
         updateStore((prev) => {
           const exists = prev.photos.some((p) => p.id === photo.id);
