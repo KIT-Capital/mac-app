@@ -15,6 +15,18 @@ type DocumentStore = {
   presignGet: (key: string, expiresSeconds?: number) => Promise<{ url: string; expiresAt: string }>;
 };
 
+function uniqueConstraint(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!current || typeof current !== "object") return null;
+    if ("constraint" in current && typeof current.constraint === "string") {
+      return current.constraint;
+    }
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return null;
+}
+
 function snapshotHash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -134,47 +146,63 @@ export async function buildAgreementDocument(
   store: DocumentStore,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  const agreement = await scopedAgreement(db, actor, input.liveAgreementId);
-  const snapshot = await freezeSnapshot(db, agreement);
-  if (!snapshot.ok || !snapshot.value) {
-    throw new Error(snapshot.errors[0] ?? "SCALE_UNFROZEN");
-  }
-  const version = await nextVersion(db, agreement.id);
-  const documentId = randomUUID();
-  const objectKey = agreementObjectKey({
-    appEnv: appEnv(env),
-    customerId: agreement.customerId,
-    liveAgreementId: agreement.id,
-    version,
-    documentId,
-  });
-  const frozen = {
-    templateVersion: snapshot.value.templateVersion,
-    templateLegalStatus: snapshot.value.templateLegalStatus,
-    contract: snapshot.value.contract,
-    scale: snapshot.value.scale,
-    schedule: snapshot.value.schedule,
-    clauses: snapshot.value.clauses,
-    collectionLines: snapshot.value.collectionLines,
-    facts: snapshot.value.facts,
-    label: snapshot.value.label,
-  };
-  const [building] = await db
-    .insert(agreementDocuments)
-    .values({
-      id: documentId,
-      liveAgreementId: agreement.id,
-      customerId: agreement.customerId,
-      version,
-      supersedesDocumentId: await latestStoredId(db, agreement.id),
+  const prepared = await db.transaction(async (tx) => {
+    const agreement = await scopedAgreement(tx, actor, input.liveAgreementId);
+    const snapshot = await freezeSnapshot(tx, agreement);
+    if (!snapshot.ok || !snapshot.value) {
+      throw new Error(snapshot.errors[0] ?? "SCALE_UNFROZEN");
+    }
+    const frozen = {
       templateVersion: snapshot.value.templateVersion,
-      status: "building",
-      snapshot: frozen,
-      snapshotHash: snapshotHash(frozen),
-      createdByKind: actorMeta(actor).createdByKind,
-      createdById: actorMeta(actor).createdById,
-    })
-    .returning();
+      templateLegalStatus: snapshot.value.templateLegalStatus,
+      contract: snapshot.value.contract,
+      scale: snapshot.value.scale,
+      schedule: snapshot.value.schedule,
+      clauses: snapshot.value.clauses,
+      collectionLines: snapshot.value.collectionLines,
+      facts: snapshot.value.facts,
+      label: snapshot.value.label,
+    };
+    const documentId = randomUUID();
+    const created = actorMeta(actor);
+    let building: typeof agreementDocuments.$inferSelect | undefined;
+    let version = 0;
+    let objectKey = "";
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      version = await nextVersion(tx, agreement.id);
+      objectKey = agreementObjectKey({
+        appEnv: appEnv(env),
+        customerId: agreement.customerId,
+        liveAgreementId: agreement.id,
+        version,
+        documentId,
+      });
+      try {
+        [building] = await tx
+          .insert(agreementDocuments)
+          .values({
+            id: documentId,
+            liveAgreementId: agreement.id,
+            customerId: agreement.customerId,
+            version,
+            supersedesDocumentId: await latestStoredId(tx, agreement.id),
+            templateVersion: snapshot.value.templateVersion,
+            status: "building",
+            snapshot: frozen,
+            snapshotHash: snapshotHash(frozen),
+            createdByKind: created.createdByKind,
+            createdById: created.createdById,
+          })
+          .returning();
+        break;
+      } catch (error) {
+        if (uniqueConstraint(error) !== "agreement_documents_live_version_uidx") throw error;
+      }
+    }
+    if (!building) throw new Error("DOCUMENT_VERSION_CONFLICT");
+    return { agreement, snapshot, building, objectKey, documentId };
+  });
+  const { snapshot, building, objectKey, documentId } = prepared;
 
   try {
     const pdf = await renderAgreementSnapshotPdf(snapshot.value);
