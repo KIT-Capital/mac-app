@@ -5,83 +5,88 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { MacLockup } from "@/components/mac-logo";
-import { SocialLogin } from "@/components/social-login";
-import { authenticate, isReservedDeskEmail } from "@/lib/auth";
+import { authenticate } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, settings, user } = useStore();
-  const [email, setEmail] = useState("jonathan.hale@mechartcap.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [deskMode, setDeskMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
 
-  async function enter(nextEmail: string, nextPassword: string) {
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
     setError("");
     setNotice("");
-    const result = authenticate(nextEmail, nextPassword);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    if (result.role !== "collector") {
+    setBusy(true);
+    if (deskMode) {
+      const result = authenticate(email, password);
+      if (!result.ok || result.role === "collector") {
+        setError(result.ok ? "That address is not a desk account." : result.error);
+        setBusy(false);
+        return;
+      }
       const session = await fetch("/api/desk-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: nextEmail, password: nextPassword }),
+        body: JSON.stringify({ email, password }),
         cache: "no-store",
         credentials: "include",
-      });
-      if (!session.ok) {
+      }).catch(() => null);
+      if (!session?.ok) {
         setError("Desk session could not start.");
+        setBusy(false);
         return;
       }
-    } else {
-      const access = await fetch("/api/collector-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "login", email: nextEmail }),
-        cache: "no-store",
-        credentials: "include",
-      });
-      const accessResult = (await access.json().catch(() => null)) as
-        | { mode?: "browser" | "live"; accepted?: boolean }
-        | null;
-      if (!access.ok) {
-        setError("Collector access could not start.");
-        return;
-      }
-      if (accessResult?.mode === "live" && accessResult.accepted) {
-        setNotice("Check your email for a secure sign-in link.");
-        return;
-      }
-      if (accessResult?.mode !== "browser") {
-        setError("Collector access could not start.");
-        return;
-      }
-    }
-    signIn({ email: nextEmail.trim(), role: result.role });
-    router.replace(result.role === "collector" ? "/collection" : "/admin");
-  }
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    void enter(email, password);
-  }
-
-  function onSocial() {
-    if (isReservedDeskEmail(email)) {
-      setError("Desk accounts must sign in with email and the preset password.");
+      signIn({ email: email.trim(), role: result.role });
+      router.replace("/admin");
       return;
     }
-    if (!password.trim()) {
-      setError("Enter your password, then continue with a social account.");
+
+    if (!email.trim().includes("@")) {
+      setError("Enter a valid email address.");
+      setBusy(false);
       return;
     }
-    void enter(email, password);
+    const access = await fetch("/api/collector-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "login", email }),
+      cache: "no-store",
+      credentials: "include",
+    }).catch(() => null);
+    const accessResult = (await access?.json().catch(() => null)) as
+      | { mode?: "browser" | "live"; accepted?: boolean }
+      | null;
+    if (!access?.ok) {
+      setError("Collector access could not start.");
+      setBusy(false);
+      return;
+    }
+    if (accessResult?.mode === "live" && accessResult.accepted) {
+      setNotice("Check your email for a secure sign-in link. It lasts 15 minutes and works once.");
+      setBusy(false);
+      return;
+    }
+    if (accessResult?.mode !== "browser") {
+      setError("Collector access could not start.");
+      setBusy(false);
+      return;
+    }
+    signIn({ email: email.trim(), role: "collector" });
+    router.replace("/collection");
+  }
+
+  function showDeskSignIn() {
+    setDeskMode(true);
+    setNotice("");
+    setError("");
   }
 
   return (
@@ -109,6 +114,12 @@ export default function LoginPage() {
         </p>
       </div>
 
+      {notice ? (
+        <div className="rounded-xl border border-[#FCB040]/40 bg-mac-card px-5 py-6 text-center">
+          <Mail className="mx-auto h-6 w-6 text-[#FCB040]" />
+          <p className="mt-3 text-sm leading-relaxed text-mac-fg">{notice}</p>
+        </div>
+      ) : (
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
           <div className="flex items-center justify-between">
@@ -129,6 +140,7 @@ export default function LoginPage() {
           />
         </div>
 
+        {deskMode ? (
         <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
           <div className="flex items-center justify-between">
             <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
@@ -156,21 +168,29 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
+        ) : null}
 
         {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
-        {notice ? <p className="text-center text-xs text-[#FCB040]">{notice}</p> : null}
 
         <button
           type="submit"
+          disabled={busy}
           className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-[#0E2A44] text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
         >
-          Sign In
+          {busy ? "Please wait…" : deskMode ? "Sign in" : "Send sign-in link"}
         </button>
       </form>
+      )}
 
-      <div className="pt-5">
-        <SocialLogin onContinue={onSocial} />
-      </div>
+      {!deskMode && !notice ? (
+        <button
+          type="button"
+          onClick={showDeskSignIn}
+          className="mac-tap pt-5 text-center text-[12px] font-medium text-mac-muted underline underline-offset-4"
+        >
+          MAC desk staff
+        </button>
+      ) : null}
 
       <div className="pt-6 pb-2 text-center">
         <p className="text-[12px] text-mac-muted">

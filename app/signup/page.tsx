@@ -92,6 +92,17 @@ export default function SignupPage() {
           </p>
         </div>
 
+        {notice ? (
+          <div className="rounded-xl border border-[#FCB040]/40 bg-mac-card px-5 py-6 text-center">
+            <p className="text-sm leading-relaxed text-mac-fg">{notice}</p>
+            <Link
+              href="/login"
+              className="mt-6 inline-block text-[12px] font-medium text-[#FCB040] underline underline-offset-4"
+            >
+              Already registered? Sign in
+            </Link>
+          </div>
+        ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
             <label htmlFor="reg-name" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase block">
@@ -165,8 +176,6 @@ export default function SignupPage() {
           </div>
 
           {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
-          {notice ? <p className="text-center text-xs text-[#FCB040]">{notice}</p> : null}
-
           <div className="pt-4 space-y-3">
             <button
               type="submit"
@@ -183,6 +192,7 @@ export default function SignupPage() {
             </p>
           </div>
         </form>
+        )}
       </div>
     </main>
   );

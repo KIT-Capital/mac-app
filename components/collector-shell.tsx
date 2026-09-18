@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
-const AUTH = ["/", "/login", "/signup", "/privacy"];
+const AUTH = ["/", "/login", "/signup", "/privacy", "/verify"];
 const VIEW_KEY = "mac-device-view";
 const VIEW_EVENT = "mac-device-view";
 

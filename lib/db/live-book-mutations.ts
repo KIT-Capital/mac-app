@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or } from "drizzle-orm";
 import { maxPurchaseAmount } from "@/lib/catalog";
 import {
   applyAgreementEnd,
@@ -18,6 +18,7 @@ import {
   agreements as preparedAgreements,
   allocations,
   applications,
+  collectorSessions,
   customers,
   liveAgreementEnds,
   liveAgreementMembers,
@@ -127,13 +128,27 @@ export async function executeLiveBookOperation(
     const [customer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, id)).limit(1);
     if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
     const patch = operation.patch as Record<string, unknown>;
-    await db.update(customers).set({
-      name: typeof patch.name === "string" ? patch.name.trim() : undefined,
-      phone: typeof patch.phone === "string" ? patch.phone.trim() : undefined,
-      status: patch.status === "suspended" || patch.status === "invited" || patch.status === "active" ? patch.status : undefined,
-      member: typeof patch.member === "boolean" ? patch.member : undefined,
-      updatedAt: new Date(),
-    }).where(eq(customers.id, id));
+    const nextStatus = patch.status === "suspended" || patch.status === "invited" || patch.status === "active"
+      ? patch.status
+      : undefined;
+    await db.transaction(async (tx) => {
+      await tx.update(customers).set({
+        name: typeof patch.name === "string" ? patch.name.trim() : undefined,
+        phone: typeof patch.phone === "string" ? patch.phone.trim() : undefined,
+        status: nextStatus,
+        member: typeof patch.member === "boolean" ? patch.member : undefined,
+        updatedAt: new Date(),
+      }).where(eq(customers.id, id));
+      if (nextStatus && nextStatus !== "active") {
+        await tx.update(collectorSessions).set({
+          revokedAt: new Date(),
+          updatedAt: new Date(),
+        }).where(and(
+          eq(collectorSessions.customerId, id),
+          isNull(collectorSessions.revokedAt),
+        ));
+      }
+    });
     return;
   }
 

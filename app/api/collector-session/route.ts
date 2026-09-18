@@ -1,14 +1,14 @@
 import { cookies } from "next/headers";
+import { after } from "next/server";
+import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { COLLECTOR_COOKIE } from "@/lib/collector-access.mjs";
-import { requestCollectorAccess } from "@/lib/collector-access.server";
+import {
+  requestCollectorAccess,
+  revokeCollectorAccessSession,
+} from "@/lib/collector-access.server";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
-import { allowMailRequest } from "@/lib/mail";
+import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
-
-function clientIp(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
-}
 
 function errorStatus(message: string) {
   if (
@@ -24,6 +24,7 @@ function errorStatus(message: string) {
   if (
     message === "COLLECTOR_EMAIL_INVALID" ||
     message === "COLLECTOR_ACTION_INVALID" ||
+    message === "RESERVED_DESK_EMAIL" ||
     message.startsWith("REGISTRATION_")
   ) {
     return 400;
@@ -32,6 +33,8 @@ function errorStatus(message: string) {
 }
 
 export async function POST(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
   const config = evaluateLiveBookConfig(process.env);
@@ -41,24 +44,28 @@ export async function POST(request: Request) {
   if (!config.ok) {
     return Response.json({ error: config.errors[0] }, { status: errorStatus(config.errors[0]) });
   }
-  if (!allowMailRequest(clientIp(request))) {
-    return Response.json(
-      { error: "Too many access requests from this device. Try again in a minute." },
-      { status: 429 },
-    );
-  }
-
   try {
     const input = await request.json();
-    return Response.json(await requestCollectorAccess(input), { status: 202 });
+    const prepared = await requestCollectorAccess(input, clientAddress(request.headers));
+    if (prepared.response.rateLimited) {
+      return Response.json(
+        { error: "Please try again shortly." },
+        { status: 429 },
+      );
+    }
+    if (prepared.deferred) after(prepared.deferred);
+    return Response.json(prepared.response, { status: 202 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "COLLECTOR_ACCESS_FAILED";
     return Response.json({ error: message }, { status: errorStatus(message) });
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
   const jar = await cookies();
+  await revokeCollectorAccessSession(jar.get(COLLECTOR_COOKIE)?.value);
   jar.delete(COLLECTOR_COOKIE);
   return Response.json(
     { ok: true },

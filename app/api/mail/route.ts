@@ -1,8 +1,12 @@
 import { cookies } from "next/headers";
 import { headers } from "next/headers";
+import { clientAddress } from "@/lib/access-rate-limit.mjs";
+import { getDb } from "@/lib/db/client";
+import { consumeAccessRateLimit } from "@/lib/db/collector-sessions";
 import { allowMailRequest, dispatchMail, listOutbox, mailConfigured, mailFrom, parseMailRequest } from "@/lib/mail";
 import { deskApiStatus } from "@/lib/desk-guard.mjs";
 import { DESK_COOKIE, readDeskToken } from "@/lib/desk-session";
+import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
@@ -39,11 +43,28 @@ export async function POST(request: Request) {
   if (unavailable) return unavailableResponse(unavailable);
   try {
     const headerList = await headers();
-    if (!allowMailRequest(clientIp(headerList))) {
+    const payload = parseMailRequest(await request.json());
+    if (payload.kind === "inquiry" && isLiveBookEnabled(process.env.MAC_LIVE_BOOK)) {
+      const [emailLimit] = await Promise.all([
+        consumeAccessRateLimit(getDb(), {
+          scope: "mail-inquiry-email",
+          key: payload.email,
+          limit: 5,
+          windowMs: 60 * 60_000,
+        }),
+        consumeAccessRateLimit(getDb(), {
+          scope: "mail-inquiry-address",
+          key: clientAddress(headerList),
+          limit: 20,
+          windowMs: 60 * 60_000,
+        }),
+      ]);
+      if (!emailLimit.allowed) {
+        return Response.json({ ok: true, preview: !mailConfigured(), ids: [] });
+      }
+    } else if (!allowMailRequest(clientIp(headerList))) {
       return Response.json({ error: "Too many emails from this device. Try again in a minute." }, { status: 429 });
     }
-
-    const payload = parseMailRequest(await request.json());
     if (DESK_ONLY.has(payload.kind)) {
       const status = deskApiStatus(await deskSession());
       if (status !== 200) {

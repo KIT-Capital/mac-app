@@ -29,9 +29,5 @@ export function authenticate(
     return { ok: false, error: "That desk password is not recognized." };
   }
 
-  if (!password.trim()) {
-    return { ok: false, error: "Enter your password." };
-  }
-
   return { ok: true, role: "collector" };
 }
