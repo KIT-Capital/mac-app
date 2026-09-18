@@ -8,8 +8,17 @@ import { WatchPhoto } from "@/components/watch-photo";
 import { COMPANY, hasApplication, maxPurchaseAmount, money } from "@/lib/catalog";
 import { LIVE_WATCH_CONFLICT, bookLabel, isLiveBookLabel, liveWatchIds } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
+import { PENDING_COUNSEL_LABEL, buildAgreementSnapshot } from "@/lib/contract/repo-agreement-snapshot.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
+
+type ListedDocument = {
+  id: string;
+  version: number;
+  status: string;
+  checksum?: string | null;
+  templateVersion?: string;
+};
 
 function moneyExact(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -32,6 +41,9 @@ export default function AgreementDetailPage() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pieceError, setPieceError] = useState("");
   const [raiseAmount, setRaiseAmount] = useState("");
+  const [bookMode, setBookMode] = useState<"browser" | "live">("browser");
+  const [documents, setDocuments] = useState<ListedDocument[]>([]);
+  const [docError, setDocError] = useState("");
   const pageOpen = useRef(true);
   useEffect(() => () => {
     pageOpen.current = false;
@@ -51,8 +63,83 @@ export default function AgreementDetailPage() {
   const repurchase = agreement && scale
     ? repurchaseDollars(agreement.amount, agreement.termMonths, scale)
     : 0;
+  const snapshot = agreement
+    ? buildAgreementSnapshot({
+        sellerName: agreement.ownerName,
+        sellerEmail: agreement.email,
+        saleAmount: agreement.amount,
+        termMonths: agreement.termMonths,
+        startDate: agreement.createdAt,
+        delivery: agreement.delivery,
+        agreementCode: agreement.agreementCode || agreement.id,
+        scale: agreement.scale,
+        timepieces: watches.map((watch) => ({
+          name: `${watch.brand} ${watch.model}`,
+          brand: watch.brand,
+          model: watch.model,
+          reference: watch.reference,
+          condition: watch.condition,
+        })),
+      })
+    : { ok: false, errors: ["AGREEMENT_NOT_FOUND"], value: null };
 
-  async function downloadPdf() {
+  useEffect(() => {
+    if (!agreement) return;
+    let cancelled = false;
+    fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreement.id)}`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as {
+          mode?: string;
+          documents?: ListedDocument[];
+        } | null;
+        if (cancelled) return;
+        if (body?.mode === "live") {
+          setBookMode("live");
+          setDocuments(Array.isArray(body.documents) ? body.documents : []);
+        } else {
+          setBookMode("browser");
+          setDocuments([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBookMode("browser");
+          setDocuments([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [agreement]);
+
+  async function openStoredDocument(documentId: string, download: boolean) {
+    setDocError("");
+    const response = await fetch("/api/agreement-documents", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "url", documentId }),
+    });
+    const body = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+    if (!response.ok || !body?.url) {
+      setDocError(body?.error === "DOCUMENT_NOT_FOUND" ? "That document is not available." : "Could not open the stored PDF.");
+      return;
+    }
+    if (download) {
+      const link = document.createElement("a");
+      link.href = body.url;
+      link.download = `${agreement?.agreementCode || "mac-repurchase-agreement"}.pdf`;
+      link.click();
+      return;
+    }
+    window.open(body.url, "_blank", "noopener,noreferrer");
+  }
+
+  async function previewPdf(kind: "view" | "download") {
     if (!agreement || pdfBusy) return;
     setPdfBusy(true);
     setPdfError("");
@@ -88,11 +175,16 @@ export default function AgreementDetailPage() {
       const blob = await response.blob();
       if (!pageOpen.current) return;
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${agreement.agreementCode || "mac-repurchase-agreement"}.pdf`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (pageOpen.current) setPdfBusy(false);
+      if (kind === "view") {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${agreement.agreementCode || "mac-repurchase-agreement"}.pdf`;
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch {
       if (pageOpen.current) setPdfError("Could not create the contract PDF.");
     } finally {
@@ -224,87 +316,180 @@ export default function AgreementDetailPage() {
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
             Repurchase agreement
           </h2>
-          <p>
-            Agreement date: {agreement.createdAt}
-            <br />
-            Transaction number: {agreement.id.replace(/\D/g, "") || "31419"}
-            <br />
-            Seller name: {agreement.ownerName}
-            <br />
-            Buyer name: Mechanical Art Capital LLC
-          </p>
-          <p>
-            This is a sale and repurchase, not a loan. The Seller sells the timepieces listed in
-            this agreement, including original box, papers, and verification, to Mechanical Art
-            Capital LLC at the Sale Amount. The Seller may buy them back at the repurchase price
-            for the month of repurchase, provided title remains clear and the pieces remain in the
-            described condition.
-          </p>
-          {watches.length ? (
-            <div className="flex gap-2">
-              {watches.map((w) => (
-                <div key={w.id} className="h-16 w-16 overflow-hidden rounded-md bg-black/5">
-                  <WatchPhoto src={w.images[0]} watch={w} alt={`${w.brand} ${w.model}`} />
-                </div>
+          <p className="text-center text-[12px] font-semibold text-[#0E2A44]">{PENDING_COUNSEL_LABEL}</p>
+          {snapshot.ok && snapshot.value ? (
+            <>
+              {snapshot.value.facts.map((line) => (
+                <p key={line}>{line}</p>
               ))}
-            </div>
-          ) : null}
-          <p>
-            Description of timepieces:{" "}
-            {watches.map((w) => `${w.brand} ${w.model} (${w.reference || w.id})`).join("; ") ||
-              "Selected collection timepieces"}
-            .
-          </p>
-          <p>
-            Sale amount (MAC purchases): {money(agreement.amount)}. Term: {agreement.termMonths}{" "}
-            months. Repurchase price if bought back at term: {money(repurchase || 0)}. Delivery:{" "}
-            {agreement.delivery}.
-            {applied
-              ? ` After purchase, the pieces are held in secure custody${settings.vaultLocation ? ` at ${settings.vaultLocation}` : ""} and may be shown by pre-scheduling with MAC.`
-              : " Custody details are confirmed after this application is received."}
-          </p>
-          {applied && schedule?.ok ? (
-            <div>
-              <h3 className="mb-2 text-xs font-semibold tracking-[0.12em] uppercase">
-                Repurchase price by month
-              </h3>
-              <table className="w-full text-left text-[12px]">
-                <thead>
-                  <tr>
-                    <th className="pb-1">Date</th>
-                    <th className="pb-1">Price</th>
-                    <th className="pb-1">Basis</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedule.rows.map((row) => (
-                    <tr key={row.month}>
-                      <td>{row.date}</td>
-                      <td>{moneyExact(row.price || 0)}</td>
-                      <td>{row.note}</td>
+              {snapshot.value.clauses.map((clause) => (
+                <section key={clause.number}>
+                  <h3 className="mb-1 text-xs font-semibold tracking-[0.12em] uppercase">
+                    {clause.number}. {clause.heading}
+                  </h3>
+                  <p>{clause.body}</p>
+                </section>
+              ))}
+              <div>
+                <h3 className="mb-2 text-xs font-semibold tracking-[0.12em] uppercase">
+                  Monthly repurchase schedule
+                </h3>
+                <table className="w-full text-left text-[12px]">
+                  <thead>
+                    <tr>
+                      <th className="pb-1">Month</th>
+                      <th className="pb-1">Date</th>
+                      <th className="pb-1">Price</th>
+                      <th className="pb-1">Basis</th>
                     </tr>
+                  </thead>
+                  <tbody>
+                    {snapshot.value.schedule.rows.map((row) => (
+                      <tr key={row.month}>
+                        <td>{row.month}</td>
+                        <td>{row.date}</td>
+                        <td>{moneyExact(row.price || 0)}</td>
+                        <td>{row.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>Missing required facts: {snapshot.errors.join(", ").replaceAll("_", " ").toLowerCase()}.</p>
+              <p>
+                Agreement date: {agreement.createdAt}
+                <br />
+                Transaction number: {agreement.id.replace(/\D/g, "") || "31419"}
+                <br />
+                Seller name: {agreement.ownerName}
+                <br />
+                Buyer name: Mechanical Art Capital LLC
+              </p>
+              <p>
+                This is a sale and repurchase, not a loan. The Seller sells the timepieces listed in
+                this agreement, including original box, papers, and verification, to Mechanical Art
+                Capital LLC at the Sale Amount. The Seller may buy them back at the repurchase price
+                for the month of repurchase, provided title remains clear and the pieces remain in the
+                described condition.
+              </p>
+              {watches.length ? (
+                <div className="flex gap-2">
+                  {watches.map((w) => (
+                    <div key={w.id} className="h-16 w-16 overflow-hidden rounded-md bg-black/5">
+                      <WatchPhoto src={w.images[0]} watch={w} alt={`${w.brand} ${w.model}`} />
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-          <p>
-            Authorized seller: {agreement.ownerName}
-            <br />
-            Authorized buyer: Mechanical Art Capital LLC
-          </p>
+                </div>
+              ) : null}
+              <p>
+                Description of timepieces:{" "}
+                {watches.map((w) => `${w.brand} ${w.model} (${w.reference || w.id})`).join("; ") ||
+                  "Selected collection timepieces"}
+                .
+              </p>
+              <p>
+                Sale amount (MAC purchases): {money(agreement.amount)}. Term: {agreement.termMonths}{" "}
+                months. Repurchase price if bought back at term: {money(repurchase || 0)}. Delivery:{" "}
+                {agreement.delivery}.
+                {applied
+                  ? ` After purchase, the pieces are held in secure custody${settings.vaultLocation ? ` at ${settings.vaultLocation}` : ""} and may be shown by pre-scheduling with MAC.`
+                  : " Custody details are confirmed after this application is received."}
+              </p>
+              {applied && schedule?.ok ? (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold tracking-[0.12em] uppercase">
+                    Repurchase price by month
+                  </h3>
+                  <table className="w-full text-left text-[12px]">
+                    <thead>
+                      <tr>
+                        <th className="pb-1">Date</th>
+                        <th className="pb-1">Price</th>
+                        <th className="pb-1">Basis</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedule.rows.map((row) => (
+                        <tr key={row.month}>
+                          <td>{row.date}</td>
+                          <td>{moneyExact(row.price || 0)}</td>
+                          <td>{row.note}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              <p>
+                Authorized seller: {agreement.ownerName}
+                <br />
+                Authorized buyer: Mechanical Art Capital LLC
+              </p>
+            </>
+          )}
           {agreement.status === "signed" ? (
             <p className="font-semibold text-emerald-800">Signed {agreement.signedAt}</p>
           ) : null}
         </article>
+        {bookMode === "live" && snapshot.ok && documents.some((row) => row.status === "stored") ? (
+          <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
+            <h3 className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Stored document</h3>
+            <p className="mt-1 text-[12px] text-mac-muted">{PENDING_COUNSEL_LABEL}</p>
+            <ul className="mt-3 space-y-2">
+              {documents.map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-mac-muted">
+                  <span>
+                    Version {row.version} · {row.status}
+                    {row.checksum ? ` · ${row.checksum.slice(0, 8)}` : ""}
+                  </span>
+                  {row.status === "stored" ? (
+                    <span className="flex gap-3">
+                      <button
+                        type="button"
+                        className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                        onClick={() => void openStoredDocument(row.id, false)}
+                      >
+                        View
+                      </button>
+                      <button
+                        type="button"
+                        className="hidden md:inline text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                        onClick={() => void openStoredDocument(row.id, true)}
+                      >
+                        Download
+                      </button>
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {docError ? <p className="mt-2 text-xs text-red-400">{docError}</p> : null}
+          </section>
+        ) : null}
       </div>
       <div className="border-t border-mac-line bg-mac-card p-4">
-        {applied ? (
-          <PillButton variant="navy" className="mb-3" disabled={pdfBusy} onClick={() => void downloadPdf()}>
-            {pdfBusy ? "Preparing PDF…" : "Download contract PDF"}
-          </PillButton>
+        {applied && bookMode === "browser" ? (
+          <div className="mb-3 flex flex-col gap-2">
+            <PillButton variant="navy" disabled={pdfBusy} onClick={() => void previewPdf("view")}>
+              {pdfBusy ? "Preparing PDF…" : "View preview"}
+            </PillButton>
+            <div className="hidden md:block">
+              <PillButton variant="navy" disabled={pdfBusy} onClick={() => void previewPdf("download")}>
+                {pdfBusy ? "Preparing PDF…" : "Download contract PDF"}
+              </PillButton>
+            </div>
+            <p className="text-center text-[11px] text-mac-faint">
+              Temporary preview — not stored. {PENDING_COUNSEL_LABEL}
+            </p>
+          </div>
         ) : null}
         {pdfError ? <p className="mb-2 text-center text-[12px] text-red-300">{pdfError}</p> : null}
+        <p className="mb-2 text-center text-[11px] text-mac-faint">
+          Electronic signing is not available.
+        </p>
         <PillButton
           variant="gold"
           disabled={!started || agreement.status === "signed"}

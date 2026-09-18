@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
@@ -178,7 +178,42 @@ export default function AdminAgreementsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [endDraft, setEndDraft] = useState({ kind: "bought_back" as BookEndKind, date: "", amount: "" });
   const [endError, setEndError] = useState("");
+  const [documentNote, setDocumentNote] = useState<{ id: string; text: string } | null>(null);
   const selected = agreements.find((item) => item.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const id = selectedId;
+    let cancelled = false;
+    fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(id)}`, {
+      credentials: "include",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as {
+          mode?: string;
+          documents?: { version?: number; status?: string; checksum?: string | null }[];
+        } | null;
+        if (cancelled) return;
+        if (body?.mode !== "live") {
+          setDocumentNote({ id, text: "No stored document in browser mode." });
+          return;
+        }
+        const newest = body.documents?.find((row) => row.status === "stored") ?? body.documents?.[0];
+        setDocumentNote({
+          id,
+          text: newest
+            ? `Version ${newest.version} · ${newest.status}${newest.checksum ? ` · ${newest.checksum.slice(0, 8)}` : ""}`
+            : "No stored document for this repo.",
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setDocumentNote({ id, text: "No stored document in browser mode." });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -411,6 +446,16 @@ export default function AdminAgreementsPage() {
         })}
       />
 
+      {selected ? (
+        <section className="mt-6 space-y-2 border border-white/25 bg-[#222] p-4">
+          <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
+            Document — {selected.agreementCode || selected.id}
+          </h3>
+          <p className="text-[12px] text-white/60">
+            {documentNote?.id === selected.id ? documentNote.text : "Checking document…"}
+          </p>
+        </section>
+      ) : null}
       {selected && selected.status !== "signed" && !selected.bookEnd ? (
         <section className="mt-6 space-y-4 border border-white/25 bg-[#222] p-4">
           <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
