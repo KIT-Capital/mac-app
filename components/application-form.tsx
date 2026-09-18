@@ -9,6 +9,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { DELIVERY_METHODS, TERMS, maxPurchaseAmount, money } from "@/lib/catalog";
 import { WatchPhoto } from "@/components/watch-photo";
 import { LIVE_WATCH_CONFLICT, liveWatchIds } from "@/lib/contract/repo-book.mjs";
+import { applicationPurchaseShare } from "@/lib/contract/repo-scale.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
@@ -16,7 +17,14 @@ import { useStore } from "@/lib/store";
 export function ApplicationForm({ backHref = "/collection" }: { backHref?: string }) {
   const router = useRouter();
   const params = useSearchParams();
-  const { user, createAgreement, settings, shells, agreements: book } = useStore();
+  const {
+    user,
+    createAgreement,
+    settings,
+    shells,
+    agreements: book,
+    applicationPurchaseShares,
+  } = useStore();
   const { timepieces, agreements } = useOwnedAssets();
   const live = liveWatchIds(book);
   const eligible = timepieces.filter(
@@ -38,7 +46,12 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
   const [busy, setBusy] = useState(false);
 
   const watch = eligible.find((w) => w.id === watchId) ?? eligible[0];
-  const purchaseShare = openShell?.ltv || settings.maxLtv;
+  const purchaseShare = applicationPurchaseShare(
+    applicationPurchaseShares,
+    settings,
+    openShell,
+    term,
+  );
   const maxPurchase = watch ? maxPurchaseAmount(watch.valueLow, watch.valueHigh, purchaseShare) : 0;
 
   async function onSubmit(e: FormEvent) {

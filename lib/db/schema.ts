@@ -177,6 +177,126 @@ export const deskAuditLog = pgTable(
   ],
 );
 
+/** Shared live desk pricing and custody settings. Exactly one row may exist. */
+export const deskSettings = pgTable(
+  "desk_settings",
+  {
+    id: text("id").primaryKey(),
+    maxLtvBps: integer("max_ltv_bps").notNull(),
+    startingRateBps: integer("starting_rate_bps").notNull(),
+    setupFeeBps: integer("setup_fee_bps").notNull(),
+    earlyRepurchaseAmountBps: integer("early_repurchase_amount_bps").notNull(),
+    brokerFeeBps: integer("broker_fee_bps").notNull(),
+    minMonths: integer("min_months").notNull(),
+    earlyStartMonth: integer("early_start_month").notNull(),
+    earlyUntilMonth: integer("early_until_month").notNull(),
+    typicalTerm: integer("typical_term").notNull(),
+    membershipMonthlyCents: integer("membership_monthly_cents").notNull(),
+    vaultLocation: text("vault_location").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("desk_settings_singleton_check", sql`${table.id} = 'default'`),
+    check("desk_settings_max_ltv_check", sql`${table.maxLtvBps} > 0 and ${table.maxLtvBps} <= 6000`),
+    check("desk_settings_money_check", sql`
+      ${table.startingRateBps} >= 1850
+      and ${table.startingRateBps} <= 10000
+      and ${table.setupFeeBps} >= 100
+      and ${table.setupFeeBps} <= 10000
+      and ${table.earlyRepurchaseAmountBps} >= 350
+      and ${table.earlyRepurchaseAmountBps} <= 10000
+      and ${table.brokerFeeBps} >= 350
+      and ${table.brokerFeeBps} <= 10000
+      and ${table.membershipMonthlyCents} between 0 and 2147483647
+    `),
+    check("desk_settings_terms_check", sql`
+      ${table.minMonths} > 0
+      and ${table.earlyStartMonth} > 0
+      and ${table.earlyUntilMonth} > 0
+      and ${table.typicalTerm} > 0
+      and ${table.minMonths} <= ${table.typicalTerm}
+      and ${table.earlyStartMonth} < ${table.earlyUntilMonth}
+      and ${table.earlyUntilMonth} <= ${table.typicalTerm}
+    `),
+  ],
+);
+
+/** Shared desk appraisal references. Empty is a valid live catalog. */
+export const catalogReferences = pgTable(
+  "catalog_references",
+  {
+    id: text("id").primaryKey(),
+    brand: text("brand").notNull(),
+    model: text("model").notNull(),
+    reference: text("reference").notNull().default(""),
+    caseMetal: text("case_metal").notNull().default(""),
+    caseDiameter: text("case_diameter").notNull().default(""),
+    typicalLowCents: integer("typical_low_cents").notNull(),
+    typicalHighCents: integer("typical_high_cents").notNull(),
+    financeable: boolean("financeable").notNull().default(false),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("catalog_references_values_check", sql`
+      ${table.typicalLowCents} >= 0
+      and ${table.typicalHighCents} >= ${table.typicalLowCents}
+      and ${table.typicalHighCents} <= 2147483647
+    `),
+  ],
+);
+
+/** Shared agreement shells used to derive new live agreement scales. */
+export const agreementShells = pgTable(
+  "agreement_shells",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    termMonths: integer("term_months").notNull(),
+    rateBps: integer("rate_bps").notNull(),
+    ltvBps: integer("ltv_bps").notNull(),
+    setupFeeBps: integer("setup_fee_bps").notNull(),
+    earlyRepurchaseAmountBps: integer("early_repurchase_amount_bps").notNull(),
+    brokerFeeBps: integer("broker_fee_bps").notNull(),
+    minMonths: integer("min_months").notNull(),
+    earlyStartMonth: integer("early_start_month").notNull(),
+    earlyUntilMonth: integer("early_until_month").notNull(),
+    status: text("status").notNull(),
+    createdOn: text("created_on").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("agreement_shells_status_check", sql`${table.status} in ('open', 'assigned', 'closed')`),
+    uniqueIndex("agreement_shells_open_uidx")
+      .on(table.status)
+      .where(sql`${table.status} = 'open'`),
+    check("agreement_shells_ltv_check", sql`${table.ltvBps} > 0 and ${table.ltvBps} <= 6000`),
+    check("agreement_shells_money_check", sql`
+      ${table.rateBps} >= 1850
+      and ${table.rateBps} <= 10000
+      and ${table.setupFeeBps} >= 100
+      and ${table.setupFeeBps} <= 10000
+      and ${table.earlyRepurchaseAmountBps} >= 350
+      and ${table.earlyRepurchaseAmountBps} <= 10000
+      and ${table.brokerFeeBps} >= 350
+      and ${table.brokerFeeBps} <= 10000
+    `),
+    check("agreement_shells_terms_check", sql`
+      ${table.termMonths} > 0
+      and ${table.minMonths} > 0
+      and ${table.earlyStartMonth} > 0
+      and ${table.earlyUntilMonth} > 0
+      and ${table.minMonths} <= ${table.termMonths}
+      and ${table.earlyStartMonth} < ${table.earlyUntilMonth}
+      and ${table.earlyUntilMonth} <= ${table.termMonths}
+    `),
+  ],
+);
+
 /** Timepiece identity. Preview data URLs stay in the browser store until Stage 3. */
 export const timepieces = pgTable(
   "timepieces",

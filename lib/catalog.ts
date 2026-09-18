@@ -1,4 +1,5 @@
 import { deskRoleForEmail } from "@/lib/auth";
+import { APPLICATION_TERMS } from "@/lib/contract/repo-scale.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 
 export const TIER_ONE_BRANDS = [
@@ -66,7 +67,7 @@ export const COMPLICATIONS = [
   "Perpetual calendar",
   "I don't know",
 ];
-export const TERMS = [3, 6, 8, 9, 12];
+export const TERMS = APPLICATION_TERMS;
 export const DELIVERY_METHODS = [
   "Insured courier",
   "Desk arranges intake",

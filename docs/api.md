@@ -127,6 +127,14 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - `GET` requires exactly one valid desk or collector session and returns
   `Cache-Control: private, no-store`. Desk reads all rows; a collector session is
   bound to immutable customer ID and email and reads only that customer.
+- Live reads also return server-authoritative desk settings, catalog references,
+  and agreement shells. An absent settings row is represented by Scenario 60 and
+  application defaults without writing a row. Empty catalog and shell tables are
+  returned empty; demo rows are never seeded in live mode. Before a collector has
+  an application or repo, custom pricing and shells are withheld and custody is
+  blank; the response exposes only the effective purchase-share cap for each
+  selectable application term so the proposed amount matches server enforcement.
+  The desk always receives the authoritative values.
 - Live reads include the server-authenticated viewer role and identity. The client
   uses that viewer to replace stale tab identity instead of trusting sessionStorage;
   desk viewers are rebuilt from the trusted staff/admin profiles.
@@ -135,6 +143,14 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   pending repos, collector signature, eligible added pieces, and permitted amount
   raises. Desk controls valuation, status, ends, and marking signed; renewal is
   admin-only.
+- Desk-data actions are `settings.update` (admin only), `catalog.upsert`,
+  `catalog.remove`, `shell.upsert`, and `shell.remove` (staff or admin).
+  Settings and shell scale terms below Scenario 60 floors are refused with
+  `AGREEMENT_SCALE_INVALID`. Settings and shell mutations append an immutable
+  desk audit row in the same transaction. Catalog mutations are audited as money
+  changes and re-check the staff row in that transaction. Replacing the open
+  shell atomically assigns the prior shell under a database lock; changing or
+  removing the sole open shell without a replacement is refused.
 - Collector signature records the seller-side contract action only. It does not
   record desk payment, cash movement, or a book end.
 - Successful mutations return a durable `{ mode: "live", acknowledged: true }`
@@ -147,17 +163,21 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - Signed or ended agreements reject repeated signing, scale edits, removal,
   added pieces, and amount changes with `AGREEMENT_IMMUTABLE`; the UI hides
   controls that no longer apply.
-- Agreement scale remains calculated from browser-local desk settings, but the
-  server rejects purchase share above the MAC default and any submitted
-  fee/adjustment term below the Scenario 60 safety defaults.
+- In live mode `agreement.create` and `agreement.renew` ignore any client scale
+  and derive the new row's frozen scale inside the transaction from server
+  settings and the open agreement shell. Existing frozen agreement scales are
+  never recomputed when settings or shells change.
 
 ## Client store
 
-`lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same client module.
+`lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same HTTP path.
 
 The default repo operations book remains browser state. After a tested staff import, the
 server-runtime owner switch moves reads and writes together to the scoped
-`/api/live-book` handlers. Catalog, shells, and desk settings remain browser-only.
+`/api/live-book` handlers. Catalog, shells, and pricing/custody settings are
+server-authoritative in live mode and remain `localStorage` data in browser mode.
+Live persistence preserves browser-mode rollback data but does not overwrite it
+with server desk data or seed demo desk rows.
 New browser-resized JPEG data previews remain local; ordinary live-book operations
 never send `data:` URLs. There is no tRPC or MCP procedure. The HTTP handlers are
 the shared human path, but an agent tool adapter remains an explicit parity

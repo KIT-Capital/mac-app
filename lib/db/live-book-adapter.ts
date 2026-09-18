@@ -1,10 +1,16 @@
 import { eq, inArray } from "drizzle-orm";
+import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
 import { ownerKey } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
+import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type {
   Agreement,
   AgreementEnd,
+  AgreementShell,
+  ApplicationPurchaseShares,
+  AppSettings,
   AppState,
+  CatalogEntry,
   ManagedUser,
   PhotoKind,
   PhotoRecord,
@@ -16,6 +22,10 @@ import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
 import {
   customers,
+  agreementShells,
+  applications,
+  catalogReferences,
+  deskSettings,
   liveAgreementEnds,
   liveAgreementMembers,
   liveAgreements,
@@ -31,13 +41,101 @@ export type LiveBookRows = {
   members: Row[];
   ends: Row[];
   previews: Row[];
+  settings?: Row[];
+  catalog?: Row[];
+  shells?: Row[];
 };
-export type LiveBookState = Pick<AppState, "timepieces" | "agreements" | "users" | "photos" | "profiles">;
+export type LiveBookState = Pick<
+  AppState,
+  "timepieces" | "agreements" | "users" | "photos" | "profiles" | "settings" | "catalog" | "shells"
+> & { applicationPurchaseShares: ApplicationPurchaseShares };
 
 const PHOTO_KINDS = new Set(["front", "back", "left", "right", "clasp", "more", "buckle", "box", "papers", "other"]);
 const text = (row: Row, key: string, fallback = "") => typeof row[key] === "string" ? row[key] : fallback;
 const optionalText = (row: Row, key: string) => text(row, key) || undefined;
 const photoKind = (value: string) => (PHOTO_KINDS.has(value) ? value : "other") as PhotoKind;
+const bps = (value: unknown, fallback: number) =>
+  typeof value === "number" ? value / 10_000 : fallback;
+
+function settings(rows: Row[]): AppSettings {
+  const row = rows[0];
+  if (!row) return { ...DEFAULT_SETTINGS };
+  return {
+    ...DEFAULT_SETTINGS,
+    maxLtv: bps(row.maxLtvBps, DEFAULT_SETTINGS.maxLtv),
+    startingRate: bps(row.startingRateBps, DEFAULT_SETTINGS.startingRate),
+    setupFee: bps(row.setupFeeBps, DEFAULT_SETTINGS.setupFee),
+    earlyRepurchaseAmount: bps(
+      row.earlyRepurchaseAmountBps,
+      DEFAULT_SETTINGS.earlyRepurchaseAmount,
+    ),
+    brokerFee: bps(row.brokerFeeBps, DEFAULT_SETTINGS.brokerFee),
+    minMonths: typeof row.minMonths === "number" ? row.minMonths : DEFAULT_SETTINGS.minMonths,
+    earlyStartMonth:
+      typeof row.earlyStartMonth === "number"
+        ? row.earlyStartMonth
+        : DEFAULT_SETTINGS.earlyStartMonth,
+    earlyUntilMonth:
+      typeof row.earlyUntilMonth === "number"
+        ? row.earlyUntilMonth
+        : DEFAULT_SETTINGS.earlyUntilMonth,
+    typicalTerm:
+      typeof row.typicalTerm === "number" ? row.typicalTerm : DEFAULT_SETTINGS.typicalTerm,
+    membershipMonthly:
+      typeof row.membershipMonthlyCents === "number"
+        ? row.membershipMonthlyCents / 100
+        : DEFAULT_SETTINGS.membershipMonthly,
+    vaultLocation: text(row, "vaultLocation", DEFAULT_SETTINGS.vaultLocation),
+  };
+}
+
+function catalog(rows: Row[]): CatalogEntry[] {
+  return rows.map((row) => ({
+    id: text(row, "id"),
+    brand: text(row, "brand"),
+    model: text(row, "model"),
+    reference: text(row, "reference"),
+    caseMetal: text(row, "caseMetal"),
+    caseDiameter: text(row, "caseDiameter"),
+    typicalLow: centsToDollars(
+      typeof row.typicalLowCents === "number" ? row.typicalLowCents : 0,
+    ) ?? 0,
+    typicalHigh: centsToDollars(
+      typeof row.typicalHighCents === "number" ? row.typicalHighCents : 0,
+    ) ?? 0,
+    financeable: Boolean(row.financeable),
+    notes: text(row, "notes"),
+  }));
+}
+
+function shells(rows: Row[]): AgreementShell[] {
+  return rows.map((row) => ({
+    id: text(row, "id"),
+    code: text(row, "code"),
+    title: text(row, "title"),
+    termMonths: typeof row.termMonths === "number" ? row.termMonths : 12,
+    rate: bps(row.rateBps, DEFAULT_SETTINGS.startingRate),
+    ltv: bps(row.ltvBps, DEFAULT_SETTINGS.maxLtv),
+    setupFee: bps(row.setupFeeBps, DEFAULT_SETTINGS.setupFee),
+    earlyRepurchaseAmount: bps(
+      row.earlyRepurchaseAmountBps,
+      DEFAULT_SETTINGS.earlyRepurchaseAmount,
+    ),
+    brokerFee: bps(row.brokerFeeBps, DEFAULT_SETTINGS.brokerFee),
+    minMonths: typeof row.minMonths === "number" ? row.minMonths : DEFAULT_SETTINGS.minMonths,
+    earlyStartMonth:
+      typeof row.earlyStartMonth === "number"
+        ? row.earlyStartMonth
+        : DEFAULT_SETTINGS.earlyStartMonth,
+    earlyUntilMonth:
+      typeof row.earlyUntilMonth === "number"
+        ? row.earlyUntilMonth
+        : DEFAULT_SETTINGS.earlyUntilMonth,
+    status:
+      row.status === "assigned" || row.status === "closed" ? row.status : "open",
+    createdAt: text(row, "createdOn"),
+  }));
+}
 
 function profile(row: Row): Profile {
   return {
@@ -74,7 +172,11 @@ function managedUser(row: Row): ManagedUser {
   };
 }
 
-export function mapLiveBookRows(rows: LiveBookRows, customerId?: string): LiveBookState {
+export function mapLiveBookRows(
+  rows: LiveBookRows,
+  customerId?: string,
+  discloseDeskTerms = true,
+): LiveBookState {
   const customerRows = customerId ? rows.customers.filter((row) => row.id === customerId) : rows.customers;
   const customerIds = new Set(customerRows.map((row) => text(row, "id")));
   const customerById = new Map(customerRows.map((row) => [text(row, "id"), row]));
@@ -171,22 +273,57 @@ export function mapLiveBookRows(rows: LiveBookRows, customerId?: string): LiveBo
     const value = profile(row);
     return [value.email, value];
   }));
+  const authoritativeSettings = settings(rows.settings ?? []);
+  const authoritativeShells = shells(rows.shells ?? []);
+  const openShell = authoritativeShells.find((shell) => shell.status === "open");
   return {
     timepieces: mappedPieces,
     agreements: mappedAgreements,
     users: customerRows.map(managedUser),
     photos: mappedPhotos,
     profiles,
+    settings: discloseDeskTerms
+      ? authoritativeSettings
+      : { ...DEFAULT_SETTINGS, vaultLocation: "" },
+    catalog: catalog(rows.catalog ?? []),
+    shells: discloseDeskTerms ? authoritativeShells : [],
+    applicationPurchaseShares: applicationPurchaseShares(
+      authoritativeSettings,
+      openShell,
+    ),
   };
 }
 
 export async function readLiveBookState(db: Database, actor: Actor): Promise<LiveBookState> {
   return db.transaction(async (tx) => {
-    const customerRows = actor.role === "collector"
-      ? await tx.select().from(customers).where(eq(customers.id, actor.customerId))
-      : await tx.select().from(customers);
+    const [customerRows, settingRows, catalogRows, shellRows, applicationRows] = await Promise.all([
+      actor.role === "collector"
+        ? tx.select().from(customers).where(eq(customers.id, actor.customerId))
+        : tx.select().from(customers),
+      tx.select().from(deskSettings),
+      tx.select().from(catalogReferences),
+      tx.select().from(agreementShells),
+      actor.role === "collector"
+        ? tx.select({ id: applications.id })
+            .from(applications)
+            .where(eq(applications.customerId, actor.customerId))
+            .limit(1)
+        : [],
+    ]);
     const customerIds = customerRows.map((row) => row.id);
-    if (!customerIds.length) return { timepieces: [], agreements: [], users: [], photos: [], profiles: {} };
+    if (!customerIds.length) {
+      return mapLiveBookRows({
+        customers: [],
+        timepieces: [],
+        agreements: [],
+        members: [],
+        ends: [],
+        previews: [],
+        settings: settingRows,
+        catalog: catalogRows,
+        shells: shellRows,
+      }, actor.role === "collector" ? actor.customerId : undefined, actor.role !== "collector" || applicationRows.length > 0);
+    }
     const [pieceRows, agreementRows] = await Promise.all([
       tx.select().from(timepieces).where(inArray(timepieces.customerId, customerIds)),
       tx.select().from(liveAgreements).where(inArray(liveAgreements.customerId, customerIds)),
@@ -205,6 +342,10 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       members: memberRows,
       ends: endRows,
       previews: previewRows,
-    }, actor.role === "collector" ? actor.customerId : undefined);
+      settings: settingRows,
+      catalog: catalogRows,
+      shells: shellRows,
+    }, actor.role === "collector" ? actor.customerId : undefined,
+    actor.role !== "collector" || applicationRows.length > 0 || agreementRows.length > 0);
   });
 }

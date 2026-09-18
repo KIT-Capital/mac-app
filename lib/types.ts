@@ -169,6 +169,8 @@ export type AgreementShell = {
   createdAt: string;
 };
 
+export type ApplicationPurchaseShares = Record<string, number>;
+
 export type PhotoRecord = {
   id: string;
   url: string;
@@ -215,5 +217,6 @@ export type AppState = {
   shells: AgreementShell[];
   photos: PhotoRecord[];
   settings: AppSettings;
+  applicationPurchaseShares?: ApplicationPurchaseShares;
   profiles: Record<string, Profile>;
 };

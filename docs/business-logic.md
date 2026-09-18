@@ -25,7 +25,20 @@ Collectors must be 18+ and accept privacy consent at signup.
 
 ## Defaults
 
-Purchase caps, typical term, membership price, and vault copy live in desk settings / `DEFAULT_SETTINGS`. Changing money math needs owner approval and the full review required by `AGENTS.md`. `lib/catalog.ts` helpers (`maxPurchaseAmount`, `buybackPrice`) are **prototype UI math**, not approved accounting policy.
+Purchase caps, Scenario 60 fees, typical term, membership price, and vault copy
+live in Neon desk settings when live mode is enabled and in `localStorage` in
+browser mode. If the live settings singleton does not exist, the server returns
+`DEFAULT_SETTINGS` and Scenario 60 constants without inserting defaults. Catalog
+references and agreement shells likewise stay empty until the desk creates them;
+production never receives demo desk data. Appearance and personal notification
+preferences are not desk settings. Before a collector has an application or repo,
+live reads expose generic Scenario 60 display defaults, no shells, blank custody,
+and only the effective purchase-share cap for each selectable application term;
+after that point the collector sees the authoritative terms used for their repo.
+
+Changing money math needs owner approval and the full review required by
+`AGENTS.md`. `lib/catalog.ts` helpers (`maxPurchaseAmount`, `buybackPrice`) are
+**prototype UI math**, not approved accounting policy.
 
 ## Operations book
 
@@ -33,6 +46,13 @@ Every live agreement is read with the same six labels on desk and collector: **o
 
 - Signature stays `draft` / `pending_signature` / `signed`. Signing does not write a book end. A book end does not change the signature flag.
 - Staff persist one current generic end: kind (`bought_back` | `in_liquidation` | `liquidated`), calendar date, and dollar amount. Staff may overwrite or clear that end. There is no end history in this app. Paid close is **bought back**. Admin **Renew** is the only path to **renewed**: it closes a live repo at that month’s Scenario 60 repurchase dollars and atomically opens a new 12-month repo with the same pieces at that scheduled amount. The collector may add free pieces; they may raise the sale amount only up to the desk LTV cap. Renewal does not post cash.
+- In live mode every newly created or renewed repo freezes a scale derived inside
+  the database transaction from the server settings and a matching-term open
+  shell; a shell for another term does not override settings. A client-submitted
+  scale is ignored. Later settings or shell changes never recompute an existing
+  repo's frozen scale. Replacing the current open shell atomically assigns the
+  prior shell; the sole open shell cannot be removed or closed without an open
+  replacement.
 - **Open** and **past due** are derived. Term date is calendar months from `createdAt`. The last day of the term is still **open**. **Past due** begins the next calendar day. Staff do not toggle those two words.
 - A recorded end always wins. Clearing the end returns the derived label.
 - Unsigned repos stay in the book. The Hale demo (created 2021-03-14, 12 months, pending signature) reads **past due**.

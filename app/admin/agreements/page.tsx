@@ -178,6 +178,7 @@ export default function AdminAgreementsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [endDraft, setEndDraft] = useState({ kind: "bought_back" as BookEndKind, date: "", amount: "" });
   const [endError, setEndError] = useState("");
+  const [shellError, setShellError] = useState("");
   const [documentNote, setDocumentNote] = useState<{ id: string; text: string } | null>(null);
   const [sendHistory, setSendHistory] = useState<{ id: string; rows: { actorKind: string; recipientKind: string; result: string }[] } | null>(null);
   const selected = agreements.find((item) => item.id === selectedId) ?? null;
@@ -239,11 +240,22 @@ export default function AdminAgreementsPage() {
     };
   }, [selectedId]);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!draft.code) return;
-    upsertShell({ ...draft, id: draft.id || `shell-${Date.now()}` });
+    setShellError("");
+    const result = await upsertShell({ ...draft, id: draft.id || `shell-${Date.now()}` });
+    if (!result.ok) {
+      setShellError("The agreement shell could not be saved.");
+      return;
+    }
     setDraft(blankShell(settings.typicalTerm));
+  }
+
+  async function onRemoveShell(id: string) {
+    setShellError("");
+    const result = await removeShell(id);
+    if (!result.ok) setShellError("The agreement shell could not be removed.");
   }
 
   const scaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -347,6 +359,7 @@ export default function AdminAgreementsPage() {
           Save Agreement Shell
         </PillButton>
       </form>
+      {shellError ? <p className="mb-4 text-sm text-red-300">{shellError}</p> : null}
       <AdminTable
         headers={["Code", "Title", "Term", "Max purchase", "Status", ""]}
         rows={shells.map((s) => [
@@ -357,7 +370,7 @@ export default function AdminAgreementsPage() {
           s.status === "open" ? "Open" : s.status === "assigned" ? "Assigned" : "Closed",
           <div key={s.id} className="flex gap-3 text-[#FCB040]">
             <button type="button" onClick={() => setDraft(s)}>Edit</button>
-            <button type="button" onClick={() => removeShell(s.id)}>Remove</button>
+            <button type="button" onClick={() => void onRemoveShell(s.id)}>Remove</button>
           </div>,
         ])}
       />

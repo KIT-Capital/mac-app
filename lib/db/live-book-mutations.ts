@@ -8,9 +8,14 @@ import {
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
+import {
+  agreementScaleFromDesk,
+  assertScenario60Floors,
+} from "@/lib/contract/repo-scale.mjs";
 import { parseLiveBookOperation } from "@/lib/live-book-operation.mjs";
 import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import type { Agreement } from "@/lib/types";
+import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
 import { liveAgreementHasDocuments } from "./agreement-documents";
 import { dollarsToCents } from "./money.mjs";
@@ -22,10 +27,13 @@ import type { Actor } from "./records";
 import { deskActor } from "./records";
 import {
   agreements as preparedAgreements,
+  agreementShells,
   allocations,
   applications,
+  catalogReferences,
   collectorSessions,
   customers,
+  deskSettings,
   liveAgreementEnds,
   liveAgreementMembers,
   liveAgreements,
@@ -109,6 +117,119 @@ function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
   };
 }
 
+const toBasisPoints = (value: unknown) => Math.round(Number(value) * 10_000);
+
+function settingsRowValues(source: Record<string, unknown>) {
+  return {
+    maxLtvBps: toBasisPoints(source.maxLtv),
+    startingRateBps: toBasisPoints(source.startingRate),
+    setupFeeBps: toBasisPoints(source.setupFee),
+    earlyRepurchaseAmountBps: toBasisPoints(source.earlyRepurchaseAmount),
+    brokerFeeBps: toBasisPoints(source.brokerFee),
+    minMonths: Number(source.minMonths),
+    earlyStartMonth: Number(source.earlyStartMonth),
+    earlyUntilMonth: Number(source.earlyUntilMonth),
+    typicalTerm: Number(source.typicalTerm),
+    membershipMonthlyCents: Math.round(Number(source.membershipMonthly) * 100),
+    vaultLocation: String(source.vaultLocation),
+  };
+}
+
+function settingsRowPatch(patch: Record<string, unknown>) {
+  const values = settingsRowValues({ ...DEFAULT_SETTINGS, ...patch });
+  const fields: Record<string, keyof typeof values> = {
+    maxLtv: "maxLtvBps",
+    startingRate: "startingRateBps",
+    setupFee: "setupFeeBps",
+    earlyRepurchaseAmount: "earlyRepurchaseAmountBps",
+    brokerFee: "brokerFeeBps",
+    minMonths: "minMonths",
+    earlyStartMonth: "earlyStartMonth",
+    earlyUntilMonth: "earlyUntilMonth",
+    typicalTerm: "typicalTerm",
+    membershipMonthly: "membershipMonthlyCents",
+    vaultLocation: "vaultLocation",
+  };
+  return Object.fromEntries(
+    Object.entries(fields)
+      .filter(([input]) => patch[input] !== undefined)
+      .map(([, column]) => [column, values[column]]),
+  );
+}
+
+function shellScale(shell: Record<string, unknown>) {
+  return {
+    purchaseShare: Number(shell.ltv),
+    annualAdjustment: Number(shell.rate),
+    setupFee: Number(shell.setupFee),
+    earlyRepurchaseAmount: Number(shell.earlyRepurchaseAmount),
+    brokerFee: Number(shell.brokerFee),
+    minMonths: Number(shell.minMonths),
+    earlyStartMonth: Number(shell.earlyStartMonth),
+    earlyUntilMonth: Number(shell.earlyUntilMonth),
+  };
+}
+
+function shellRowValues(shell: Record<string, unknown>) {
+  return {
+    id: String(shell.id),
+    code: String(shell.code),
+    title: String(shell.title),
+    termMonths: Number(shell.termMonths),
+    rateBps: toBasisPoints(shell.rate),
+    ltvBps: toBasisPoints(shell.ltv),
+    setupFeeBps: toBasisPoints(shell.setupFee),
+    earlyRepurchaseAmountBps: toBasisPoints(shell.earlyRepurchaseAmount),
+    brokerFeeBps: toBasisPoints(shell.brokerFee),
+    minMonths: Number(shell.minMonths),
+    earlyStartMonth: Number(shell.earlyStartMonth),
+    earlyUntilMonth: Number(shell.earlyUntilMonth),
+    status: String(shell.status),
+    createdOn: String(shell.createdAt),
+  };
+}
+
+async function serverAgreementScale(db: Database, termMonths: number) {
+  const [settingRows, shellRows] = await Promise.all([
+    db.select().from(deskSettings).where(eq(deskSettings.id, "default")).limit(1),
+    db.select().from(agreementShells).where(eq(agreementShells.status, "open")).limit(1),
+  ]);
+  const setting = settingRows[0];
+  const shell = shellRows[0];
+  const settings = setting
+    ? {
+        ...DEFAULT_SETTINGS,
+        maxLtv: setting.maxLtvBps / 10_000,
+        startingRate: setting.startingRateBps / 10_000,
+        setupFee: setting.setupFeeBps / 10_000,
+        earlyRepurchaseAmount: setting.earlyRepurchaseAmountBps / 10_000,
+        brokerFee: setting.brokerFeeBps / 10_000,
+        minMonths: setting.minMonths,
+        earlyStartMonth: setting.earlyStartMonth,
+        earlyUntilMonth: setting.earlyUntilMonth,
+        typicalTerm: setting.typicalTerm,
+        membershipMonthly: setting.membershipMonthlyCents / 100,
+        vaultLocation: setting.vaultLocation,
+      }
+    : DEFAULT_SETTINGS;
+  const openShell = shell?.termMonths === termMonths
+    ? {
+        termMonths: shell.termMonths,
+        rate: shell.rateBps / 10_000,
+        ltv: shell.ltvBps / 10_000,
+        setupFee: shell.setupFeeBps / 10_000,
+        earlyRepurchaseAmount: shell.earlyRepurchaseAmountBps / 10_000,
+        brokerFee: shell.brokerFeeBps / 10_000,
+        minMonths: shell.minMonths,
+        earlyStartMonth: shell.earlyStartMonth,
+        earlyUntilMonth: shell.earlyUntilMonth,
+      }
+    : undefined;
+  const scale = agreementScaleFromDesk(settings, openShell, termMonths);
+  if (!assertScenario60Floors(scale).ok) throw new Error("AGREEMENT_SCALE_INVALID");
+  return scale;
+}
+
 const AUDITED_DESK_ACTIONS = new Set([
   "customer.update",
   "customer.remove",
@@ -123,6 +244,11 @@ const AUDITED_DESK_ACTIONS = new Set([
   "agreement.renew",
   "agreement.remove",
   "preview.remove",
+  "settings.update",
+  "catalog.upsert",
+  "catalog.remove",
+  "shell.upsert",
+  "shell.remove",
 ]);
 const LOCKED_AGREEMENT_ACTIONS = new Set([
   "agreement.create",
@@ -136,6 +262,24 @@ const LOCKED_AGREEMENT_ACTIONS = new Set([
   "agreement.setAmount",
   "agreement.remove",
 ]);
+
+function auditTargetId(operation: Operation & Record<string, unknown>) {
+  if (typeof operation.id === "string") return operation.id;
+  if (operation.action === "settings.update") return "default";
+  if (operation.shell && typeof operation.shell === "object") {
+    return String((operation.shell as Record<string, unknown>).id ?? "");
+  }
+  if (operation.entry && typeof operation.entry === "object") {
+    return String((operation.entry as Record<string, unknown>).id ?? "");
+  }
+  if (operation.timepiece && typeof operation.timepiece === "object") {
+    return String((operation.timepiece as Record<string, unknown>).id ?? "");
+  }
+  if (operation.customer && typeof operation.customer === "object") {
+    return String((operation.customer as Record<string, unknown>).id ?? "");
+  }
+  return "";
+}
 
 export async function executeLiveBookOperation(
   db: Database,
@@ -159,18 +303,11 @@ export async function executeLiveBookOperation(
       });
       const trusted = deskActor(staff.role, staff.email, staff.id);
       await executeLiveBookOperationCore(tx as unknown as Database, trusted, operation);
-      const targetId = typeof operation.id === "string"
-        ? operation.id
-        : typeof operation.timepiece === "object" && operation.timepiece
-          ? String((operation.timepiece as Record<string, unknown>).id ?? "")
-          : typeof operation.customer === "object" && operation.customer
-            ? String((operation.customer as Record<string, unknown>).id ?? "")
-            : null;
       await writeDeskAudit(
         tx,
         staff,
         operation.action,
-        targetId ?? "",
+        auditTargetId(operation),
         options.clientAddress ?? "unknown",
       );
     });
@@ -186,10 +323,169 @@ export async function executeLiveBookOperation(
 async function executeLiveBookOperationCore(
   db: Database,
   actor: Actor,
-  input: unknown,
+  operation: Operation & Record<string, unknown>,
 ) {
-  const operation = parseLiveBookOperation(input) as Operation & Record<string, unknown>;
   const action = operation.action;
+
+  if (action === "settings.update") {
+    if (actor.role !== "admin") throw new Error("ADMIN_REQUIRED");
+    const patch = operation.patch as Record<string, unknown>;
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext('mac-desk-settings'))`);
+    const [current] = await db.select().from(deskSettings)
+      .where(eq(deskSettings.id, "default"))
+      .for("update")
+      .limit(1);
+    const currentSettings = current
+      ? {
+          ...DEFAULT_SETTINGS,
+          maxLtv: current.maxLtvBps / 10_000,
+          startingRate: current.startingRateBps / 10_000,
+          setupFee: current.setupFeeBps / 10_000,
+          earlyRepurchaseAmount: current.earlyRepurchaseAmountBps / 10_000,
+          brokerFee: current.brokerFeeBps / 10_000,
+          minMonths: current.minMonths,
+          earlyStartMonth: current.earlyStartMonth,
+          earlyUntilMonth: current.earlyUntilMonth,
+          typicalTerm: current.typicalTerm,
+          membershipMonthly: current.membershipMonthlyCents / 100,
+          vaultLocation: current.vaultLocation,
+        }
+      : DEFAULT_SETTINGS;
+    const nextSettings = { ...currentSettings, ...patch };
+    const terms = {
+      purchaseShare: nextSettings.maxLtv,
+      annualAdjustment: nextSettings.startingRate,
+      setupFee: nextSettings.setupFee,
+      earlyRepurchaseAmount: nextSettings.earlyRepurchaseAmount,
+      brokerFee: nextSettings.brokerFee,
+    };
+    if (
+      !assertScenario60Floors(terms).ok ||
+      nextSettings.minMonths > nextSettings.typicalTerm ||
+      nextSettings.earlyStartMonth >= nextSettings.earlyUntilMonth ||
+      nextSettings.earlyUntilMonth > nextSettings.typicalTerm
+    ) {
+      throw new Error("AGREEMENT_SCALE_INVALID");
+    }
+    const update = settingsRowPatch(patch);
+    if (current) {
+      await db.update(deskSettings)
+        .set({ ...update, updatedAt: new Date() })
+        .where(eq(deskSettings.id, "default"));
+    } else {
+      await db.insert(deskSettings).values({
+        id: "default",
+        ...settingsRowValues(nextSettings),
+      });
+    }
+    return;
+  }
+
+  if (action === "catalog.upsert") {
+    requireDesk(actor);
+    const entry = operation.entry as Record<string, unknown>;
+    const typicalLowCents = dollarsToCents(Number(entry.typicalLow));
+    const typicalHighCents = dollarsToCents(Number(entry.typicalHigh));
+    if (typicalLowCents === null || typicalHighCents === null) {
+      throw new Error("CATALOG_ENTRY_INVALID");
+    }
+    const values = {
+      id: String(entry.id),
+      brand: String(entry.brand),
+      model: String(entry.model),
+      reference: String(entry.reference),
+      caseMetal: String(entry.caseMetal),
+      caseDiameter: String(entry.caseDiameter),
+      typicalLowCents,
+      typicalHighCents,
+      financeable: Boolean(entry.financeable),
+      notes: String(entry.notes),
+    };
+    await db.insert(catalogReferences).values(values).onConflictDoUpdate({
+      target: catalogReferences.id,
+      set: {
+        brand: values.brand,
+        model: values.model,
+        reference: values.reference,
+        caseMetal: values.caseMetal,
+        caseDiameter: values.caseDiameter,
+        typicalLowCents: values.typicalLowCents,
+        typicalHighCents: values.typicalHighCents,
+        financeable: values.financeable,
+        notes: values.notes,
+        updatedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (action === "catalog.remove") {
+    requireDesk(actor);
+    const result = await db.delete(catalogReferences)
+      .where(eq(catalogReferences.id, String(operation.id)))
+      .returning({ id: catalogReferences.id });
+    if (!result.length) throw new Error("CATALOG_ENTRY_NOT_FOUND");
+    return;
+  }
+
+  if (action === "shell.upsert") {
+    requireDesk(actor);
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext('mac-open-agreement-shell'))`);
+    const shell = operation.shell as Record<string, unknown>;
+    const terms = shellScale(shell);
+    if (!assertScenario60Floors(terms).ok) throw new Error("AGREEMENT_SCALE_INVALID");
+    const values = shellRowValues(shell);
+    const [open] = await db.select({ id: agreementShells.id })
+      .from(agreementShells)
+      .where(eq(agreementShells.status, "open"))
+      .for("update")
+      .limit(1);
+    if (open?.id === values.id && values.status !== "open") {
+      throw new Error("AGREEMENT_OPEN_SHELL_REQUIRED");
+    }
+    if (values.status === "open" && open && open.id !== values.id) {
+      await db.update(agreementShells)
+        .set({ status: "assigned", updatedAt: new Date() })
+        .where(eq(agreementShells.id, open.id));
+    }
+    await db.insert(agreementShells).values(values).onConflictDoUpdate({
+      target: agreementShells.id,
+      set: {
+        code: values.code,
+        title: values.title,
+        termMonths: values.termMonths,
+        rateBps: values.rateBps,
+        ltvBps: values.ltvBps,
+        setupFeeBps: values.setupFeeBps,
+        earlyRepurchaseAmountBps: values.earlyRepurchaseAmountBps,
+        brokerFeeBps: values.brokerFeeBps,
+        minMonths: values.minMonths,
+        earlyStartMonth: values.earlyStartMonth,
+        earlyUntilMonth: values.earlyUntilMonth,
+        status: values.status,
+        createdOn: values.createdOn,
+        updatedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (action === "shell.remove") {
+    requireDesk(actor);
+    await db.execute(sql`select pg_advisory_xact_lock(hashtext('mac-open-agreement-shell'))`);
+    const [target] = await db.select({ status: agreementShells.status })
+      .from(agreementShells)
+      .where(eq(agreementShells.id, String(operation.id)))
+      .for("update")
+      .limit(1);
+    if (!target) throw new Error("AGREEMENT_SHELL_NOT_FOUND");
+    if (target.status === "open") throw new Error("AGREEMENT_OPEN_SHELL_REQUIRED");
+    const result = await db.delete(agreementShells)
+      .where(eq(agreementShells.id, String(operation.id)))
+      .returning({ id: agreementShells.id });
+    if (!result.length) throw new Error("AGREEMENT_SHELL_NOT_FOUND");
+    return;
+  }
 
   if (action === "profile.update") {
     if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
@@ -359,7 +655,8 @@ async function executeLiveBookOperationCore(
     }
     const [owner] = await db.select().from(customers).where(eq(customers.id, actor.customerId)).limit(1);
     if (!owner || owner.email !== actor.email) throw new Error("COLLECTOR_NOT_FOUND");
-    const share = Number((agreement.scale as { purchaseShare?: number } | undefined)?.purchaseShare ?? 0.6);
+    const scale = await serverAgreementScale(db, agreement.termMonths);
+    const share = scale.purchaseShare;
     const cap = pieces.reduce((sum, row) => sum + maxPurchaseAmount(
       (row.valueLowCents ?? 0) / 100,
       (row.valueHighCents ?? 0) / 100,
@@ -385,7 +682,7 @@ async function executeLiveBookOperationCore(
         status: "pending_signature",
         agreementCode: agreement.agreementCode,
         createdOn: agreement.createdAt,
-        scale: agreement.scale ?? null,
+        scale,
       });
       await tx.insert(liveAgreementMembers).values(agreement.watchIds.map((timepieceId) => ({
         id: `${agreement.id}:${timepieceId}`,
@@ -496,11 +793,12 @@ async function executeLiveBookOperationCore(
   if (action === "agreement.renew") {
     if (actor.role !== "admin") throw new Error("ADMIN_REQUIRED");
     const agreement = await ownedAgreement(db, actor, String(operation.id));
+    const scale = await serverAgreementScale(db, 12);
     const planned = planRenewal(
       agreement,
       String(operation.closeDate),
       undefined,
-      operation.scale as Record<string, unknown>,
+      scale,
     );
     if (!planned.ok) throw new Error(planned.error);
     const successorId = String(operation.successorId);
@@ -529,7 +827,7 @@ async function executeLiveBookOperationCore(
         status: "pending_signature",
         agreementCode: String(operation.agreementCode),
         createdOn: String(operation.closeDate),
-        scale: operation.scale as Record<string, unknown>,
+        scale,
       });
       await tx.insert(liveAgreementMembers).values(agreement.watchIds.map((timepieceId) => ({
         id: `${successorId}:${timepieceId}`,

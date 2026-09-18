@@ -244,6 +244,69 @@ test.describe("collector app", () => {
     await expect(page.getByRole("button", { name: "Executed & Verified" })).toBeVisible();
   });
 
+  test("first live application uses term-specific server purchase caps without disclosing terms", async ({ page }) => {
+    const email = "first.application@example.com";
+    await page.route("**/api/live-book", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          viewer: { role: "collector", email, customerId: "cust-first" },
+          book: {
+            timepieces: [{
+              id: "piece-first",
+              ownerEmail: email,
+              brand: "Vacheron Constantin",
+              model: "Overseas",
+              images: [],
+              status: "appraised",
+              valueLow: 100_000,
+              valueHigh: 120_000,
+              financeable: true,
+              condition: "Excellent",
+              boxPapers: "Box and papers",
+              caseMetal: "Steel",
+              caseType: "Round",
+              caseDiameter: "41mm",
+              dialColor: "Blue",
+              buckle: "Folding clasp",
+              band: "bracelet",
+              bandMaterial: "Steel",
+              complication: "Date",
+            }],
+            agreements: [],
+            users: [],
+            photos: [],
+            profiles: {
+              [email]: {
+                name: "First Applicant",
+                email,
+                phone: "",
+                member: false,
+                avatar: "",
+                role: "collector",
+                onboardingComplete: true,
+                applicationSubmitted: false,
+                preferences: {},
+              },
+            },
+            catalog: [],
+            shells: [],
+            settings: { maxLtv: 0.6, typicalTerm: 9, vaultLocation: "" },
+            applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.55 },
+          },
+        }),
+      });
+    });
+
+    await page.goto("/repurchase");
+    await expect(page.getByText("Enter Amount Up to $45,000")).toBeVisible();
+    await page.getByLabel("Term (months)").selectOption("12");
+    await expect(page.getByText("Enter Amount Up to $55,000")).toBeVisible();
+    await expect(page.getByText(/%|Server Vault|setup fee|repurchase window/i)).toHaveCount(0);
+  });
+
   test("partners lists maison names and burger opens collector destinations", async ({ page }) => {
     await signInHale(page);
     await openMenu(page);
