@@ -195,6 +195,10 @@ export default function AdminAgreementsPage() {
           documents?: { version?: number; status?: string; checksum?: string | null }[];
         } | null;
         if (cancelled) return;
+        if (!response.ok) {
+          setDocumentNote({ id, text: "Could not check this document." });
+          return;
+        }
         if (body?.mode !== "live") {
           setDocumentNote({ id, text: "No stored document in browser mode." });
           return;
@@ -208,7 +212,7 @@ export default function AdminAgreementsPage() {
         });
       })
       .catch(() => {
-        if (!cancelled) setDocumentNote({ id, text: "No stored document in browser mode." });
+        if (!cancelled) setDocumentNote({ id, text: "Could not check this document." });
       });
     return () => {
       cancelled = true;

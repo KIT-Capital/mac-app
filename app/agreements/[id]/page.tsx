@@ -117,6 +117,8 @@ export default function AgreementDetailPage() {
 
   async function openStoredDocument(documentId: string, download: boolean) {
     setDocError("");
+    const tab = download ? null : window.open("", "_blank");
+    if (tab) tab.opener = null;
     const response = await fetch("/api/agreement-documents", {
       method: "POST",
       credentials: "include",
@@ -126,6 +128,7 @@ export default function AgreementDetailPage() {
     });
     const body = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
     if (!response.ok || !body?.url) {
+      tab?.close();
       setDocError(body?.error === "DOCUMENT_NOT_FOUND" ? "That document is not available." : "Could not open the stored PDF.");
       return;
     }
@@ -136,13 +139,19 @@ export default function AgreementDetailPage() {
       link.click();
       return;
     }
-    window.open(body.url, "_blank", "noopener,noreferrer");
+    if (!tab) {
+      setDocError("Allow pop-ups to view the stored PDF.");
+      return;
+    }
+    tab.location.href = body.url;
   }
 
   async function previewPdf(kind: "view" | "download") {
     if (!agreement || pdfBusy) return;
     setPdfBusy(true);
     setPdfError("");
+    const tab = kind === "view" ? window.open("", "_blank") : null;
+    if (tab) tab.opener = null;
     try {
       const response = await fetch("/api/contracts/pdf", {
         method: "POST",
@@ -166,18 +175,29 @@ export default function AgreementDetailPage() {
           })),
         }),
       });
-      if (!pageOpen.current) return;
+      if (!pageOpen.current) {
+        tab?.close();
+        return;
+      }
       if (!response.ok) {
+        tab?.close();
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
         setPdfError(body?.error || "Could not create the contract PDF.");
         return;
       }
       const blob = await response.blob();
-      if (!pageOpen.current) return;
+      if (!pageOpen.current) {
+        tab?.close();
+        return;
+      }
       const url = URL.createObjectURL(blob);
       if (pageOpen.current) setPdfBusy(false);
       if (kind === "view") {
-        window.open(url, "_blank", "noopener,noreferrer");
+        if (!tab) {
+          setPdfError("Allow pop-ups to view the PDF.");
+          return;
+        }
+        tab.location.href = url;
       } else {
         const link = document.createElement("a");
         link.href = url;
@@ -186,6 +206,7 @@ export default function AgreementDetailPage() {
       }
       window.setTimeout(() => URL.revokeObjectURL(url), 4000);
     } catch {
+      tab?.close();
       if (pageOpen.current) setPdfError("Could not create the contract PDF.");
     } finally {
       if (pageOpen.current) setPdfBusy(false);
@@ -434,7 +455,7 @@ export default function AgreementDetailPage() {
             <p className="font-semibold text-emerald-800">Signed {agreement.signedAt}</p>
           ) : null}
         </article>
-        {bookMode === "live" && snapshot.ok && documents.some((row) => row.status === "stored") ? (
+        {bookMode === "live" && documents.some((row) => row.status === "stored") ? (
           <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
             <h3 className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Stored document</h3>
             <p className="mt-1 text-[12px] text-mac-muted">{PENDING_COUNSEL_LABEL}</p>
