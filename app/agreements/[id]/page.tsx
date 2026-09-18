@@ -44,6 +44,10 @@ export default function AgreementDetailPage() {
   const [bookMode, setBookMode] = useState<"browser" | "live">("browser");
   const [documents, setDocuments] = useState<ListedDocument[]>([]);
   const [docError, setDocError] = useState("");
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailNote, setMailNote] = useState("");
+  const [otherAddress, setOtherAddress] = useState("");
+  const [confirmAddress, setConfirmAddress] = useState("");
   const pageOpen = useRef(true);
   useEffect(() => () => {
     pageOpen.current = false;
@@ -144,6 +148,47 @@ export default function AgreementDetailPage() {
       return;
     }
     tab.location.href = body.url;
+  }
+
+  async function emailStoredDocument(documentId: string, recipientKind: "self" | "other") {
+    if (mailBusy) return;
+    setMailBusy(true);
+    setMailNote("");
+    setDocError("");
+    try {
+      const response = await fetch("/api/agreement-documents", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "email",
+          documentId,
+          recipientKind,
+          ...(recipientKind === "other" ? { address: otherAddress, confirmAddress } : {}),
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as { send?: { result?: string }; error?: string } | null;
+      if (!response.ok || body?.send?.result !== "accepted") {
+        setDocError(
+          body?.error === "DOCUMENT_RECIPIENT_UNCONFIRMED"
+            ? "Type the same email twice to confirm it."
+            : body?.error === "DOCUMENT_SEND_THROTTLED"
+              ? "Wait before sending again."
+              : "Could not email the stored PDF.",
+        );
+        return;
+      }
+      setMailNote("The stored PDF was accepted for delivery.");
+      if (recipientKind === "other") {
+        setOtherAddress("");
+        setConfirmAddress("");
+      }
+    } catch {
+      setDocError("Could not email the stored PDF.");
+    } finally {
+      setMailBusy(false);
+    }
   }
 
   async function previewPdf(kind: "view" | "download") {
@@ -487,6 +532,45 @@ export default function AgreementDetailPage() {
                 </li>
               ))}
             </ul>
+            {documents.some((row) => row.status === "stored") ? (
+              <div className="mt-3 space-y-2">
+                <button
+                  type="button"
+                  className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                  disabled={mailBusy}
+                  onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "self")}
+                >
+                  Email me
+                </button>
+                <label className="block text-[11px] text-mac-faint">
+                  Other email
+                  <input
+                    className="mt-1 w-full bg-transparent text-[13px] text-mac-fg outline-none"
+                    value={otherAddress}
+                    onChange={(event) => setOtherAddress(event.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="block text-[11px] text-mac-faint">
+                  Confirm other email
+                  <input
+                    className="mt-1 w-full bg-transparent text-[13px] text-mac-fg outline-none"
+                    value={confirmAddress}
+                    onChange={(event) => setConfirmAddress(event.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                  disabled={mailBusy}
+                  onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "other")}
+                >
+                  Email this address
+                </button>
+              </div>
+            ) : null}
+            {mailNote ? <p className="mt-2 text-[12px] text-mac-muted">{mailNote}</p> : null}
             {docError ? <p className="mt-2 text-xs text-red-400">{docError}</p> : null}
           </section>
         ) : null}

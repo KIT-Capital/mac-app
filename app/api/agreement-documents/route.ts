@@ -6,9 +6,13 @@ import {
 } from "@/lib/collector-access.mjs";
 import {
   buildAgreementDocument,
+  listAgreementDocumentSends,
   listAgreementDocuments,
   mintAgreementDocumentUrl,
+  sendAgreementDocument,
 } from "@/lib/db/agreement-documents";
+import { previewClientIp } from "@/lib/contract/pdf-request-policy.mjs";
+import { allowMailRequest } from "@/lib/mail-rate.mjs";
 import { getDb } from "@/lib/db/client";
 import { deskActor, toCollectorActor, type Actor } from "@/lib/db/records";
 import { customers } from "@/lib/db/schema";
@@ -84,7 +88,16 @@ export async function GET(request: Request) {
       liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
       customerId: url.searchParams.get("customerId") ?? undefined,
     });
-    return json({ mode: "live", documents: documents.map((row) => publicDocument(row as Record<string, unknown>)) });
+    const sends = context.actor.role === "collector"
+      ? []
+      : await listAgreementDocumentSends(getDb(), context.actor, {
+        liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
+      });
+    return json({
+      mode: "live",
+      documents: documents.map((row) => publicDocument(row as Record<string, unknown>)),
+      sends,
+    });
   } catch (error) {
     const failure = liveBookErrorResponse(error);
     return json({ mode: "live", error: failure.error }, failure.status);
@@ -103,6 +116,29 @@ export async function POST(request: Request) {
     }
     const body = input as Record<string, unknown>;
     const action = String(body.action ?? "build");
+    if (action === "email") {
+      if (context.actor.role !== "collector") {
+        return json({ mode: "live", error: "DOCUMENT_NOT_FOUND" }, 404);
+      }
+      if (Object.keys(body).some((key) => !["action", "documentId", "recipientKind", "address", "confirmAddress"].includes(key))) {
+        return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);
+      }
+      if (!allowMailRequest(previewClientIp(request.headers))) {
+        return json({ mode: "live", error: "DOCUMENT_SEND_THROTTLED" }, 429);
+      }
+      const sent = await sendAgreementDocument(
+        getDb(),
+        context.actor,
+        {
+          documentId: String(body.documentId ?? ""),
+          recipientKind: String(body.recipientKind ?? ""),
+          address: typeof body.address === "string" ? body.address : undefined,
+          confirmAddress: typeof body.confirmAddress === "string" ? body.confirmAddress : undefined,
+        },
+        documentStore(),
+      );
+      return json({ mode: "live", send: sent });
+    }
     if (action === "url") {
       if (Object.keys(body).some((key) => key !== "action" && key !== "documentId")) {
         return json({ mode: "live", error: "DOCUMENT_BODY_INVALID" }, 400);

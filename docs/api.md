@@ -40,7 +40,14 @@ There is no tRPC router. Server surface is App Router handlers. Everything else 
   object key, bucket, or credentials.
 - There is no tRPC or MCP procedure. These HTTP handlers are the shared human
   path; an agent tool adapter remains an explicit parity exception.
-- Email of a stored PDF is a later unit on this same route.
+- `POST` `{ action: "email", documentId, recipientKind }` emails the stored,
+  checksum-verified PDF as a Resend attachment. `self` uses the verified
+  collector email and ignores any client address. `other` requires two identical
+  server-normalized addresses. Desk email POSTs return the same
+  `DOCUMENT_NOT_FOUND` body as a missing ID. Sends are throttled (five per
+  document and five per collector per hour, plus `allowMailRequest`). Agreement
+  sends are not written to `GET /api/mail`. Desk `GET` includes send history
+  (`actorKind`, `recipientKind`, `result`) without recipient addresses.
 
 ## `POST` `/api/desk/live-book-import`
 
