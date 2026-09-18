@@ -2,10 +2,12 @@ import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
+  check,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -37,6 +39,85 @@ export const customers = pgTable("customers", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const collectorAccessTokens = pgTable(
+  "collector_access_tokens",
+  {
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull().unique(),
+    customerId: text("customer_id").references(() => customers.id, { onDelete: "cascade" }),
+    registrationPayload: jsonb("registration_payload"),
+    purpose: text("purpose").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    sendStatus: text("send_status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("collector_access_tokens_customer_id_idx").on(table.customerId),
+    index("collector_access_tokens_expires_at_idx").on(table.expiresAt),
+    check(
+      "collector_access_tokens_purpose_check",
+      sql`${table.purpose} in ('login', 'register')`,
+    ),
+    check(
+      "collector_access_tokens_send_status_check",
+      sql`${table.sendStatus} in ('pending', 'sent', 'send_failed')`,
+    ),
+    check(
+      "collector_access_tokens_payload_check",
+      sql`(
+        (${table.purpose} = 'login' and ${table.customerId} is not null and ${table.registrationPayload} is null)
+        or
+        (
+          ${table.purpose} = 'register'
+          and ${table.customerId} is null
+          and (
+            (${table.consumedAt} is null and ${table.registrationPayload} is not null)
+            or
+            (${table.consumedAt} is not null and ${table.registrationPayload} is null)
+          )
+        )
+      )`,
+    ),
+  ],
+);
+
+export const collectorSessions = pgTable(
+  "collector_sessions",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("collector_sessions_customer_id_idx").on(table.customerId),
+    index("collector_sessions_expires_at_idx").on(table.expiresAt),
+  ],
+);
+
+export const accessRateLimits = pgTable(
+  "access_rate_limits",
+  {
+    scope: text("scope").notNull(),
+    keyHash: text("key_hash").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    hits: integer("hits").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.scope, table.keyHash, table.windowStart] }),
+    index("access_rate_limits_window_start_idx").on(table.windowStart),
+    check("access_rate_limits_hits_check", sql`${table.hits} > 0`),
+  ],
+);
 
 /** Timepiece identity. Preview data URLs stay in the browser store until Stage 3. */
 export const timepieces = pgTable(

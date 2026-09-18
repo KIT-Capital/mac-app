@@ -5,35 +5,37 @@ import {
 } from "@/lib/collector-access.mjs";
 import { verifyCollectorAccess } from "@/lib/collector-access.server";
 import { DESK_COOKIE } from "@/lib/desk-session";
+import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
-function errorStatus(message: string) {
-  if (message === "COLLECTOR_INACTIVE") return 403;
-  if (
-    message === "COLLECTOR_LIVE_BOOK_DISABLED" ||
-    message === "COLLECTOR_LIVE_BOOK_APP_ENV_INVALID" ||
-    message === "COLLECTOR_SESSION_SECRET_REQUIRED" ||
-    message === "COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED" ||
-    message === "COLLECTOR_MAGIC_LINK_ORIGIN_INVALID" ||
-    message === "COLLECTOR_ACCESS_EMAIL_REQUIRED"
-  ) {
-    return 503;
-  }
-  if (message.startsWith("TOKEN_")) return 400;
-  return 500;
+function invalidRedirect(request: Request) {
+  return NextResponse.redirect(new URL("/verify?state=invalid", request.url), 303);
+}
+
+function unavailableRedirect(request: Request) {
+  return NextResponse.redirect(new URL("/verify?state=unavailable", request.url), 303);
 }
 
 export async function GET(request: Request) {
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
   const token = new URL(request.url).searchParams.get("token");
-  if (!token) {
-    return Response.json({ error: "TOKEN_REQUIRED" }, { status: 400 });
-  }
+  if (!token) return invalidRedirect(request);
+  const page = new URL("/verify", request.url);
+  page.searchParams.set("token", token);
+  return NextResponse.redirect(page);
+}
 
+export async function POST(request: Request) {
+  const origin = refuseCrossSiteMutation(request);
+  if (origin) return origin;
+  const unavailable = liveUnavailability(process.env);
+  if (unavailable) return unavailableResponse(unavailable);
+  const token = String((await request.formData()).get("token") ?? "");
+  if (!token) return invalidRedirect(request);
   try {
     const verified = await verifyCollectorAccess(token);
-    const response = NextResponse.redirect(verified.redirectUrl);
+    const response = NextResponse.redirect(verified.redirectUrl, 303);
     response.cookies.set(
       COLLECTOR_COOKIE,
       verified.sessionToken,
@@ -42,7 +44,8 @@ export async function GET(request: Request) {
     response.cookies.delete(DESK_COOKIE);
     return response;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "COLLECTOR_VERIFICATION_FAILED";
-    return Response.json({ error: message }, { status: errorStatus(message) });
+    return error instanceof Error && error.message === "ACCESS_TOKEN_INVALID"
+      ? invalidRedirect(request)
+      : unavailableRedirect(request);
   }
 }

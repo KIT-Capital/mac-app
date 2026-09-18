@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { COLLECTOR_COOKIE } from "@/lib/collector-access.mjs";
+import { revokeCollectorAccessSession } from "@/lib/collector-access.server";
 import {
   DESK_COOKIE,
   DESK_SESSION_SECRET_REQUIRED,
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Desk credentials were not recognized." }, { status: 401 });
   }
   const jar = await cookies();
+  await revokeCollectorAccessSession(jar.get(COLLECTOR_COOKIE)?.value);
   jar.delete(COLLECTOR_COOKIE);
   jar.set(DESK_COOKIE, token, deskCookieOptions());
   return Response.json({ ok: true });
@@ -37,6 +39,8 @@ export async function DELETE(request: Request) {
   const origin = refuseCrossSiteMutation(request);
   if (origin) return origin;
   const jar = await cookies();
+  await revokeCollectorAccessSession(jar.get(COLLECTOR_COOKIE)?.value);
+  jar.delete(COLLECTOR_COOKIE);
   jar.delete(DESK_COOKIE);
   return Response.json({ ok: true });
 }

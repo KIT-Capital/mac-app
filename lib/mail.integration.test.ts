@@ -85,26 +85,32 @@ describe("mail delivery boundaries", () => {
   it("delivers access mail without retaining its URL in the desk outbox", async () => {
     const accessUrl =
       "https://development.example.com/api/collector-session/verify?token=delivered-token-marker";
+    let sendOptions: { idempotencyKey?: string } | undefined;
     const delivered = await dispatchCollectorAccessMail(
       {
         to: "collector@example.com",
         name: "Collector",
         action: "login",
         url: accessUrl,
+        tokenId: "token-row-123",
       },
       {
         env: {
           RESEND_API_KEY: "test-api-key",
           MAC_INTERNAL_EMAIL: INTERNAL_EMAIL,
         },
-        sendEmail: async () => ({
-          data: { id: "resend-test-id" },
-          error: null,
-        }),
+        sendEmail: async (_message, options) => {
+          sendOptions = options;
+          return {
+            data: { id: "resend-test-id" },
+            error: null,
+          };
+        },
       },
     );
     assert.equal(delivered.status, "sent");
     assert.equal(delivered.resendId, "resend-test-id");
+    assert.deepEqual(sendOptions, { idempotencyKey: "collector-access/token-row-123" });
     assert.equal(listOutbox().some((item) => item.kind === "access"), false);
     assert.equal(
       listOutbox().some((item) => item.text.includes("delivered-token-marker")),

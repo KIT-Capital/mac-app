@@ -25,6 +25,57 @@ test.describe("collector app", () => {
     await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
   });
 
+  test("collector sign-in uses email only and desk credentials stay hidden", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByLabel("Email Address")).toHaveValue("");
+    await expect(page.locator("input[type=password]")).toHaveCount(0);
+    await expect(page.getByText(/continue with google|continue with apple/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send sign-in link" })).toBeVisible();
+
+    await page.getByRole("button", { name: "MAC desk staff" }).click();
+    await expect(page.locator("#login-password")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+  });
+
+  test("an unusable verification link shows one safe retry path", async ({ page }) => {
+    const response = await page.goto("/verify?state=invalid");
+    expect(response?.headers()["x-frame-options"]).toBe("DENY");
+    expect(response?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
+    await expect(page.getByText(/could not be used/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Request a new link" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    await expect(page.locator("form")).toHaveCount(0);
+  });
+
+  test("live collector login and signup stop at the email sent state", async ({ page }) => {
+    await page.route("**/api/collector-session", async (route) => {
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, mode: "live", accepted: true }),
+      });
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Email Address").fill("known@example.com");
+    await page.getByRole("button", { name: "Send sign-in link" }).click();
+    await expect(page.getByText(/lasts 15 minutes and works once/i)).toBeVisible();
+    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Sign up" })).toBeVisible();
+
+    await page.goto("/signup");
+    await page.getByLabel("Full Legal Name").fill("Ada Locke");
+    await page.getByLabel("Email Address").fill("ada@example.com");
+    await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
+    await page.getByRole("checkbox", { name: /privacy policy/i }).check();
+    await page.getByRole("button", { name: "Create Account" }).click();
+    await expect(page.getByText(/check your email to verify/i)).toBeVisible();
+    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /already registered/i })).toBeVisible();
+  });
+
   test("Hale collection shows demo pieces and photographs", async ({ page }) => {
     await signInHale(page);
     await expect(page.getByText("Richard Mille")).toBeVisible();

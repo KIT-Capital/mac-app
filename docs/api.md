@@ -74,33 +74,40 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - `POST` sets the HMAC-signed `mac_desk` cookie after desk credentials are accepted.
 - `DELETE` clears it.
 
-## Collector session prerequisite
+## Collector sessions
 
-- `POST /api/collector-session` is dormant by default. With `MAC_LIVE_BOOK` off,
-  it returns `{ ok: true, mode: "browser" }` without Neon, mail, or cookie work.
-- Enabled mode is development-only and requires both collector security settings
+- With `MAC_LIVE_BOOK` off, `POST /api/collector-session` returns
+  `{ ok: true, mode: "browser" }` without Neon, mail, or cookie work.
+- Enabled mode runs in development, staging, and production and requires both collector security settings
   plus `RESEND_API_KEY`; preview delivery is refused for identity verification.
   `action: "login"` accepts an email; valid-format known and unknown emails both
   receive the same generic `202` response, but only known customers receive mail.
 - `action: "register"` accepts bounded `name`, normalized `email`, and `phone`.
-  It signs those details into the verification link and does not create a customer.
-- `GET /api/collector-session/verify?token=…` verifies signature, expiry, action,
-  email, and customer binding. Login redirects to `/collection`; registration
-  creates or reuses the email's customer, then redirects to `/collection/setup`.
-  Both set the HttpOnly, session-only `mac_collector` cookie.
+  The details stay in the hashed-token row and no customer exists before confirmation.
+- The emailed `/verify?token=…` page does not consume the token. Its same-origin
+  form posts to `/api/collector-session/verify`, which atomically consumes the
+  token once and creates the revocable session row. Login redirects to
+  `/collection`; registration creates or reuses the customer, then redirects to
+  `/collection/setup`. Expired, consumed, and missing tokens share one retry page.
+- `mac_collector` is an HttpOnly, Secure, SameSite=Lax session cookie containing
+  only a signed opaque session-row id. The row expires after 30 days and can be revoked.
 - Links use only `COLLECTOR_MAGIC_LINK_ORIGIN`, never request host headers.
   Access links are sent through Resend and are never retained in the generic desk
   outbox, whether delivery succeeds or fails.
+- Link requests use Postgres windows: three per email and ten per forwarded
+  address per hour. A limited email still receives the generic accepted response
+  and creates no token. Registration also has a hard global 100-per-hour cap.
 - Login and signup use this request path. Browser mode preserves the prototype
   local flow. Live mode stops after the generic check-email response; only
   verification creates a session or registration customer.
-- `DELETE /api/collector-session` clears `mac_collector`. Verification clears
-  `mac_desk`; desk login clears `mac_collector`.
+- `DELETE /api/collector-session` revokes the row and clears `mac_collector`.
+  Verification clears `mac_desk`; desk login revokes and clears `mac_collector`.
 
 ## `GET` / `POST` `/api/live-book`
 
 - Unset `MAC_LIVE_BOOK` returns browser mode before opening Neon. Enabled use is
-  development-only and requires the verified collector-access configuration.
+  available in development, staging, and production and requires the verified
+  collector-access configuration.
 - `GET` requires exactly one valid desk or collector session and returns
   `Cache-Control: private, no-store`. Desk reads all rows; a collector session is
   bound to immutable customer ID and email and reads only that customer.

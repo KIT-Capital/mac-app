@@ -6,12 +6,11 @@
 
 Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
-- **Collector** — any non-desk email plus a non-empty password becomes role `collector`. There is no password verifier.
+- **Collector** — browser mode accepts a valid non-desk email without a password.
+  Live mode sends a one-time email link and creates no session until confirmation.
 - **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). Live-book authorization adds a signed, HttpOnly, session-only `mac_collector` cookie after collector Sign In or development live registration and clears it on Sign Out. A new browser session still starts at splash / Sign In.
 - **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first.
-- **Social buttons** — UI only; they call the same local `enter()` path.
-
-### Dormant verified collector access
+### Verified collector access
 
 `MAC_LIVE_BOOK` defaults off and accepts only `1`, `true`, or `on`. While off,
 `POST /api/collector-session` returns browser mode before opening Neon, sending
@@ -23,19 +22,27 @@ fails closed unless `COLLECTOR_SESSION_SECRET`, a valid fixed HTTPS
 `RESEND_API_KEY` are present. Preview mail cannot prove identity. Login links are
 issued only for an existing Neon customer, but valid unknown emails receive the
 same generic accepted response. Suspended collectors receive that same response
-without mail, and existing sessions are rejected as
-soon as the Neon customer is no longer active. Registration details are bounded and signed;
-reserved desk identities are refused and the customer is created only after link
-verification. Verification sets the signed, expiring, HttpOnly, session-only
-`mac_collector` cookie. Links are never derived from request hosts and access
-mail is never retained in the generic desk outbox, including send failures.
-Tokens must not be logged. A genuinely delivered link can be replayed during its
-15-minute lifetime; one-time nonce persistence remains deferred. WorkOS and Neon
-Auth remain disabled.
+without mail, and existing sessions are rejected as soon as the Neon customer is
+no longer active. Registration details are bounded and held only in the access
+token row; reserved desk identities are refused and the customer is created only
+after confirmation.
+
+Access links contain a random 32-byte token. Neon stores only its SHA-256 hash, a
+15-minute expiry, and a consumed time. `GET /verify` never consumes it; the
+same-origin confirmation `POST` conditionally consumes it once and creates a
+30-day revocable session row in the same transaction. The HttpOnly, Secure,
+SameSite=Lax `mac_collector` cookie contains only a signed opaque session-row id.
+Expired, consumed, and missing links show the same retry message. Links are never
+derived from request hosts and access mail is never retained in the generic desk
+outbox, including send failures. Tokens, recipient addresses, and session ids
+must not be logged. WorkOS and Neon Auth remain disabled.
 
 An invited collector may request the same non-enumerating login link. Successful
 verification atomically activates that exact customer ID and email before issuing
-the session. Suspended collectors remain blocked.
+the session. Suspended collectors remain blocked. Login-link limits are stored in
+Postgres per email and forwarded address; unknown, suspended, and active emails
+receive the same accepted response. Address windows are observed but not enforced
+until the production forwarding smoke in the go-live runbook.
 
 ### Production runs live only
 

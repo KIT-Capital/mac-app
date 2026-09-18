@@ -39,7 +39,7 @@ type MailDeliveryOptions = {
     html: string;
     text: string;
     tags: { name: string; value: string }[];
-  }) => Promise<SendEmailResult>;
+  }, options?: { idempotencyKey?: string }) => Promise<SendEmailResult>;
 };
 
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
@@ -132,6 +132,7 @@ export async function dispatchCollectorAccessMail(
     name: string;
     action: "login" | "register";
     url: string;
+    tokenId?: string;
   },
   options: MailDeliveryOptions = {},
 ) {
@@ -148,7 +149,11 @@ export async function dispatchCollectorAccessMail(
     rows: [["Email", input.to]],
     body: input.url,
   });
-  return deliver(mail, options);
+  return deliver(
+    mail,
+    options,
+    input.tokenId ? `collector-access/${input.tokenId}` : undefined,
+  );
 }
 
 function composeMail(request: MailRequest): ComposedMail[] {
@@ -353,6 +358,7 @@ function letter({
 async function deliver(
   mail: ComposedMail,
   options: MailDeliveryOptions = {},
+  idempotencyKey?: string,
 ): Promise<OutboxItem> {
   const env = options.env ?? process.env;
   const apiKey = env.RESEND_API_KEY?.trim();
@@ -389,8 +395,8 @@ async function deliver(
       tags: [{ name: "kind", value: mail.kind }],
     };
     const { data, error } = options.sendEmail
-      ? await options.sendEmail(message)
-      : await new Resend(apiKey).emails.send(message);
+      ? await options.sendEmail(message, { idempotencyKey })
+      : await new Resend(apiKey).emails.send(message, { idempotencyKey });
 
     if (error) {
       markMailFailed(item, error);
