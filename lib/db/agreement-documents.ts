@@ -8,6 +8,8 @@ import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
 import { agreementDocuments, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
 
+type QueryDb = Pick<Database, "select" | "insert" | "update">;
+
 type DocumentStore = {
   putIfAbsent: (key: string, body: Uint8Array, checksum: string) => Promise<void>;
   head: (key: string) => Promise<boolean>;
@@ -43,7 +45,7 @@ function appEnv(env: NodeJS.ProcessEnv) {
   return value === "staging" || value === "production" ? value : "development";
 }
 
-async function scopedAgreement(db: Database, actor: Actor, liveAgreementId: string) {
+async function scopedAgreement(db: QueryDb, actor: Actor, liveAgreementId: string) {
   const where = actor.role === "collector"
     ? and(eq(liveAgreements.id, liveAgreementId), eq(liveAgreements.customerId, actor.customerId))
     : eq(liveAgreements.id, liveAgreementId);
@@ -52,7 +54,7 @@ async function scopedAgreement(db: Database, actor: Actor, liveAgreementId: stri
   return row;
 }
 
-async function scopedDocument(db: Database, actor: Actor, documentId: string) {
+async function scopedDocument(db: QueryDb, actor: Actor, documentId: string) {
   const where = actor.role === "collector"
     ? and(eq(agreementDocuments.id, documentId), eq(agreementDocuments.customerId, actor.customerId))
     : eq(agreementDocuments.id, documentId);
@@ -61,7 +63,7 @@ async function scopedDocument(db: Database, actor: Actor, documentId: string) {
   return row;
 }
 
-async function livePieces(db: Database, liveAgreementId: string) {
+async function livePieces(db: QueryDb, liveAgreementId: string) {
   const members = await db
     .select()
     .from(liveAgreementMembers)
@@ -71,7 +73,7 @@ async function livePieces(db: Database, liveAgreementId: string) {
   return db.select().from(timepieces).where(inArray(timepieces.id, ids));
 }
 
-async function nextVersion(db: Database, liveAgreementId: string) {
+async function nextVersion(db: QueryDb, liveAgreementId: string) {
   const [row] = await db
     .select({ version: max(agreementDocuments.version) })
     .from(agreementDocuments)
@@ -79,7 +81,7 @@ async function nextVersion(db: Database, liveAgreementId: string) {
   return Number(row?.version ?? 0) + 1;
 }
 
-async function latestStoredId(db: Database, liveAgreementId: string) {
+async function latestStoredId(db: QueryDb, liveAgreementId: string) {
   const [row] = await db
     .select({ id: agreementDocuments.id })
     .from(agreementDocuments)
@@ -118,7 +120,7 @@ async function reconcileBuilding(db: Database, store: DocumentStore, row: typeof
   return updated ?? row;
 }
 
-async function freezeSnapshot(db: Database, agreement: typeof liveAgreements.$inferSelect) {
+async function freezeSnapshot(db: QueryDb, agreement: typeof liveAgreements.$inferSelect) {
   const pieces = await livePieces(db, agreement.id);
   return buildAgreementSnapshot({
     sellerName: agreement.ownerName,
