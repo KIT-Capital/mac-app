@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { issueDeskToken } from "../lib/desk-session";
 import { DEFAULT_SETTINGS } from "../lib/theme";
 import {
+  APPRAISER,
   DESK,
   DESK_PASSWORD,
   HALE,
@@ -9,6 +10,7 @@ import {
   openCollectorAgreements,
   openDeskAgreements,
   signIn,
+  signInAppraiser,
   signInDesk,
   signInHale,
   signOutFromMenu,
@@ -178,11 +180,23 @@ test.describe("desk", () => {
       await expect(page.getByText(/Desk specialists are reviewing/i)).toBeVisible();
     }
     await page.goto("/login");
-    await signIn(page, DESK, DESK_PASSWORD);
+    await signIn(page, APPRAISER, DESK_PASSWORD);
     await page.getByRole("link", { name: "Client Assets" }).click();
     const row = page.getByRole("row").filter({ hasText: "Logical One" });
     await row.getByRole("button", { name: "Appraise" }).click();
     await expect(row.getByText("$145,000 – $175,000")).toBeVisible();
+  });
+
+  test("admin reads appraisal numbers but cannot write them", async ({ page }) => {
+    await signInDesk(page);
+    await page.getByRole("link", { name: "Client Assets" }).click();
+    const row = page.getByRole("row").filter({ hasText: "Royal Oak Selfwinding" });
+    await expect(row.getByRole("button", { name: "Appraise" })).toBeDisabled();
+    await expect(row.getByRole("button", { name: "Review" })).toBeEnabled();
+    await page.getByRole("link", { name: "Timepiece Catalog" }).click();
+    await expect(page.getByTestId("catalog-read-only")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Reference" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Remove" })).toHaveCount(0);
   });
 
   test("desk sees a collector piece added in the same session", async ({ page }) => {
@@ -302,7 +316,7 @@ test.describe("desk", () => {
   });
 
   test("catalog and config save on this device", async ({ page }) => {
-    await signInDesk(page);
+    await signInAppraiser(page);
     await page.getByRole("link", { name: "Timepiece Catalog" }).click();
     await page.getByLabel("Brand").fill("F.P. Journe");
     await page.getByLabel("Model").fill("Chronomètre Bleu");

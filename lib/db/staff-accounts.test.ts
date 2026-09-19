@@ -415,10 +415,11 @@ describe("staff accounts repository", { skip }, () => {
   });
 
   it("commits desk mutations and their audit row together", async () => {
+    // Appraisal values need an appraiser (R5); the audit behaviour under test is role-agnostic.
     const admin = await createStaffAccount(db, {
-      name: "Auditing Admin",
-      email: `audit-admin.${suffix}@mac.test`,
-      role: "admin",
+      name: "Auditing Appraiser",
+      email: `audit-appraiser.${suffix}@mac.test`,
+      role: "appraiser",
       passwordHash: await hashStaffPassword("temporary password 123"),
       mustRotate: false,
     });
@@ -438,7 +439,7 @@ describe("staff accounts repository", { skip }, () => {
 
     await executeLiveBookOperation(
       db,
-      deskActor("admin", admin.email, admin.id),
+      deskActor("appraiser", admin.email, admin.id),
       {
         action: "timepiece.deskUpdate",
         id: piece.id,
@@ -458,7 +459,7 @@ describe("staff accounts repository", { skip }, () => {
 
     await assert.rejects(() => executeLiveBookOperation(
       db,
-      deskActor("admin", admin.email, admin.id),
+      deskActor("appraiser", admin.email, admin.id),
       {
         action: "timepiece.deskUpdate",
         id: piece.id,
