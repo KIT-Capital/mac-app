@@ -143,6 +143,12 @@
     transition-duration: 120ms;
     transition-timing-function: ease-out;
   }
+  button:not(:disabled):active {
+    transform: translateY(1px) scale(0.98);
+    filter: brightness(0.92);
+    --tw-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+  }
 }
 
 @layer utilities {
@@ -174,13 +180,6 @@
   .mac-phone-screen textarea::placeholder {
     color: var(--mac-faint);
   }
-}
-
-button:not(:disabled):active {
-  transform: translateY(1px) scale(0.98);
-  filter: brightness(0.92);
-  --tw-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
 }
 
 @media (prefers-reduced-motion: reduce) {
