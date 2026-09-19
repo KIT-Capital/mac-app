@@ -20,6 +20,15 @@ import type { Database } from "./client";
 import { liveAgreementHasDocuments } from "./agreement-documents";
 import { dollarsToCents } from "./money.mjs";
 import {
+  assertAppraisalPhotoChangeAllowed,
+  assertRetailPieceEditable,
+  decideAppraisalAttempt,
+  reopenAppraisalAttempt,
+  returnAppraisalAttempt,
+  submitAppraisalAttempt,
+  pieceHasAppraisalAttempt,
+} from "./appraisal-attempts";
+import {
   lockStaffForDeskMutation,
   writeDeskAudit,
 } from "./staff-accounts";
@@ -29,6 +38,7 @@ import {
   agreements as preparedAgreements,
   agreementShells,
   allocations,
+  appraisalAttempts,
   applications,
   catalogReferences,
   collectorSessions,
@@ -73,6 +83,20 @@ async function ownedPiece(db: Database, actor: Actor, id: string) {
     ? and(eq(timepieces.id, id), eq(timepieces.customerId, actor.customerId))
     : eq(timepieces.id, id);
   const [piece] = await db.select().from(timepieces).where(where).limit(1);
+  if (!piece) throw new Error("TIMEPIECE_NOT_FOUND");
+  return piece;
+}
+
+async function lockedOwnedPiece(db: Database, actor: Actor, id: string) {
+  const where = !isDesk(actor)
+    ? and(eq(timepieces.id, id), eq(timepieces.customerId, actor.customerId))
+    : eq(timepieces.id, id);
+  const [piece] = await db
+    .select()
+    .from(timepieces)
+    .where(where)
+    .for("update")
+    .limit(1);
   if (!piece) throw new Error("TIMEPIECE_NOT_FOUND");
   return piece;
 }
@@ -245,7 +269,10 @@ async function serverAgreementScale(db: Database, termMonths: number) {
   return scale;
 }
 
-const AUDITED_DESK_ACTIONS = new Set([
+export const AUDITED_DESK_ACTIONS = new Set([
+  "appraisal.return",
+  "appraisal.decide",
+  "appraisal.reopen",
   "customer.update",
   "customer.remove",
   "customer.invite",
@@ -264,6 +291,17 @@ const AUDITED_DESK_ACTIONS = new Set([
   "catalog.remove",
   "shell.upsert",
   "shell.remove",
+]);
+const LOCKED_APPRAISAL_ACTIONS = new Set([
+  "appraisal.submit",
+  "appraisal.return",
+  "appraisal.decide",
+  "appraisal.reopen",
+  "timepiece.update",
+  "timepiece.deskUpdate",
+  "timepiece.remove",
+  "preview.upsert",
+  "preview.remove",
 ]);
 const LOCKED_AGREEMENT_ACTIONS = new Set([
   "agreement.create",
@@ -296,6 +334,31 @@ function auditTargetId(operation: Operation & Record<string, unknown>) {
   return "";
 }
 
+function auditDetail(
+  operation: Operation & Record<string, unknown>,
+  result: unknown,
+) {
+  if (operation.action === "appraisal.reopen") {
+    return { reason: String(operation.reason ?? "") };
+  }
+  if (
+    operation.action === "appraisal.decide" &&
+    result &&
+    typeof result === "object"
+  ) {
+    const row = result as Record<string, unknown>;
+    return {
+      decision: operation.decision,
+      decisionNo: row.decisionNo,
+      ...(row.rangeWarning ? { rangeWarning: row.rangeWarning } : {}),
+    };
+  }
+  if (operation.action === "appraisal.return") {
+    return { note: String(operation.note ?? "") };
+  }
+  return {};
+}
+
 export async function executeLiveBookOperation(
   db: Database,
   actor: Actor,
@@ -317,17 +380,26 @@ export async function executeLiveBookOperation(
         role: actor.role,
       });
       const trusted = deskActor(staff.role, staff.email, staff.id);
-      await executeLiveBookOperationCore(tx as unknown as Database, trusted, operation);
+      const result = await executeLiveBookOperationCore(
+        tx as unknown as Database,
+        trusted,
+        operation,
+      );
       await writeDeskAudit(
         tx,
         staff,
         operation.action,
         auditTargetId(operation),
         options.clientAddress ?? "unknown",
+        auditDetail(operation, result),
       );
+      return result;
     });
   }
-  if (LOCKED_AGREEMENT_ACTIONS.has(operation.action)) {
+  if (
+    LOCKED_AGREEMENT_ACTIONS.has(operation.action) ||
+    LOCKED_APPRAISAL_ACTIONS.has(operation.action)
+  ) {
     return db.transaction((tx) =>
       executeLiveBookOperationCore(tx as unknown as Database, actor, operation)
     );
@@ -341,6 +413,38 @@ async function executeLiveBookOperationCore(
   operation: Operation & Record<string, unknown>,
 ) {
   const action = operation.action;
+
+  if (action === "appraisal.submit") {
+    return submitAppraisalAttempt(db, actor, {
+      id: String(operation.id),
+      timepieceId: String(operation.timepieceId),
+      note: String(operation.note ?? ""),
+    });
+  }
+
+  if (action === "appraisal.return") {
+    return returnAppraisalAttempt(db, actor, {
+      id: String(operation.id),
+      note: String(operation.note),
+    });
+  }
+
+  if (action === "appraisal.decide") {
+    return decideAppraisalAttempt(db, actor, {
+      id: String(operation.id),
+      decision: operation.decision === "accept" ? "accept" : "refuse",
+      value: operation.value as number | undefined,
+      rangeLow: operation.rangeLow as number | undefined,
+      rangeHigh: operation.rangeHigh as number | undefined,
+    });
+  }
+
+  if (action === "appraisal.reopen") {
+    return reopenAppraisalAttempt(db, actor, {
+      id: String(operation.id),
+      reason: String(operation.reason),
+    });
+  }
 
   if (action === "settings.update") {
     requireDesk(actor);
@@ -586,11 +690,12 @@ async function executeLiveBookOperationCore(
     const id = String(operation.id);
     const [customer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, id)).limit(1);
     if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
-    const [piece, agreement] = await Promise.all([
+    const [piece, agreement, attempt] = await Promise.all([
       db.select({ id: timepieces.id }).from(timepieces).where(eq(timepieces.customerId, id)).limit(1),
       db.select({ id: liveAgreements.id }).from(liveAgreements).where(eq(liveAgreements.customerId, id)).limit(1),
+      db.select({ id: appraisalAttempts.id }).from(appraisalAttempts).where(eq(appraisalAttempts.customerId, id)).limit(1),
     ]);
-    if (piece[0] || agreement[0]) throw new Error("CUSTOMER_REFERENCED");
+    if (piece[0] || agreement[0] || attempt[0]) throw new Error("CUSTOMER_REFERENCED");
     await db.delete(customers).where(eq(customers.id, id));
     return;
   }
@@ -620,7 +725,10 @@ async function executeLiveBookOperationCore(
     // actors set `appraised`, so `timepiece.update` must not be a side door.
     if (isDesk(actor) && patchNeedsAppraisal(patch)) requireAppraiser(actor);
     const id = String(operation.id);
-    const current = await ownedPiece(db, actor, id);
+    const current = await lockedOwnedPiece(db, actor, id);
+    if (actor.role === "collector") {
+      await assertRetailPieceEditable(db, current.id);
+    }
     // Moving a piece off `appraised` erases an appraiser's recorded decision,
     // so it needs the same fence as making one (R1, R5).
     if (
@@ -630,6 +738,16 @@ async function executeLiveBookOperationCore(
       patch.status !== "appraised"
     ) {
       requireAppraiser(actor);
+    }
+    if (
+      isDesk(actor) &&
+      (patchNeedsAppraisal(patch) ||
+        (current.status === "appraised" &&
+          patch.status !== undefined &&
+          patch.status !== "appraised")) &&
+      await pieceHasAppraisalAttempt(db, current.id)
+    ) {
+      throw new Error("ATTEMPT_STATE_CONFLICT");
     }
     const values = pieceValues(patch, actor);
     const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -649,8 +767,22 @@ async function executeLiveBookOperationCore(
 
   if (action === "timepiece.remove") {
     const id = String(operation.id);
-    await ownedPiece(db, actor, id);
-    const [live, app, prepared, allocation, original] = await Promise.all([
+    if (actor.role === "collector") await lockedOwnedPiece(db, actor, id);
+    else await ownedPiece(db, actor, id);
+    if (actor.role === "collector") {
+      const [openReview] = await db
+        .select({ id: appraisalAttempts.id })
+        .from(appraisalAttempts)
+        .where(
+          and(
+            eq(appraisalAttempts.timepieceId, id),
+            eq(appraisalAttempts.status, "under_review"),
+          ),
+        )
+        .limit(1);
+      if (openReview) throw new Error("REVIEW_LOCKED");
+    }
+    const [live, app, prepared, allocation, original, attempt] = await Promise.all([
       db.select({ id: liveAgreementMembers.id }).from(liveAgreementMembers).where(eq(liveAgreementMembers.timepieceId, id)).limit(1),
       db.select({ id: applications.id }).from(applications).where(eq(applications.timepieceId, id)).limit(1),
       db.select({ id: preparedAgreements.id }).from(preparedAgreements).where(eq(preparedAgreements.timepieceId, id)).limit(1),
@@ -660,8 +792,13 @@ async function executeLiveBookOperationCore(
         .from(photoObjects)
         .where(and(eq(photoObjects.timepieceId, id), ne(photoObjects.status, "abandoned")))
         .limit(1),
+      db
+        .select({ id: appraisalAttempts.id })
+        .from(appraisalAttempts)
+        .where(eq(appraisalAttempts.timepieceId, id))
+        .limit(1),
     ]);
-    if (live[0] || app[0] || prepared[0] || allocation[0] || original[0]) {
+    if (live[0] || app[0] || prepared[0] || allocation[0] || original[0] || attempt[0]) {
       throw new Error("TIMEPIECE_REFERENCED");
     }
     await db.transaction(async (tx) => {
@@ -931,14 +1068,38 @@ async function executeLiveBookOperationCore(
 
   if (action === "preview.upsert") {
     const timepieceId = String(operation.timepieceId);
-    await ownedPiece(db, actor, timepieceId);
-    const [existing] = await db.select({ timepieceId: livePreviews.timepieceId })
+    await lockedOwnedPiece(db, actor, timepieceId);
+    if (actor.role === "collector") await assertRetailPieceEditable(db, timepieceId);
+    const [existing] = await db
+      .select({
+        timepieceId: livePreviews.timepieceId,
+        kind: livePreviews.kind,
+        previewUrl: livePreviews.previewUrl,
+        photoObjectId: livePreviews.photoObjectId,
+      })
       .from(livePreviews)
       .where(eq(livePreviews.id, String(operation.id)))
       .limit(1);
     if (existing && existing.timepieceId !== timepieceId) {
       throw new Error("PREVIEW_ID_COLLISION");
     }
+    if (
+      existing &&
+      await pieceHasAppraisalAttempt(db, timepieceId) &&
+      (
+        existing.kind !== String(operation.kind) ||
+        existing.previewUrl !== String(operation.url) ||
+        existing.photoObjectId !== null
+      )
+    ) {
+      throw new Error("PHOTO_REFERENCED");
+    }
+    await assertAppraisalPhotoChangeAllowed(
+      db,
+      timepieceId,
+      String(operation.kind),
+      String(operation.id),
+    );
     await db.insert(livePreviews).values({
       id: String(operation.id),
       timepieceId,
@@ -954,8 +1115,30 @@ async function executeLiveBookOperationCore(
   if (action === "preview.remove") {
     requireDesk(actor);
     const id = String(operation.id);
-    const [preview] = await db.select({ id: livePreviews.id }).from(livePreviews).where(eq(livePreviews.id, id)).limit(1);
+    const [locator] = await db
+      .select({
+        id: livePreviews.id,
+        timepieceId: livePreviews.timepieceId,
+      })
+      .from(livePreviews)
+      .where(eq(livePreviews.id, id))
+      .limit(1);
+    if (!locator) throw new Error("PREVIEW_NOT_FOUND");
+    await lockedOwnedPiece(db, actor, locator.timepieceId);
+    const [preview] = await db
+      .select({ id: livePreviews.id })
+      .from(livePreviews)
+      .where(
+        and(
+          eq(livePreviews.id, id),
+          eq(livePreviews.timepieceId, locator.timepieceId),
+        ),
+      )
+      .limit(1);
     if (!preview) throw new Error("PREVIEW_NOT_FOUND");
+    if (await pieceHasAppraisalAttempt(db, locator.timepieceId)) {
+      throw new Error("PHOTO_REFERENCED");
+    }
     await db.delete(livePreviews).where(eq(livePreviews.id, id));
     return;
   }

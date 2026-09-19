@@ -18,6 +18,13 @@ import {
 } from "@/lib/admin-seed";
 import { isReservedDeskEmail } from "@/lib/auth";
 import { maxPurchaseAmount } from "@/lib/catalog";
+import {
+  applyAppraisalDecision,
+  applyAppraisalReopen,
+  applyAppraisalReturn,
+  applyAppraisalSubmit,
+  browserPhotoMutationError,
+} from "@/lib/appraisal-attempt-apply.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
@@ -26,9 +33,11 @@ import {
   mergeLiveSettings,
   liveBookFailureState,
   liveDeskOverlay,
+  freshReconciliationAction,
   operationDisposition,
   parseLiveBookResponse,
   parseLiveBookMutationResponse,
+  readAfterInFlight,
   selectLiveUser,
   shouldApplyReconciliation,
   shouldPersistBrowserBook,
@@ -43,6 +52,8 @@ import {
   conflictingLiveWatchIds,
   isEligibleLiveAddWatch,
   isLiveBookLabel,
+  isUnderReview,
+  liveWatchIds,
   LIVE_WATCH_CONFLICT,
   utcToday,
   validateRecordedEndKind,
@@ -106,8 +117,18 @@ type Store = AppState & {
   removeCatalog: (id: string) => Promise<OperationAck>;
   upsertShell: (shell: AgreementShell) => Promise<OperationAck>;
   removeShell: (id: string) => Promise<OperationAck>;
-  upsertPhoto: (photo: PhotoRecord) => void;
+  upsertPhoto: (photo: PhotoRecord) => Promise<OperationAck>;
   removePhoto: (id: string) => Promise<OperationAck>;
+  submitAppraisal: (input: { id: string; timepieceId: string; note?: string }) => Promise<OperationAck>;
+  returnAppraisal: (input: { id: string; note: string }) => Promise<OperationAck>;
+  decideAppraisal: (input: {
+    id: string;
+    decision: "accept" | "refuse";
+    value?: number;
+    rangeLow?: number;
+    rangeHigh?: number;
+  }) => Promise<OperationAck & { rangeWarning?: "below" | "above" }>;
+  reopenAppraisal: (input: { id: string; reason: string }) => Promise<OperationAck>;
   resetDemo: () => void;
 };
 
@@ -139,6 +160,8 @@ function emptyState(): AppState {
     catalog: DEMO_CATALOG,
     shells: DEMO_SHELLS,
     photos: [],
+    appraisalAttempts: [],
+    appraisalAttemptPhotos: [],
     settings: DEMO_SETTINGS,
     profiles: {},
   };
@@ -150,7 +173,12 @@ let snapshot: AppState = SERVER_STATE;
 const listeners = new Set<() => void>();
 let storeMode: StoreMode = "unknown";
 const LIVE_BOOK_UNAVAILABLE = "LIVE_BOOK_UNAVAILABLE";
-type OperationAck = { ok: boolean; error?: string; mode?: "browser" | "live" };
+type OperationAck = {
+  ok: boolean;
+  error?: string;
+  mode?: "browser" | "live";
+  rangeWarning?: "below" | "above";
+};
 let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
 let loadStarted = false;
 let optimisticGeneration = 0;
@@ -165,7 +193,17 @@ const DESK_DATA_ACTIONS = new Set([
 
 type BookState = Pick<
   AppState,
-  "timepieces" | "agreements" | "users" | "photos" | "profiles" | "catalog" | "shells" | "settings" | "applicationPurchaseShares"
+  | "timepieces"
+  | "agreements"
+  | "users"
+  | "photos"
+  | "appraisalAttempts"
+  | "appraisalAttemptPhotos"
+  | "profiles"
+  | "catalog"
+  | "shells"
+  | "settings"
+  | "applicationPurchaseShares"
 >;
 
 function readPersistedState(): AppState {
@@ -179,9 +217,21 @@ function readPersistedState(): AppState {
       const parsed = JSON.parse(raw) as AppState;
       const timepieces = Array.isArray(parsed.timepieces) ? parsed.timepieces : [];
       const agreements = Array.isArray(parsed.agreements) ? parsed.agreements : [];
+      const appraisalAttempts = Array.isArray(parsed.appraisalAttempts)
+        ? parsed.appraisalAttempts
+        : [];
+      const appraisalAttemptPhotos = Array.isArray(parsed.appraisalAttemptPhotos)
+        ? parsed.appraisalAttemptPhotos
+        : [];
       const counts = ownedCounts(sessionUser?.email, timepieces, agreements);
       return {
-        ...withDeskDefaults({ ...parsed, agreements, user: null }, timepieces),
+        ...withDeskDefaults({
+          ...parsed,
+          agreements,
+          appraisalAttempts,
+          appraisalAttemptPhotos,
+          user: null,
+        }, timepieces),
         user: normalizeUser(sessionUser, counts.pieces, counts.agreements),
       };
     }
@@ -298,6 +348,8 @@ function persistLiveSafeState(next: AppState) {
     agreements: browser.agreements ?? [],
     users: browser.users ?? [],
     photos: browser.photos ?? [],
+    appraisalAttempts: browser.appraisalAttempts ?? [],
+    appraisalAttemptPhotos: browser.appraisalAttemptPhotos ?? [],
     profiles: browser.profiles ?? {},
     settings: {
       ...(browser.settings ?? {}),
@@ -405,6 +457,33 @@ async function reconcileLiveStore(force = false) {
   }
 }
 
+async function reconcileFreshLiveStore() {
+  const result = await readAfterInFlight(
+    liveBookReadInFlight,
+    () => readLiveBookMode(),
+  );
+  if (result.mode === "unavailable") {
+    enterUnavailableMode(snapshot);
+    return;
+  }
+  if (result.mode === "rotation") {
+    window.location.replace("/admin/password");
+    return;
+  }
+  const action = freshReconciliationAction(result);
+  if (action === "browser") {
+    storeMode = "browser";
+    snapshot = readPersistedState();
+    notifyStore();
+    return;
+  }
+  if (action !== "live" || result.mode !== "live" || !("book" in result)) return;
+  if (storeMode === "browser") persistLiveDataPreviews(snapshot);
+  storeMode = "live";
+  snapshot = mergeBook(snapshot, result.book, result.viewer);
+  notifyStore();
+}
+
 async function reloadAfterIdentityChange() {
   if (!shouldRecheckLiveBook(storeMode)) return;
   if (liveBookReadInFlight) await liveBookReadInFlight;
@@ -461,7 +540,13 @@ function queueLiveWrite(operation: unknown) {
       notifyStore();
       return { ok: true, mode: "browser" };
     } else if (result.ok && result.mode === "live") {
-      return { ok: true, mode: "live" };
+      return {
+        ok: true,
+        mode: "live",
+        ...("rangeWarning" in result && result.rangeWarning
+          ? { rangeWarning: result.rangeWarning as "below" | "above" }
+          : {}),
+      };
     } else if (!result.ok) {
       await reconcileLiveStore(true).catch(() => undefined);
       return { ok: false, error: typeof body?.error === "string" ? body.error : "LIVE_BOOK_WRITE_FAILED" };
@@ -508,7 +593,7 @@ function refreshStoreFromDisk() {
 
 function updateStore(
   recipe: (prev: AppState) => AppState,
-  options: { operation?: unknown; deferLive?: boolean } = {},
+  options: { operation?: unknown; deferLive?: boolean; applyOnAck?: boolean } = {},
 ) {
   if (storeMode === "unavailable") {
     return Promise.resolve({ ok: false, error: LIVE_BOOK_UNAVAILABLE } as OperationAck);
@@ -542,14 +627,18 @@ function updateStore(
   if (!deferred) notifyStore();
   if (deferred) {
     optimisticGeneration += 1;
-    return queueLiveWrite(options.operation).then((result) => {
+    return queueLiveWrite(options.operation).then(async (result) => {
       if (result.ok && storeMode === "live") {
-        snapshot = next;
-        persistLiveSafeState(next);
-        const action = (options.operation as { action?: string }).action;
-        if (!action || !DESK_DATA_ACTIONS.has(action)) persistLiveDataPreviews(next);
-        notifyStore();
-        void reconcileLiveStore().catch(() => undefined);
+        if (options.applyOnAck !== false) {
+          snapshot = next;
+          persistLiveSafeState(next);
+          const action = (options.operation as { action?: string }).action;
+          if (!action || !DESK_DATA_ACTIONS.has(action)) persistLiveDataPreviews(next);
+          notifyStore();
+          void reconcileLiveStore().catch(() => undefined);
+        } else {
+          await reconcileFreshLiveStore();
+        }
       }
       return result;
     });
@@ -579,6 +668,8 @@ function demoState(): AppState {
     catalog: DEMO_CATALOG,
     shells: DEMO_SHELLS,
     photos: photosFromWatches(DEMO_TIMEPIECES),
+    appraisalAttempts: [],
+    appraisalAttemptPhotos: [],
     settings: DEMO_SETTINGS,
     profiles: seedProfiles(DEMO_PROFILE),
   };
@@ -677,6 +768,8 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
     catalog: state.catalog?.length ? state.catalog : seedDeskDefaults ? DEMO_CATALOG : [],
     shells: state.shells?.length ? state.shells : seedDeskDefaults ? DEMO_SHELLS : [],
     photos: state.photos?.length ? state.photos : photosFromWatches(timepieces),
+    appraisalAttempts: state.appraisalAttempts ?? [],
+    appraisalAttemptPhotos: state.appraisalAttemptPhotos ?? [],
     settings: seedDeskDefaults
       ? {
           ...DEMO_SETTINGS,
@@ -876,6 +969,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }), { operation: { action: "timepiece.create", timepiece: watch }, deferLive: true }),
       updateTimepiece: async (id, patch) => {
         const desk = isDeskRole(state.user?.role);
+        const current = state.timepieces.find((piece) => piece.id === id);
+        const attempted = state.appraisalAttempts.some(
+          (attempt) => attempt.timepieceId === id,
+        );
         // Same fences the live book enforces, so both books answer alike (R25):
         // admins never write appraisal numbers (R5), and moving a piece off
         // `appraised` erases an appraiser's decision, so it needs the same role (R1).
@@ -890,10 +987,75 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ) {
           return { ok: false, error: "ROLE_FORBIDDEN" };
         }
-        return updateStore((prev) => ({
-          ...prev,
-          timepieces: prev.timepieces.map((w) => (w.id === id ? { ...w, ...patch } : w)),
-        }), {
+        if (
+          desk &&
+          attempted &&
+          (patchNeedsAppraisal(patch) || demotesAppraisal)
+        ) {
+          return { ok: false, error: "ATTEMPT_STATE_CONFLICT" };
+        }
+        if (patch.images && isUnderReview(state.appraisalAttempts, id)) {
+          return { ok: false, error: "REVIEW_LOCKED" };
+        }
+        if (current && attempted && patch.images) {
+          const before = new Map(
+            current.images.map((url, index) => [
+              current.photoKinds?.[index] ?? REQUESTABLE_PHOTO_KINDS[index],
+              url,
+            ]),
+          );
+          const after = new Map(
+            patch.images.map((url, index) => [
+              patch.photoKinds?.[index] ?? REQUESTABLE_PHOTO_KINDS[index],
+              url,
+            ]),
+          );
+          const replacesOrDeletes = [...before].some(
+            ([kind, url]) => !kind || after.get(kind) !== url,
+          );
+          if (replacesOrDeletes) return { ok: false, error: "PHOTO_KIND_TAKEN" };
+        }
+        if (!desk) {
+          if (isUnderReview(state.appraisalAttempts, id)) {
+            return { ok: false, error: "REVIEW_LOCKED" };
+          }
+          if (liveWatchIds(state.agreements).has(id)) {
+            return { ok: false, error: "PIECE_HELD" };
+          }
+        }
+        return updateStore((prev) => {
+          const before = prev.timepieces.find((piece) => piece.id === id);
+          const updated = before ? { ...before, ...patch } : null;
+          if (!updated || !patch.images) {
+            return {
+              ...prev,
+              timepieces: prev.timepieces.map((w) => (w.id === id ? { ...w, ...patch } : w)),
+            };
+          }
+          const otherPhotos = prev.photos.filter((photo) => photo.assetId !== id);
+          const previousByKind = new Map(
+            prev.photos
+              .filter((photo) => photo.assetId === id)
+              .map((photo) => [photo.kind, photo]),
+          );
+          const synced = slotPhotosFor(updated).map(({ kind, url }, index) => {
+            const previous = previousByKind.get(kind);
+            return {
+              id: previous?.id ?? nextId(`ph-${id}-${index}`),
+              url,
+              kind,
+              assetId: id,
+              caption: `${updated.brand} ${updated.model}`,
+              uploadedAt: previous?.uploadedAt ?? new Date().toISOString().slice(0, 10),
+              ownerEmail: updated.ownerEmail || prev.user?.email || "",
+            };
+          });
+          return {
+            ...prev,
+            timepieces: prev.timepieces.map((piece) => (piece.id === id ? updated : piece)),
+            photos: [...synced, ...otherPhotos],
+          };
+        }, {
           operation: {
             action: desk ? "timepiece.deskUpdate" : "timepiece.update",
             id,
@@ -903,7 +1065,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
       removeTimepiece: async (id) =>
-        updateStore((prev) => ({
+        isUnderReview(state.appraisalAttempts, id)
+          ? { ok: false, error: "REVIEW_LOCKED" }
+          : state.appraisalAttempts.some((attempt) => attempt.timepieceId === id) ||
+              liveWatchIds(state.agreements).has(id)
+            ? { ok: false, error: "TIMEPIECE_REFERENCED" }
+            : updateStore((prev) => ({
           ...prev,
           timepieces: prev.timepieces.filter((w) => w.id !== id),
           photos: prev.photos.filter((p) => p.assetId !== id),
@@ -1154,11 +1321,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             : { action: "customer.invite", customer: user },
           deferLive: true,
         }),
-      removeUser: async (id) =>
-        updateStore(
+      removeUser: async (id) => {
+        const target = state.users.find((user) => user.id === id);
+        const targetPieceIds = new Set(
+          state.timepieces
+            .filter(
+              (piece) =>
+                piece.ownerEmail?.toLowerCase() === target?.email.toLowerCase(),
+            )
+            .map((piece) => piece.id),
+        );
+        if (
+          state.appraisalAttempts.some((attempt) =>
+            targetPieceIds.has(attempt.timepieceId)
+          )
+        ) {
+          return { ok: false, error: "CUSTOMER_REFERENCED" };
+        }
+        return updateStore(
           (prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) }),
           { operation: { action: "customer.remove", id }, deferLive: true },
-        ),
+        );
+      },
       upsertCatalog: async (entry) => {
         if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
         return updateStore((prev) => {
@@ -1189,8 +1373,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           (prev) => ({ ...prev, shells: prev.shells.filter((s) => s.id !== id) }),
           { operation: { action: "shell.remove", id }, deferLive: true },
         ),
-      upsertPhoto: (photo) =>
-        updateStore((prev) => {
+      upsertPhoto: async (photo) => {
+        const appraisalError = browserPhotoMutationError(state, photo);
+        if (appraisalError) return { ok: false, error: appraisalError };
+        return updateStore((prev) => {
           const exists = prev.photos.some((p) => p.id === photo.id);
           return {
             ...prev,
@@ -1200,9 +1386,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           operation: photo.assetId && !photo.url.startsWith("data:")
             ? { action: "preview.upsert", id: photo.id, timepieceId: photo.assetId, kind: photo.kind, url: photo.url }
             : undefined,
-        }),
-      removePhoto: async (id) =>
-        updateStore(
+        });
+      },
+      removePhoto: async (id) => {
+        const photo = state.photos.find((row) => row.id === id);
+        if (
+          photo?.assetId &&
+          state.appraisalAttempts.some((attempt) => attempt.timepieceId === photo.assetId)
+        ) {
+          return { ok: false, error: "PHOTO_REFERENCED" };
+        }
+        return updateStore(
           (prev) => ({ ...prev, photos: prev.photos.filter((p) => p.id !== id) }),
           {
             operation: state.photos.find((photo) => photo.id === id)?.url.startsWith("data:")
@@ -1210,7 +1404,73 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : { action: "preview.remove", id },
             deferLive: true,
           },
-        ),
+        );
+      },
+      submitAppraisal: async (input) => {
+        const planned = applyAppraisalSubmit(
+          getStoreSnapshot(),
+          state.user,
+          input,
+        );
+        if (!("state" in planned)) return { ok: false, error: planned.error };
+        const acknowledgement = await updateStore(
+          () => planned.state as AppState,
+          {
+            operation: { action: "appraisal.submit", ...input },
+            deferLive: true,
+            applyOnAck: false,
+          },
+        );
+        return acknowledgement;
+      },
+      returnAppraisal: async (input) => {
+        const planned = applyAppraisalReturn(getStoreSnapshot(), state.user, input);
+        if (!("state" in planned)) return { ok: false, error: planned.error };
+        return updateStore(
+          () => planned.state as AppState,
+          {
+            operation: { action: "appraisal.return", ...input },
+            deferLive: true,
+            applyOnAck: false,
+          },
+        );
+      },
+      decideAppraisal: async (input) => {
+        const planned = applyAppraisalDecision(
+          getStoreSnapshot(),
+          state.user,
+          input,
+        );
+        if (!("state" in planned)) return { ok: false, error: planned.error };
+        const acknowledgement = await updateStore(
+          () => planned.state as AppState,
+          {
+            operation: { action: "appraisal.decide", ...input },
+            deferLive: true,
+            applyOnAck: false,
+          },
+        );
+        return {
+          ...acknowledgement,
+          rangeWarning:
+            acknowledgement.rangeWarning ??
+            ("rangeWarning" in planned
+              ? planned.rangeWarning as "below" | "above" | undefined
+              : undefined),
+        };
+      },
+      reopenAppraisal: async (input) => {
+        const planned = applyAppraisalReopen(getStoreSnapshot(), state.user, input);
+        if (!("state" in planned)) return { ok: false, error: planned.error };
+        return updateStore(
+          () => planned.state as AppState,
+          {
+            operation: { action: "appraisal.reopen", ...input },
+            deferLive: true,
+            applyOnAck: false,
+          },
+        );
+      },
       resetDemo: () => {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem("mac-app-state-v2");

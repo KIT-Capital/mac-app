@@ -381,6 +381,10 @@ export const photoObjects = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    check(
+      "photo_objects_status_check",
+      sql`${table.status} in ('pending', 'stored', 'abandoned')`,
+    ),
     index("photo_objects_timepiece_id_idx").on(table.timepieceId),
     uniqueIndex("photo_objects_timepiece_checksum_uidx")
       .on(table.timepieceId, table.originalChecksum)
@@ -610,6 +614,180 @@ export const livePreviews = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("live_previews_timepiece_id_idx").on(table.timepieceId)],
+);
+
+/**
+ * One immutable retail submission plus its evolving desk decision.
+ * Returned submissions keep their snapshot but do not receive a decision number.
+ */
+export const appraisalAttempts = pgTable(
+  "appraisal_attempts",
+  {
+    id: text("id").primaryKey(),
+    timepieceId: text("timepiece_id")
+      .notNull()
+      .references(() => timepieces.id),
+    customerId: text("customer_id")
+      .notNull()
+      .references(() => customers.id),
+    attemptNo: integer("attempt_no").notNull(),
+    decisionNo: integer("decision_no"),
+    status: text("status").notNull().default("under_review"),
+    note: text("note").notNull().default(""),
+    responseNote: text("response_note"),
+    snapshot: jsonb("snapshot").notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Null only inside the submit transaction while evidence rows are inserted. */
+    evidenceSealedAt: timestamp("evidence_sealed_at", { withTimezone: true }),
+    decidedByStaffId: text("decided_by_staff_id").references(() => staffAccounts.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    valueCents: integer("value_cents"),
+    rangeLowCents: integer("range_low_cents"),
+    rangeHighCents: integer("range_high_cents"),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+    finalizedByStaffId: text("finalized_by_staff_id").references(() => staffAccounts.id),
+    finalizedAgreementId: text("finalized_agreement_id").references(() => liveAgreements.id),
+    reopenedCount: integer("reopened_count").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "appraisal_attempts_status_check",
+      sql`${table.status} in ('under_review', 'returned', 'accepted', 'refused')`,
+    ),
+    check("appraisal_attempts_attempt_no_check", sql`${table.attemptNo} between 1 and 2147483647`),
+    check(
+      "appraisal_attempts_decision_no_check",
+      sql`${table.decisionNo} is null or ${table.decisionNo} between 1 and 3`,
+    ),
+    check("appraisal_attempts_reopened_count_check", sql`${table.reopenedCount} >= 0`),
+    check("appraisal_attempts_note_check", sql`length(${table.note}) <= 256`),
+    check(
+      "appraisal_attempts_response_note_check",
+      sql`
+        (
+          ${table.status} = 'returned'
+          and ${table.responseNote} is not null
+          and length(${table.responseNote}) between 1 and 1000
+        )
+        or (
+          ${table.status} <> 'returned'
+          and ${table.responseNote} is null
+        )
+      `,
+    ),
+    check(
+      "appraisal_attempts_finalization_shape_check",
+      sql`
+        (
+          ${table.finalizedAt} is null
+          and ${table.finalizedByStaffId} is null
+          and ${table.finalizedAgreementId} is null
+        )
+        or (
+          ${table.status} = 'accepted'
+          and ${table.finalizedAt} is not null
+          and ${table.finalizedByStaffId} is not null
+          and ${table.finalizedAgreementId} is not null
+        )
+      `,
+    ),
+    check(
+      "appraisal_attempts_decision_shape_check",
+      sql`
+        (
+          ${table.status} in ('under_review', 'returned')
+          and (
+            (
+              ${table.decisionNo} is null
+              and ${table.decidedByStaffId} is null
+              and ${table.decidedAt} is null
+              and ${table.valueCents} is null
+              and ${table.rangeLowCents} is null
+              and ${table.rangeHighCents} is null
+            )
+            or (
+              ${table.status} = 'under_review'
+              and ${table.decisionNo} is not null
+              and ${table.decidedByStaffId} is not null
+              and ${table.decidedAt} is not null
+              and (
+                (
+                  ${table.valueCents} is not null
+                  and ${table.rangeLowCents} is not null
+                  and ${table.rangeHighCents} is not null
+                  and ${table.valueCents} >= 0
+                  and ${table.rangeLowCents} >= 0
+                  and ${table.rangeHighCents} >= ${table.rangeLowCents}
+                )
+                or (
+                  ${table.valueCents} is null
+                  and ${table.rangeLowCents} is null
+                  and ${table.rangeHighCents} is null
+                )
+              )
+            )
+          )
+        )
+        or (
+          ${table.status} = 'accepted'
+          and ${table.decisionNo} is not null
+          and ${table.decidedByStaffId} is not null
+          and ${table.decidedAt} is not null
+          and ${table.valueCents} is not null
+          and ${table.rangeLowCents} is not null
+          and ${table.rangeHighCents} is not null
+          and ${table.valueCents} >= 0
+          and ${table.rangeLowCents} >= 0
+          and ${table.rangeHighCents} >= ${table.rangeLowCents}
+        )
+        or (
+          ${table.status} = 'refused'
+          and ${table.decisionNo} is not null
+          and ${table.decidedByStaffId} is not null
+          and ${table.decidedAt} is not null
+          and ${table.valueCents} is null
+          and ${table.rangeLowCents} is null
+          and ${table.rangeHighCents} is null
+        )
+      `,
+    ),
+    uniqueIndex("appraisal_attempts_timepiece_attempt_uidx").on(
+      table.timepieceId,
+      table.attemptNo,
+    ),
+    uniqueIndex("appraisal_attempts_timepiece_decision_uidx")
+      .on(table.timepieceId, table.decisionNo)
+      .where(sql`${table.decisionNo} is not null`),
+    uniqueIndex("appraisal_attempts_open_timepiece_uidx")
+      .on(table.timepieceId)
+      .where(sql`${table.status} = 'under_review'`),
+    index("appraisal_attempts_customer_id_idx").on(table.customerId),
+    index("appraisal_attempts_decided_by_staff_id_idx").on(table.decidedByStaffId),
+    index("appraisal_attempts_finalized_by_staff_id_idx").on(table.finalizedByStaffId),
+    index("appraisal_attempts_finalized_agreement_id_idx").on(table.finalizedAgreementId),
+  ],
+);
+
+/** Exact stored photo evidence frozen with one appraisal submission. */
+export const appraisalAttemptPhotos = pgTable(
+  "appraisal_attempt_photos",
+  {
+    attemptId: text("attempt_id")
+      .notNull()
+      .references(() => appraisalAttempts.id),
+    photoObjectId: text("photo_object_id")
+      .notNull()
+      .references(() => photoObjects.id),
+    originalKey: text("original_key").notNull(),
+    originalChecksum: text("original_checksum").notNull(),
+    kind: text("kind").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.attemptId, table.photoObjectId] }),
+    uniqueIndex("appraisal_attempt_photos_attempt_kind_uidx").on(table.attemptId, table.kind),
+    index("appraisal_attempt_photos_photo_object_id_idx").on(table.photoObjectId),
+  ],
 );
 
 /** Frozen unsigned agreement PDF metadata. Not the signed archive table. */

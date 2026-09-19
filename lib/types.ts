@@ -41,6 +41,86 @@ export type Timepiece = {
   complication: string;
   evaluatedAt?: string;
   assetCode?: string;
+  /** Derived from appraisalAttempts at read; never the source of truth. */
+  appraisalState?: AppraisalStateWord;
+  decisionsUsed?: number;
+  appraisalValue?: number;
+};
+
+export type AppraisalAttemptStatus =
+  | "under_review"
+  | "returned"
+  | "accepted"
+  | "refused";
+
+export type AppraisalStateWord =
+  | "not_sent"
+  | "with_mac"
+  | "accepted"
+  | "not_accepted"
+  | "closed";
+
+export type AppraisalSnapshotFields = Pick<
+  Timepiece,
+  | "brand"
+  | "model"
+  | "reference"
+  | "condition"
+  | "boxPapers"
+  | "caseMetal"
+  | "caseType"
+  | "caseDiameter"
+  | "dialColor"
+  | "buckle"
+  | "band"
+  | "bandMaterial"
+  | "complication"
+>;
+
+export type AppraisalSnapshot = {
+  fields: AppraisalSnapshotFields;
+  note: string;
+  /** Projection to restore when a first, undecided submission is returned. */
+  baseline?: {
+    status: WatchStatus;
+    financeable: boolean;
+    valueLowCents?: number;
+    valueHighCents?: number;
+    evaluatedAt?: string;
+  };
+  /** Browser snapshots are behavioral demos, not retained evidence. */
+  book?: "browser";
+};
+
+export type AppraisalAttempt = {
+  id: string;
+  timepieceId: string;
+  customerId?: string;
+  attemptNo: number;
+  decisionNo: number | null;
+  status: AppraisalAttemptStatus;
+  note: string;
+  responseNote?: string;
+  snapshot: AppraisalSnapshot;
+  submittedAt: string;
+  decidedByStaffId?: string;
+  decidedAt?: string;
+  valueCents?: number;
+  rangeLowCents?: number;
+  rangeHighCents?: number;
+  finalizedAt?: string;
+  finalizedByStaffId?: string;
+  finalizedAgreementId?: string;
+  reopenedCount: number;
+};
+
+export type AppraisalAttemptPhoto = {
+  attemptId: string;
+  photoId: string;
+  kind: PhotoKind;
+  originalKey?: string;
+  checksum?: string;
+  book?: "browser";
 };
 
 export type AgreementStatus = "draft" | "pending_signature" | "signed";
@@ -219,6 +299,8 @@ export type AppState = {
   catalog: CatalogEntry[];
   shells: AgreementShell[];
   photos: PhotoRecord[];
+  appraisalAttempts: AppraisalAttempt[];
+  appraisalAttemptPhotos: AppraisalAttemptPhoto[];
   settings: AppSettings;
   applicationPurchaseShares?: ApplicationPurchaseShares;
   profiles: Record<string, Profile>;

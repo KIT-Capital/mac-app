@@ -159,6 +159,8 @@ test.describe("collector app", () => {
                 agreements: [],
                 users: [],
                 photos: [],
+                appraisalAttempts: [],
+                appraisalAttemptPhotos: [],
                 profiles: {
                   [email]: {
                     name: "Photo Preflight",
@@ -214,6 +216,8 @@ test.describe("collector app", () => {
                 agreements: [],
                 users: [],
                 photos: [],
+                appraisalAttempts: [],
+                appraisalAttemptPhotos: [],
                 profiles: {
                   [email]: {
                     name: "Photo Success",
@@ -358,6 +362,8 @@ test.describe("collector app", () => {
             agreements: [],
             users: [],
             photos: [],
+            appraisalAttempts: [],
+            appraisalAttemptPhotos: [],
             profiles: {
               [email]: {
                 name: "Photo Preview",
@@ -534,6 +540,8 @@ test.describe("collector app", () => {
             agreements: [],
             users: [],
             photos: [],
+            appraisalAttempts: [],
+            appraisalAttemptPhotos: [],
             profiles: {
               [email]: {
                 name: "First Applicant",

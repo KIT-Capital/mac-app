@@ -391,6 +391,8 @@ test.describe("desk", () => {
             agreements: [],
             users: [],
             photos: [],
+            appraisalAttempts: [],
+            appraisalAttemptPhotos: [],
             profiles: {},
             catalog: [],
             shells: [],
