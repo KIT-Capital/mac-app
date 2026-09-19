@@ -5,7 +5,7 @@
 There is no tRPC router. Server surface is App Router handlers. Everything else is client state.
 
 Cookie-authenticated mutations (`POST` / `DELETE` on `/api/live-book`,
-`/api/agreement-documents`, `/api/mail`, `/api/desk-session`, and
+`/api/agreement-documents`, `/api/photos`, `/api/mail`, `/api/desk-session`, and
 `/api/desk/*`) refuse a cross-site caller **403** `REQUEST_ORIGIN_FORBIDDEN`
 before reading the body. Same-origin (`Sec-Fetch-Site: same-origin`) or
 `Origin` exactly equal to `COLLECTOR_MAGIC_LINK_ORIGIN` is allowed. `GET`
@@ -56,6 +56,33 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   document and five per collector per hour, plus `allowMailRequest`). Agreement
   sends are not written to `GET /api/mail`. Desk `GET` includes send history
   (`actorKind`, `recipientKind`, `result`) without recipient addresses.
+
+## `POST` `/api/photos`
+
+- Live mode requires a valid collector or desk session. Every action is
+  same-origin gated before JSON is read. The handler accepts metadata only and
+  never receives or streams image bytes.
+- With `MAC_LIVE_BOOK` off, it returns `{ mode: "browser" }` without opening
+  Neon or R2.
+- `request-upload` accepts one piece id, kind, and `size`, `type`, and
+  lowercase hexadecimal `sha256` metadata for both `original` and `preview`.
+  JPEG, PNG, and HEIC are allowed up to 25 MB. It returns two server-keyed,
+  signed PUT URLs plus their exact required headers, expiring within 600 seconds;
+  no bucket, key, or credential field is returned. `X-Amz-Checksum-Sha256` is
+  standard base64 even though request metadata uses lowercase hexadecimal.
+  Repeating an identical pending upload for the same piece reuses its photo id.
+  A matching stored row returns its id and `stored` status without new PUT URLs.
+- The browser PUT must preserve signed `Content-Length`, `Content-Type`,
+  `X-Amz-Checksum-Sha256`, and `If-None-Match: *` headers. A 412 means the
+  object may already exist and should be followed by `confirm`.
+- `confirm` performs checksum-enabled metadata HEADs for both objects. Missing
+  objects or checksum headers remain pending; a size mismatch returns
+  `PHOTO_SIZE_MISMATCH`; only matching size and SHA-256 metadata becomes stored.
+- `preview-url` returns only `{ url, expiresAt }` for a stored photo visible to
+  the actor. Foreign, pending, abandoned, and unknown ids all return
+  `PHOTO_NOT_FOUND`.
+- `npm run photos:sweep` checks pending rows older than 24 hours, marking
+  matching pairs stored and all others abandoned. It never deletes objects.
 
 ## `POST` `/api/desk/live-book-import`
 
@@ -186,11 +213,13 @@ exception. Official cash and inventory stay outside this app.
 Stages 2–5 and 7 added repositories under `lib/db/` for customers, timepieces,
 original photos, applications, prepared agreement versions, mock signature
 envelopes, archived PDFs, and contract report snapshots on Neon `development`.
-Only the live operations book has an HTTP surface. The other repositories remain
-an agent-native exception. Isolation is enforced in the repository and tested by
-`npm run test:db`. Do not dual-write or auto-migrate the browser store. Do not add
-a server file proxy. Stage 6 ledger posting is deferred and is not this product’s
-books.
+The live operations book, agreement documents, and direct photo uploads have
+authorized HTTP handlers for the human app. A tRPC or MCP adapter for those
+capabilities and the remaining repository-only operations remains an explicit
+agent-native exception. Isolation is enforced in the repository and tested by
+`npm run test:db`. Do not dual-write or auto-migrate the browser store. Do not
+add a server file proxy. Stage 6 ledger posting is deferred and is not this
+product’s books.
 
 In-app tutorials (`/guide` for collectors, `/admin/guide` for staff) are static
 screens. They do not mutate the book. There is no tRPC or MCP procedure for them;

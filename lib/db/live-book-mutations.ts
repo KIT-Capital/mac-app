@@ -622,13 +622,20 @@ async function executeLiveBookOperationCore(
       db.select({ id: applications.id }).from(applications).where(eq(applications.timepieceId, id)).limit(1),
       db.select({ id: preparedAgreements.id }).from(preparedAgreements).where(eq(preparedAgreements.timepieceId, id)).limit(1),
       db.select({ id: allocations.id }).from(allocations).where(eq(allocations.timepieceId, id)).limit(1),
-      db.select({ id: photoObjects.id }).from(photoObjects).where(eq(photoObjects.timepieceId, id)).limit(1),
+      db
+        .select({ id: photoObjects.id })
+        .from(photoObjects)
+        .where(and(eq(photoObjects.timepieceId, id), ne(photoObjects.status, "abandoned")))
+        .limit(1),
     ]);
     if (live[0] || app[0] || prepared[0] || allocation[0] || original[0]) {
       throw new Error("TIMEPIECE_REFERENCED");
     }
     await db.transaction(async (tx) => {
       await tx.delete(livePreviews).where(eq(livePreviews.timepieceId, id));
+      await tx
+        .delete(photoObjects)
+        .where(and(eq(photoObjects.timepieceId, id), eq(photoObjects.status, "abandoned")));
       await tx.delete(timepieces).where(eq(timepieces.id, id));
     });
     return;

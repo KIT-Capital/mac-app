@@ -1,0 +1,2 @@
+DROP INDEX "photo_objects_timepiece_checksum_uidx";--> statement-breakpoint
+CREATE UNIQUE INDEX "photo_objects_timepiece_checksum_uidx" ON "photo_objects" USING btree ("timepiece_id","original_checksum") WHERE "photo_objects"."status" <> 'abandoned' and "photo_objects"."preview_key" is not null;

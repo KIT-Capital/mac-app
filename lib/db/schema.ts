@@ -333,7 +333,7 @@ export const timepieces = pgTable(
   (table) => [index("timepieces_customer_id_idx").on(table.customerId)],
 );
 
-/** Original object + optional thumbnail. Preview data URLs stay in the browser. */
+/** Direct-upload original and preview metadata. No image bytes enter the server. */
 export const photoObjects = pgTable(
   "photo_objects",
   {
@@ -348,6 +348,12 @@ export const photoObjects = pgTable(
     originalKey: text("original_key").notNull(),
     originalChecksum: text("original_checksum").notNull(),
     originalBytes: integer("original_bytes").notNull(),
+    contentType: text("content_type"),
+    previewKey: text("preview_key"),
+    previewChecksum: text("preview_checksum"),
+    previewBytes: integer("preview_bytes"),
+    previewContentType: text("preview_content_type"),
+    status: text("status").notNull().default("stored"),
     thumbnailKey: text("thumbnail_key"),
     thumbnailChecksum: text("thumbnail_checksum"),
     uploadedBy: text("uploaded_by").notNull(),
@@ -356,7 +362,9 @@ export const photoObjects = pgTable(
   },
   (table) => [
     index("photo_objects_timepiece_id_idx").on(table.timepieceId),
-    uniqueIndex("photo_objects_timepiece_checksum_uidx").on(table.timepieceId, table.originalChecksum),
+    uniqueIndex("photo_objects_timepiece_checksum_uidx")
+      .on(table.timepieceId, table.originalChecksum)
+      .where(sql`${table.status} <> 'abandoned' and ${table.previewKey} is not null`),
   ],
 );
 
@@ -568,7 +576,7 @@ export const liveAgreementEnds = pgTable("live_agreement_ends", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Labeled preview URL only. Never an original object key or JPEG jsonb. */
+/** Legacy URL or reference to a stored photo preview. */
 export const livePreviews = pgTable(
   "live_previews",
   {
@@ -577,7 +585,8 @@ export const livePreviews = pgTable(
       .notNull()
       .references(() => timepieces.id),
     kind: text("kind").notNull().default("legacy_preview"),
-    previewUrl: text("preview_url").notNull(),
+    previewUrl: text("preview_url"),
+    photoObjectId: text("photo_object_id").references(() => photoObjects.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("live_previews_timepiece_id_idx").on(table.timepieceId)],
