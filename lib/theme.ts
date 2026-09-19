@@ -11,6 +11,23 @@ export const MAC = {
   parchment: "#F3EEE6",
 } as const;
 
+/** Settings the desk persists server-side. The browser store and the Desk
+ * config page share this list so a new field cannot reach one and not the other. */
+export const SERVER_SETTING_KEYS = [
+  "maxLtv",
+  "startingRate",
+  "setupFee",
+  "earlyRepurchaseAmount",
+  "brokerFee",
+  "minMonths",
+  "earlyStartMonth",
+  "earlyUntilMonth",
+  "typicalTerm",
+  "membershipMonthly",
+  "vaultLocation",
+  "requiredPhotoKinds",
+] as const;
+
 export const DEFAULT_SETTINGS = {
   companyName: "Mechanical Art Capital",
   phone: "+1 (833) 209-0972",

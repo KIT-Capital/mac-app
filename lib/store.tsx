@@ -48,7 +48,7 @@ import {
   validateRecordedEndKind,
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
-import { DEFAULT_SETTINGS } from "@/lib/theme";
+import { DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
 import { canEditAppraisal, isDeskRole, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
@@ -1091,21 +1091,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       updateSettings: (patch) => {
         const serverPatch = Object.fromEntries(
-          [
-            "maxLtv",
-            "startingRate",
-            "setupFee",
-            "earlyRepurchaseAmount",
-            "brokerFee",
-            "minMonths",
-            "earlyStartMonth",
-            "earlyUntilMonth",
-            "typicalTerm",
-            "membershipMonthly",
-            "vaultLocation",
-          ]
-            .filter((key) => patch[key as keyof AppSettings] !== undefined)
-            .map((key) => [key, patch[key as keyof AppSettings]]),
+          SERVER_SETTING_KEYS
+            .filter((key) => patch[key] !== undefined)
+            .map((key) => [key, patch[key]]),
         );
         return updateStore(
           (prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }),

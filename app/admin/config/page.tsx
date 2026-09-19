@@ -6,6 +6,7 @@ import { AdminChrome } from "@/components/admin-chrome";
 import { Field, PillButton } from "@/components/field";
 import { settingsToTerms } from "@/lib/contract/repo-scale.mjs";
 import { isSuperAdmin } from "@/lib/roles.mjs";
+import { SERVER_SETTING_KEYS } from "@/lib/theme";
 import { useStore } from "@/lib/store";
 import {
   DEFAULT_REQUIRED_PHOTO_KINDS,
@@ -13,21 +14,6 @@ import {
   normalizeRequiredPhotoKinds,
 } from "@/lib/timepiece-shots.mjs";
 import type { AppSettings, PhotoKind } from "@/lib/types";
-
-const SERVER_FIELD_KEYS = [
-  "maxLtv",
-  "startingRate",
-  "setupFee",
-  "earlyRepurchaseAmount",
-  "brokerFee",
-  "minMonths",
-  "earlyStartMonth",
-  "earlyUntilMonth",
-  "typicalTerm",
-  "membershipMonthly",
-  "vaultLocation",
-  "requiredPhotoKinds",
-] as const satisfies readonly (keyof AppSettings)[];
 
 export default function AdminConfigPage() {
   const { bookMode, settings, updateSettings, user } = useStore();
@@ -93,7 +79,7 @@ export default function AdminConfigPage() {
       };
       const patch = bookMode === "live"
         ? Object.fromEntries(
-            SERVER_FIELD_KEYS
+            SERVER_SETTING_KEYS
               .filter((key) => dirtyFields.current.has(key))
               .map((key) => [key, normalized[key]]),
           ) as Partial<AppSettings>

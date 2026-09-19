@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
 import { createDb } from "./client";
 import {
@@ -417,7 +417,7 @@ describe("direct photo uploads", { skip }, () => {
     );
   });
 
-  it("caps a timepiece at seven photos and still reuses an existing checksum", async () => {
+  it("bounds a timepiece to the seven intake slots and lets a retake reuse one", async () => {
     const customer = await registerCollector(db, {
       email: `collector-photo-cap.${suffix}@mac.test`,
       name: "Photo Cap",
@@ -436,31 +436,29 @@ describe("direct photo uploads", { skip }, () => {
       assert.equal(upload.status, "pending");
     }
 
-    await assert.rejects(
-      () => requestPhotoUpload(db, store, actor, {
-        timepieceId: piece.id, kind: "more", ...parts(`cap-eighth-${suffix}`).input,
-      }),
-      { message: "PHOTO_LIMIT" },
-    );
+    // Seven slots is the bound, so a kind with no intake slot is refused —
+    // a collector would have no way to supply or replace it.
+    for (const kind of ["more", "buckle", "other"]) {
+      await assert.rejects(
+        () => requestPhotoUpload(db, store, actor, {
+          timepieceId: piece.id, kind, ...parts(`slotless-${kind}-${suffix}`).input,
+        }),
+        { message: "PHOTO_UPLOAD_INVALID" },
+        `${kind} has no intake slot`,
+      );
+    }
 
-    // The cap counts photos, not requests: re-requesting one already on the
-    // piece is how a retry resumes, and must keep working at the limit.
-    const retry = await requestPhotoUpload(db, store, actor, {
-      timepieceId: piece.id, kind: "front", ...parts(`cap-front-${suffix}`).input,
+    // Retaking a shot must keep working with every slot filled: a superseded
+    // row stays stored (see the legacy-row test), so it must not consume a slot.
+    const retake = await requestPhotoUpload(db, store, actor, {
+      timepieceId: piece.id, kind: "front", ...parts(`cap-retake-${suffix}`).input,
     });
-    assert.equal(retry.status, "pending");
-
-    // An abandoned row frees its place.
-    const [abandoned] = await db
-      .select({ id: photoObjects.id })
+    assert.equal(retake.status, "pending");
+    const kindsHeld = await db
+      .select({ kind: photoObjects.kind })
       .from(photoObjects)
-      .where(and(eq(photoObjects.timepieceId, piece.id), eq(photoObjects.kind, "papers")))
-      .limit(1);
-    await db.update(photoObjects).set({ status: "abandoned" }).where(eq(photoObjects.id, abandoned.id));
-    const eighth = await requestPhotoUpload(db, store, actor, {
-      timepieceId: piece.id, kind: "more", ...parts(`cap-eighth-${suffix}`).input,
-    });
-    assert.equal(eighth.status, "pending");
+      .where(and(eq(photoObjects.timepieceId, piece.id), ne(photoObjects.status, "abandoned")));
+    assert.deepEqual([...new Set(kindsHeld.map((row) => row.kind))].sort(), [...kinds].sort());
   });
 
   it("keeps pending photo metadata attached to its timepiece", async () => {
