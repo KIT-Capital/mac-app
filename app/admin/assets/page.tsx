@@ -3,15 +3,27 @@
 import { useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { catalogAppraisalPatch, moneyRange } from "@/lib/catalog";
+import { canEditAppraisal } from "@/lib/roles.mjs";
 import { useStore } from "@/lib/store";
 
+const APPRAISER_REQUIRED = "Appraiser or super admin required";
+
 export default function AdminAssetsPage() {
-  const { timepieces, catalog, updateTimepiece, removeTimepiece } = useStore();
+  const { timepieces, catalog, updateTimepiece, removeTimepiece, user } = useStore();
+  const canAppraise = canEditAppraisal(user);
   const [error, setError] = useState("");
 
   async function save(operation: Promise<{ ok: boolean; error?: string }>) {
     const result = await operation;
-    setError(result.ok ? "" : result.error || "The asset change could not be saved.");
+    if (result.ok) {
+      setError("");
+      return;
+    }
+    setError(
+      result.error === "ROLE_FORBIDDEN"
+        ? `${APPRAISER_REQUIRED} to appraise.`
+        : result.error || "The asset change could not be saved.",
+    );
   }
 
   return (
@@ -35,6 +47,9 @@ export default function AdminAssetsPage() {
             </button>
             <button
               type="button"
+              disabled={!canAppraise}
+              title={canAppraise ? undefined : APPRAISER_REQUIRED}
+              className="disabled:cursor-not-allowed disabled:opacity-40"
               onClick={() => {
                 const patch = catalogAppraisalPatch(
                   w,

@@ -43,7 +43,7 @@ import {
   timepieces,
 } from "./schema";
 
-import { isDeskRole } from "../roles.mjs";
+import { canEditAppraisal, isDeskRole, patchNeedsAppraisal } from "../roles.mjs";
 import type { DeskRole } from "../types";
 
 type Operation = ReturnType<typeof parseLiveBookOperation>;
@@ -56,6 +56,15 @@ function isDesk(
 
 function requireDesk(actor: Actor) {
   if (!isDesk(actor)) throw new Error("DESK_REQUIRED");
+}
+
+/**
+ * Appraisal numbers and catalog ranges belong to appraisers and super admins.
+ * Admins may read them and operate the rest of the desk (R5, KTD2).
+ */
+function requireAppraiser(actor: Actor) {
+  requireDesk(actor);
+  if (!canEditAppraisal(actor)) throw new Error("ROLE_FORBIDDEN");
 }
 
 async function ownedPiece(db: Database, actor: Actor, id: string) {
@@ -385,7 +394,7 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "catalog.upsert") {
-    requireDesk(actor);
+    requireAppraiser(actor);
     const entry = operation.entry as Record<string, unknown>;
     const typicalLowCents = dollarsToCents(Number(entry.typicalLow));
     const typicalHighCents = dollarsToCents(Number(entry.typicalHigh));
@@ -423,7 +432,7 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "catalog.remove") {
-    requireDesk(actor);
+    requireAppraiser(actor);
     const result = await db.delete(catalogReferences)
       .where(eq(catalogReferences.id, String(operation.id)))
       .returning({ id: catalogReferences.id });
@@ -597,10 +606,23 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "timepiece.update" || action === "timepiece.deskUpdate") {
-    if (action === "timepiece.deskUpdate") requireDesk(actor);
-    const id = String(operation.id);
-    await ownedPiece(db, actor, id);
     const patch = operation.patch as Record<string, unknown>;
+    if (action === "timepiece.deskUpdate") requireDesk(actor);
+    // A desk actor is fenced on either action name; `pieceValues` lets desk
+    // actors set `appraised`, so `timepiece.update` must not be a side door.
+    if (isDesk(actor) && patchNeedsAppraisal(patch)) requireAppraiser(actor);
+    const id = String(operation.id);
+    const current = await ownedPiece(db, actor, id);
+    // Moving a piece off `appraised` erases an appraiser's recorded decision,
+    // so it needs the same fence as making one (R1, R5).
+    if (
+      isDesk(actor) &&
+      current.status === "appraised" &&
+      patch.status !== undefined &&
+      patch.status !== "appraised"
+    ) {
+      requireAppraiser(actor);
+    }
     const values = pieceValues(patch, actor);
     const update: Record<string, unknown> = { updatedAt: new Date() };
     for (const key of Object.keys(patch)) {

@@ -2,6 +2,8 @@ import { expect, type Page } from "@playwright/test";
 
 export const HALE = "jonathan.hale@mechartcap.com";
 export const DESK = "admin@mechartcap.com";
+/** Development appraiser fixture (lib/desk-identities.mjs). Appraisal writes need this role. */
+export const APPRAISER = "desk@mechartcap.com";
 export const DESK_PASSWORD = process.env.DESK_DEVELOPMENT_PASSWORD ?? "";
 
 export async function signIn(page: Page, email: string, password: string) {
@@ -27,8 +29,14 @@ export async function signInDesk(page: Page) {
   await expect(page.getByText(/Desk ·/)).toBeVisible();
 }
 
+export async function signInAppraiser(page: Page) {
+  await signIn(page, APPRAISER, DESK_PASSWORD);
+  await expect(page).toHaveURL(/\/admin/);
+  await expect(page.getByText(/Desk ·/)).toBeVisible();
+}
+
 export async function appraiseHaleRoyalOak(page: Page) {
-  await signInDesk(page);
+  await signInAppraiser(page);
   await page.getByRole("link", { name: "Client Assets" }).click();
   const row = page.getByRole("row").filter({ hasText: "Royal Oak Selfwinding" });
   await row.getByRole("button", { name: "Appraise" }).click();

@@ -189,6 +189,36 @@ describe("commitLiveBookImport", { skip }, () => {
     assert.deepEqual(oldRepo?.watchIds.sort(), newRepo?.watchIds.sort());
   });
 
+  it("refuses an admin import that carries appraisal values", async () => {
+    // R5: bulk-writing appraised status, financeable, or values is an appraisal write.
+    const admin = deskActor("admin", `admin.import.${suffix}@mac.test`);
+    await assert.rejects(
+      () => commitLiveBookImport(db, admin, haleExport, {
+        confirmLiveImport: true,
+        env: { APP_ENV: "development" } as NodeJS.ProcessEnv,
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const plainIds = haleExport.timepieces.map((watch) => `${watch.id}-plain`);
+    createdPieceIds.push(...plainIds);
+    const plainPayload = {
+      ...haleExport,
+      timepieces: haleExport.timepieces.map((watch, index) => ({
+        ...watch,
+        id: plainIds[index],
+        status: "not_evaluated",
+        financeable: false,
+        valueLow: undefined,
+        valueHigh: undefined,
+      })),
+      agreements: [],
+    };
+    await commitLiveBookImport(db, admin, plainPayload, {
+      confirmLiveImport: true,
+      env: { APP_ENV: "development" } as NodeJS.ProcessEnv,
+    });
+  });
+
   it("refuses commit after the owner flag", async () => {
     await assert.rejects(
       () =>

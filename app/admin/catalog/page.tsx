@@ -4,8 +4,11 @@ import { FormEvent, useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, PillButton } from "@/components/field";
 import { money } from "@/lib/catalog";
+import { canEditAppraisal } from "@/lib/roles.mjs";
 import { useStore } from "@/lib/store";
 import type { CatalogEntry } from "@/lib/types";
+
+const APPRAISER_REQUIRED_COPY = "Appraiser or super admin required to change ranges.";
 
 const BLANK: CatalogEntry = {
   id: "",
@@ -21,7 +24,8 @@ const BLANK: CatalogEntry = {
 };
 
 export default function AdminCatalogPage() {
-  const { catalog, upsertCatalog, removeCatalog } = useStore();
+  const { catalog, upsertCatalog, removeCatalog, user } = useStore();
+  const canEdit = canEditAppraisal(user);
   const [draft, setDraft] = useState<CatalogEntry>(BLANK);
   const [error, setError] = useState("");
 
@@ -31,7 +35,7 @@ export default function AdminCatalogPage() {
     setError("");
     const result = await upsertCatalog({ ...draft, id: draft.id || `cat-${Date.now()}` });
     if (!result.ok) {
-      setError("The catalog reference could not be saved.");
+      setError(result.error === "ROLE_FORBIDDEN" ? APPRAISER_REQUIRED_COPY : "The catalog reference could not be saved.");
       return;
     }
     setDraft(BLANK);
@@ -40,7 +44,9 @@ export default function AdminCatalogPage() {
   async function onRemove(id: string) {
     setError("");
     const result = await removeCatalog(id);
-    if (!result.ok) setError("The catalog reference could not be removed.");
+    if (!result.ok) {
+      setError(result.error === "ROLE_FORBIDDEN" ? APPRAISER_REQUIRED_COPY : "The catalog reference could not be removed.");
+    }
   }
 
   return (
@@ -49,7 +55,12 @@ export default function AdminCatalogPage() {
         Master catalog used by the add-timepiece dropdowns. Staff research a reference here before a
         collector asset is created.
       </p>
-      <form onSubmit={onSubmit} className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {!canEdit ? (
+        <p className="mb-4 text-sm text-[#E8D5C0]" data-testid="catalog-read-only">
+          {APPRAISER_REQUIRED_COPY} Admins can read every reference.
+        </p>
+      ) : null}
+      <form onSubmit={onSubmit} className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3" hidden={!canEdit}>
         <Field label="Brand">
           <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className="w-full bg-transparent py-1 text-[16px] outline-none" />
         </Field>
@@ -92,8 +103,14 @@ export default function AdminCatalogPage() {
           `${money(c.typicalLow)} – ${money(c.typicalHigh)}`,
           c.financeable ? "Yes" : "No",
           <div key={c.id} className="flex gap-3 text-[#FCB040]">
-            <button type="button" onClick={() => setDraft(c)}>Edit</button>
-            <button type="button" onClick={() => void onRemove(c.id)}>Remove</button>
+            {canEdit ? (
+              <>
+                <button type="button" onClick={() => setDraft(c)}>Edit</button>
+                <button type="button" onClick={() => void onRemove(c.id)}>Remove</button>
+              </>
+            ) : (
+              <span className="text-white/45">Read only</span>
+            )}
           </div>,
         ])}
       />

@@ -49,7 +49,7 @@ import {
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
-import { isDeskRole } from "@/lib/roles.mjs";
+import { canEditAppraisal, isDeskRole, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
   browserSessionStorage,
@@ -855,18 +855,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...prev.photos,
           ],
         }), { operation: { action: "timepiece.create", timepiece: watch }, deferLive: true }),
-      updateTimepiece: async (id, patch) =>
-        updateStore((prev) => ({
+      updateTimepiece: async (id, patch) => {
+        const desk = isDeskRole(state.user?.role);
+        // Same fence the live book enforces (R5): admins operate the desk but
+        // never write appraisal numbers, in either book.
+        if (desk && patchNeedsAppraisal(patch) && !canEditAppraisal(state.user)) {
+          return { ok: false, error: "ROLE_FORBIDDEN" };
+        }
+        return updateStore((prev) => ({
           ...prev,
           timepieces: prev.timepieces.map((w) => (w.id === id ? { ...w, ...patch } : w)),
         }), {
           operation: {
-            action: state.user?.role === "collector" ? "timepiece.update" : "timepiece.deskUpdate",
+            action: desk ? "timepiece.deskUpdate" : "timepiece.update",
             id,
             patch,
           },
           deferLive: true,
-        }),
+        });
+      },
       removeTimepiece: async (id) =>
         updateStore((prev) => ({
           ...prev,
@@ -1123,19 +1130,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           (prev) => ({ ...prev, users: prev.users.filter((u) => u.id !== id) }),
           { operation: { action: "customer.remove", id }, deferLive: true },
         ),
-      upsertCatalog: (entry) =>
-        updateStore((prev) => {
+      upsertCatalog: async (entry) => {
+        if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
+        return updateStore((prev) => {
           const exists = prev.catalog.some((c) => c.id === entry.id);
           return {
             ...prev,
             catalog: exists ? prev.catalog.map((c) => (c.id === entry.id ? entry : c)) : [entry, ...prev.catalog],
           };
-        }, { operation: { action: "catalog.upsert", entry }, deferLive: true }),
-      removeCatalog: (id) =>
-        updateStore(
+        }, { operation: { action: "catalog.upsert", entry }, deferLive: true });
+      },
+      removeCatalog: async (id) => {
+        if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
+        return updateStore(
           (prev) => ({ ...prev, catalog: prev.catalog.filter((c) => c.id !== id) }),
           { operation: { action: "catalog.remove", id }, deferLive: true },
-        ),
+        );
+      },
       upsertShell: (shell) =>
         updateStore((prev) => {
           const exists = prev.shells.some((s) => s.id === shell.id);

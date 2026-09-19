@@ -547,6 +547,100 @@ describe("live-book operation repository", { skip }, () => {
     assert.equal(state.agreements[0].bookEnd?.kind, "bought_back");
   });
 
+  it("reserves appraisal values and catalog writes for appraisers and super admins", async () => {
+    const a = await collector("appraisal-fence");
+    const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Santos" });
+    const admin = deskActor("admin", "dov@mechartcap.com");
+    const appraiser = deskActor("appraiser", "appraiser@mechartcap.com");
+
+    for (const patch of [
+      { valueLow: 100000 },
+      { valueHigh: 120000 },
+      { financeable: true },
+      { status: "appraised" },
+      { evaluatedAt: "2026-09-19T12:00:00.000Z" },
+    ]) {
+      await assert.rejects(
+        () => executeLiveBookOperation(db, admin, { action: "timepiece.deskUpdate", id: piece.id, patch }),
+        { message: "ROLE_FORBIDDEN" },
+        `admin must not write ${Object.keys(patch)[0]}`,
+      );
+    }
+    // The collector-named action must not be a side door for a desk actor.
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "timepiece.update",
+        id: piece.id,
+        patch: { status: "appraised" },
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const [untouched] = await db.select().from(timepieces).where(eq(timepieces.id, piece.id));
+    assert.equal(untouched.valueLowCents, null);
+    assert.equal(untouched.status, "not_evaluated");
+
+    await executeLiveBookOperation(db, admin, {
+      action: "timepiece.deskUpdate",
+      id: piece.id,
+      patch: { assetCode: "MAC-0001", status: "reviewing" },
+    });
+    const [tagged] = await db.select().from(timepieces).where(eq(timepieces.id, piece.id));
+    assert.equal(tagged.assetCode, "MAC-0001");
+    assert.equal(tagged.status, "reviewing");
+
+    await executeLiveBookOperation(db, appraiser, {
+      action: "timepiece.deskUpdate",
+      id: piece.id,
+      patch: { status: "appraised", valueLow: 100000, valueHigh: 120000, financeable: true },
+    });
+    const [appraised] = await db.select().from(timepieces).where(eq(timepieces.id, piece.id));
+    assert.equal(appraised.status, "appraised");
+    assert.equal(appraised.valueLowCents, 10_000_000);
+
+    // Demoting an appraised piece would erase the appraiser's decision.
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "timepiece.deskUpdate",
+        id: piece.id,
+        patch: { status: "reviewing" },
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const [stillAppraised] = await db.select().from(timepieces).where(eq(timepieces.id, piece.id));
+    assert.equal(stillAppraised.status, "appraised");
+    await executeLiveBookOperation(db, appraiser, {
+      action: "timepiece.deskUpdate",
+      id: piece.id,
+      patch: { status: "reviewing" },
+    });
+
+    const entry = {
+      id: `cat-fence-${suffix}`,
+      brand: "Cartier",
+      model: "Santos",
+      reference: "WSSA0018",
+      caseMetal: "Steel",
+      caseDiameter: "39.8",
+      typicalLow: 6000,
+      typicalHigh: 8000,
+      financeable: true,
+      notes: "",
+    };
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, { action: "catalog.upsert", entry }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    await executeLiveBookOperation(db, appraiser, { action: "catalog.upsert", entry });
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, { action: "catalog.remove", id: entry.id }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    await executeLiveBookOperation(db, deskActor("super_admin", "rc@mechartcap.com"), {
+      action: "catalog.remove",
+      id: entry.id,
+    });
+  });
+
   it("allows only desk renewal and moves membership transactionally", async () => {
     const a = await collector("renew");
     const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Richard Mille", model: "RM 011" });
