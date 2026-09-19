@@ -25,6 +25,7 @@ import {
   timepieces,
 } from "./schema";
 import { hashStaffPassword } from "../staff-password.mjs";
+import { MASTER_SUPER_ADMIN_EMAIL, SEEDED_DESK_ACCOUNTS } from "../roles.mjs";
 import { rotateDeskPasswordRequest } from "../auth.server";
 import { issueDeskToken, readDeskToken } from "../desk-session";
 import { resolveDeskActor } from "../server/request-actor";
@@ -58,7 +59,7 @@ describe("staff accounts repository", { skip }, () => {
     }
   });
 
-  async function account(label: string, role: "admin" | "staff" = "staff") {
+  async function account(label: string, role: "admin" | "appraiser" | "super_admin" = "admin") {
     const row = await createStaffAccount(db, {
       name: label,
       email: `${label}.${suffix}@mac.test`,
@@ -71,7 +72,7 @@ describe("staff accounts repository", { skip }, () => {
   }
 
   it("verifies only an active row and returns its database role", async () => {
-    const member = await account("verify", "staff");
+    const member = await account("verify", "appraiser");
     const verified = await verifyStaffCredentials(
       db,
       member.email,
@@ -79,7 +80,7 @@ describe("staff accounts repository", { skip }, () => {
       { address: "127.0.0.1" },
     );
     assert.equal(verified?.id, member.id);
-    assert.equal(verified?.role, "staff");
+    assert.equal(verified?.role, "appraiser");
     assert.equal(verified?.mustRotate, true);
 
     assert.equal(await verifyStaffCredentials(
@@ -91,8 +92,8 @@ describe("staff accounts repository", { skip }, () => {
   });
 
   it("uses the same fixed dummy scrypt path for unknown and disabled emails", async () => {
-    const active = await account("timing-active", "staff");
-    const disabled = await account("timing-disabled", "staff");
+    const active = await account("timing-active");
+    const disabled = await account("timing-disabled");
     await db.update(staffAccounts).set({ disabledAt: new Date() })
       .where(eq(staffAccounts.id, disabled.id));
     const candidates: string[] = [];
@@ -127,7 +128,7 @@ describe("staff accounts repository", { skip }, () => {
   });
 
   it("refuses an over-limit email before running scrypt", async () => {
-    const member = await account("limited", "staff");
+    const member = await account("limited");
     for (let attempt = 0; attempt < 10; attempt += 1) {
       await consumeAccessRateLimit(db, {
         scope: "desk-password-email",
@@ -228,7 +229,7 @@ describe("staff accounts repository", { skip }, () => {
 
   it("disables and resets staff with immutable audit rows", async () => {
     const admin = await account("admin", "admin");
-    const member = await account("managed", "staff");
+    const member = await account("managed", "admin");
     await setStaffDisabled(db, admin, member.id, true, "127.0.0.1");
     assert.equal(await verifyStaffCredentials(
       db,
@@ -295,7 +296,7 @@ describe("staff accounts repository", { skip }, () => {
       () => addStaffAccount(db, admin, {
         name: "Collision",
         email: collector.email,
-        role: "staff",
+        role: "admin",
         clientAddress: "127.0.0.1",
       }),
       /STAFF_EMAIL_RESERVED/,
@@ -304,7 +305,7 @@ describe("staff accounts repository", { skip }, () => {
     const added = await addStaffAccount(db, admin, {
       name: "New Staff",
       email: `new-staff.${suffix}@mac.test`,
-      role: "staff",
+      role: "admin",
       clientAddress: "127.0.0.1",
     });
     staffIds.push(added.row.id);
@@ -314,7 +315,7 @@ describe("staff accounts repository", { skip }, () => {
       added.row.email,
       added.temporaryPassword,
       { address: "127.0.0.1" },
-    ))?.role, "staff");
+    ))?.role, "admin");
     const [audit] = await db.select().from(deskAuditLog)
       .where(eq(deskAuditLog.targetId, added.row.id));
     assert.equal(audit.action, "staff.add");
@@ -329,7 +330,7 @@ describe("staff accounts repository", { skip }, () => {
   });
 
   it("rotates a forced password and writes an audit row", async () => {
-    const member = await account("rotate", "staff");
+    const member = await account("rotate", "appraiser");
     const rotated = await rotateStaffPassword(db, member, {
       currentPassword: "temporary password 123",
       newPassword: "a different secure password 456",
@@ -342,20 +343,22 @@ describe("staff accounts repository", { skip }, () => {
       "a different secure password 456",
       { address: "127.0.0.1" },
     ))?.mustRotate, false);
-    await assert.rejects(() => listStaffAccounts(db, member), /ADMIN_REQUIRED/);
+    const visible = await listStaffAccounts(db, member);
+    assert.ok(visible.some((row) => row.id === member.id));
+    assert.equal(visible.some((row) => row.role === "super_admin"), false);
     const [audit] = await db.select().from(deskAuditLog)
       .where(eq(deskAuditLog.targetId, member.id));
     assert.equal(audit.action, "staff.password.rotate");
   });
 
   it("validates the password-rotation request and reissues a normal token", async () => {
-    const member = await account("rotate-request", "staff");
+    const member = await account("rotate-request", "appraiser");
     const secret = "desk-rotation-test-secret-material-0123456789";
     const env = {
       APP_ENV: "production",
       DESK_SESSION_KEYS: `k1:${secret}`,
     };
-    const token = issueDeskToken(member.email, "staff", {
+    const token = issueDeskToken(member.email, "appraiser", {
       env,
       mustRotate: true,
     });
@@ -408,7 +411,7 @@ describe("staff accounts repository", { skip }, () => {
       member.email,
       "a different secure password 456",
       { address: "127.0.0.2" },
-    ))?.role, "staff");
+    ))?.role, "appraiser");
   });
 
   it("commits desk mutations and their audit row together", async () => {
@@ -477,7 +480,7 @@ describe("staff accounts repository", { skip }, () => {
     const member = await createStaffAccount(db, {
       name: "Actor Staff",
       email: `actor-staff.${suffix}@mac.test`,
-      role: "staff",
+      role: "admin",
       passwordHash: await hashStaffPassword("temporary password 123"),
       mustRotate: false,
     });
@@ -494,9 +497,9 @@ describe("staff accounts repository", { skip }, () => {
       DESK_SESSION_KEYS: `k1:${secret}`,
     });
     try {
-      const token = issueDeskToken(member.email, "staff");
+      const token = issueDeskToken(member.email, "admin");
       const before = await resolveDeskActor(token);
-      assert.equal("actor" in (before ?? {}) ? before?.actor.role : null, "staff");
+      assert.equal("actor" in (before ?? {}) ? before?.actor.role : null, "admin");
       await setStaffDisabled(db, admin, member.id, true, "127.0.0.1");
       assert.deepEqual(await resolveDeskActor(token), { error: "DESK_SESSION_INVALID" });
       await setStaffDisabled(db, admin, member.id, false, "127.0.0.1");
@@ -506,11 +509,11 @@ describe("staff accounts repository", { skip }, () => {
       );
       const enabled = await findStaffByEmail(db, member.email);
       assert.ok(enabled);
-      const freshToken = issueDeskToken(member.email, "staff", {
+      const freshToken = issueDeskToken(member.email, "admin", {
         now: enabled.sessionValidAfter.getTime() + 1,
       });
       const freshActor = await resolveDeskActor(freshToken);
-      assert.equal("actor" in (freshActor ?? {}) ? freshActor?.actor.role : null, "staff");
+      assert.equal("actor" in (freshActor ?? {}) ? freshActor?.actor.role : null, "admin");
       await resetStaffPassword(db, admin, member.id, "127.0.0.1");
       assert.deepEqual(await resolveDeskActor(freshToken), { error: "DESK_SESSION_INVALID" });
     } finally {
@@ -518,6 +521,162 @@ describe("staff accounts repository", { skip }, () => {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
       }
+    }
+  });
+
+  it("seeds the master and two admins with no password and refuses their sign-in", async () => {
+    const seeded = await db.select().from(staffAccounts)
+      .where(inArray(staffAccounts.email, SEEDED_DESK_ACCOUNTS.map((seed) => seed.email)));
+    assert.equal(seeded.length, 3);
+    const master = seeded.find((row) => row.email === MASTER_SUPER_ADMIN_EMAIL);
+    assert.ok(master);
+    assert.equal(master.role, "super_admin");
+    assert.equal(master.isMaster, true);
+    assert.equal(seeded.filter((row) => row.isMaster).length, 1);
+    for (const row of seeded.filter((row) => !row.passwordHash)) {
+      assert.equal(row.passwordSetAt, null);
+      assert.equal(await verifyStaffCredentials(db, row.email, "anything at all 123", {
+        address: `seed-${row.id}-${suffix}`,
+      }), null);
+      // Even a verifier that says "match" cannot sign a passwordless row in.
+      assert.equal(await verifyStaffCredentials(db, row.email, "dummy preimage", {
+        address: `seed-match-${row.id}-${suffix}`,
+        verifyPassword: async () => true,
+      }), null);
+      await clearAccessRateLimit(db, "desk-password-email", row.email);
+    }
+  });
+
+  it("refuses a temporary-password reset for a row that never set a password", async () => {
+    const superAdmin = await account("reset-seed-super", "super_admin");
+    const [seededAdmin] = await db.select().from(staffAccounts).where(and(
+      eq(staffAccounts.role, "admin"),
+      isNull(staffAccounts.passwordHash),
+      inArray(staffAccounts.email, SEEDED_DESK_ACCOUNTS.map((seed) => seed.email)),
+    )).limit(1);
+    if (!seededAdmin) return;
+    await assert.rejects(
+      () => resetStaffPassword(db, superAdmin, seededAdmin.id, "127.0.0.1"),
+      /PASSWORD_NOT_SET/,
+    );
+  });
+
+  it("does not confirm hidden super-admin emails to an admin through add", async () => {
+    const admin = await account("oracle-admin", "admin");
+    const hidden = await account("oracle-super", "super_admin");
+    await assert.rejects(
+      () => addStaffAccount(db, admin, {
+        name: "Probe",
+        email: hidden.email,
+        role: "admin",
+        clientAddress: "127.0.0.1",
+      }),
+      /ROLE_FORBIDDEN/,
+    );
+    const visible = await account("oracle-visible", "admin");
+    await assert.rejects(
+      () => addStaffAccount(db, admin, {
+        name: "Probe",
+        email: visible.email,
+        role: "admin",
+        clientAddress: "127.0.0.1",
+      }),
+      /STAFF_EXISTS/,
+    );
+  });
+
+  it("fences desk-account verbs by role and protects the master row", async () => {
+    const admin = await account("fence-admin", "admin");
+    const superAdmin = await account("fence-super", "super_admin");
+    const appraiser = await account("fence-appraiser", "appraiser");
+
+    await assert.rejects(
+      () => addStaffAccount(db, admin, {
+        name: "Nope",
+        email: `fence-nope.${suffix}@mac.test`,
+        role: "appraiser",
+        clientAddress: "127.0.0.1",
+      }),
+      /ROLE_FORBIDDEN/,
+    );
+    await assert.rejects(
+      () => setStaffDisabled(db, admin, appraiser.id, true, "127.0.0.1"),
+      /ROLE_FORBIDDEN/,
+    );
+    await assert.rejects(
+      () => resetStaffPassword(db, appraiser, superAdmin.id, "127.0.0.1"),
+      /ROLE_FORBIDDEN/,
+    );
+    await assert.rejects(
+      () => setStaffDisabled(db, superAdmin, superAdmin.id, true, "127.0.0.1"),
+      /ROLE_FORBIDDEN/,
+    );
+
+    const [masterRow] = await db.select().from(staffAccounts)
+      .where(eq(staffAccounts.isMaster, true));
+    assert.ok(masterRow);
+    await assert.rejects(
+      () => setStaffDisabled(db, superAdmin, masterRow.id, true, "127.0.0.1"),
+      /ROLE_FORBIDDEN/,
+    );
+
+    const created = await addStaffAccount(db, superAdmin, {
+      name: "New Appraiser",
+      email: `fence-new-appraiser.${suffix}@mac.test`,
+      role: "appraiser",
+      clientAddress: "127.0.0.1",
+    });
+    staffIds.push(created.row.id);
+    await setStaffDisabled(db, superAdmin, created.row.id, true, "127.0.0.1");
+
+    const adminView = await listStaffAccounts(db, admin);
+    assert.equal(adminView.some((row) => row.role === "super_admin"), false);
+    assert.equal(adminView.find((row) => row.id === appraiser.id)?.manageable, false);
+    const superView = await listStaffAccounts(db, superAdmin);
+    assert.ok(superView.some((row) => row.id === masterRow.id && row.manageable === false));
+  });
+
+  it("bootstraps onto a seeded passwordless row with the same email and keeps its role", async () => {
+    const schema = `staff_seed_bootstrap_${randomUUID().replaceAll("-", "")}`;
+    await db.execute(sql.raw(`create schema "${schema}"`));
+    await db.execute(sql.raw(
+      `create table "${schema}".staff_accounts (like public.staff_accounts including all)`,
+    ));
+    await db.execute(sql.raw(
+      `create table "${schema}".desk_audit_log (like public.desk_audit_log including all)`,
+    ));
+    await db.execute(sql.raw(
+      `create table "${schema}".customers (like public.customers including all)`,
+    ));
+    const email = `seed-master.${suffix}@mac.test`;
+    const env = {
+      DESK_BOOTSTRAP_ADMIN_EMAIL: email,
+      DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH: await hashStaffPassword("bootstrap password 123"),
+    };
+    const inSchema = <T>(work: (isolated: ReturnType<typeof createDb>) => Promise<T>) =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql.raw(`set local search_path to "${schema}", public`));
+        return work(tx as unknown as ReturnType<typeof createDb>);
+      });
+    try {
+      await inSchema((isolated) => isolated.insert(staffAccounts).values({
+        id: `seed-${suffix}`,
+        name: "Seeded Master",
+        email,
+        role: "super_admin",
+        isMaster: true,
+        mustRotate: true,
+      }));
+      const result = await inSchema((isolated) => bootstrapFirstAdmin(isolated, env));
+      assert.ok(result);
+      assert.equal(result.id, `seed-${suffix}`);
+      assert.equal(result.role, "super_admin");
+      assert.equal(result.isMaster, true);
+      assert.equal(result.mustRotate, true);
+      assert.ok(result.passwordHash);
+      assert.equal(await inSchema((isolated) => bootstrapFirstAdmin(isolated, env)), null);
+    } finally {
+      await db.execute(sql.raw(`drop schema "${schema}" cascade`));
     }
   });
 

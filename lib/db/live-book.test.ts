@@ -81,7 +81,7 @@ describe("live-book operation repository", { skip }, () => {
   it("persists shared desk data, audits money changes, and derives new agreement scale", async () => {
     await db.delete(agreementShells);
     await db.delete(deskSettings);
-    const emptyLiveDesk = await readLiveBookState(db, deskActor("staff", "desk@mechartcap.com"));
+    const emptyLiveDesk = await readLiveBookState(db, deskActor("appraiser", "desk@mechartcap.com"));
     assert.equal(emptyLiveDesk.settings.maxLtv, 0.6);
     assert.deepEqual(emptyLiveDesk.shells, []);
     assert.equal((await db.select().from(deskSettings)).length, 0);
@@ -96,13 +96,13 @@ describe("live-book operation repository", { skip }, () => {
     const member = await createStaffAccount(db, {
       name: "U5 Staff",
       email: `u5-staff.${suffix}@mac.test`,
-      role: "staff",
+      role: "appraiser",
       passwordHash,
       mustRotate: false,
     });
     staffIds.push(admin.id, member.id);
     const adminActor = deskActor("admin", admin.email, admin.id);
-    const staff = deskActor("staff", member.email, member.id);
+    const staff = deskActor("appraiser", member.email, member.id);
     const options = {
       env: { MAC_LIVE_BOOK: "1" } as NodeJS.ProcessEnv,
       clientAddress: "127.0.0.1",
@@ -124,9 +124,15 @@ describe("live-book operation repository", { skip }, () => {
         appearance: "light",
       },
     };
+    // Every desk role is admin-level for money settings; retail actors are refused.
     await assert.rejects(
-      () => executeLiveBookOperation(db, staff, settingsOperation, options),
-      { message: "ADMIN_REQUIRED" },
+      () => executeLiveBookOperation(
+        db,
+        { role: "collector", customerId: "nobody", email: "nobody@example.com" },
+        settingsOperation,
+        options,
+      ),
+      { message: "DESK_REQUIRED" },
     );
     await executeLiveBookOperation(db, adminActor, settingsOperation, options);
     await executeLiveBookOperation(db, adminActor, {
@@ -455,7 +461,7 @@ describe("live-book operation repository", { skip }, () => {
     await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Tank" });
     await createTimepiece(db, b.actor, b.customer.id, { brand: "Rolex", model: "Daytona" });
     const own = await readLiveBookState(db, a.actor);
-    const all = await readLiveBookState(db, deskActor("staff", "desk@mechartcap.com"));
+    const all = await readLiveBookState(db, deskActor("appraiser", "desk@mechartcap.com"));
     assert.equal(own.timepieces.length, 1);
     assert.equal(own.timepieces[0].ownerEmail, a.customer.email);
     assert.ok(all.timepieces.some((row) => row.ownerEmail === a.customer.email));
@@ -525,14 +531,14 @@ describe("live-book operation repository", { skip }, () => {
       { message: "DESK_REQUIRED" },
     );
     await assert.rejects(
-      () => executeLiveBookOperation(db, deskActor("staff", "desk@mechartcap.com"), {
+      () => executeLiveBookOperation(db, deskActor("appraiser", "desk@mechartcap.com"), {
         action: "agreement.recordEnd",
         id: repoId,
         end: { kind: "renewed", date: "2026-09-17", amount: 70000 },
       }),
       { message: "ADMIN_RENEW_REQUIRED" },
     );
-    await executeLiveBookOperation(db, deskActor("staff", "desk@mechartcap.com"), {
+    await executeLiveBookOperation(db, deskActor("appraiser", "desk@mechartcap.com"), {
       action: "agreement.recordEnd",
       id: repoId,
       end: { kind: "bought_back", date: "2026-09-17", amount: 70000 },
@@ -541,7 +547,7 @@ describe("live-book operation repository", { skip }, () => {
     assert.equal(state.agreements[0].bookEnd?.kind, "bought_back");
   });
 
-  it("allows only admin renewal and moves membership transactionally", async () => {
+  it("allows only desk renewal and moves membership transactionally", async () => {
     const a = await collector("renew");
     const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Richard Mille", model: "RM 011" });
     const repoId = `repo-renew-${suffix}`;
@@ -565,10 +571,11 @@ describe("live-book operation repository", { skip }, () => {
       scale: { purchaseShare: 0.01, annualAdjustment: 0.01 },
     };
     await assert.rejects(
-      () => executeLiveBookOperation(db, deskActor("staff", "desk@mechartcap.com"), operation),
-      { message: "ADMIN_REQUIRED" },
+      () => executeLiveBookOperation(db, a.actor, operation),
+      { message: "DESK_REQUIRED" },
     );
-    await executeLiveBookOperation(db, deskActor("admin", "admin@mechartcap.com"), operation);
+    // Super admins and appraisers hold the former admin verbs.
+    await executeLiveBookOperation(db, deskActor("super_admin", "rc@mechartcap.com"), operation);
     const state = await readLiveBookState(db, a.actor);
     assert.equal(state.agreements.find((row) => row.id === repoId)?.bookEnd?.kind, "renewed");
     assert.deepEqual(state.agreements.find((row) => row.id === operation.successorId)?.watchIds, [piece.id]);
@@ -735,7 +742,7 @@ describe("live-book operation repository", { skip }, () => {
   it("lets desk mutate explicit customers, previews, and agreements safely", async () => {
     const empty = await collector("customer-empty");
     const linked = await collector("customer-linked");
-    const desk = deskActor("staff", "desk@mechartcap.com");
+    const desk = deskActor("appraiser", "desk@mechartcap.com");
     const invitedId = `customer-invited-${suffix}`;
     await executeLiveBookOperation(db, desk, {
       action: "customer.invite",
@@ -794,7 +801,7 @@ describe("live-book operation repository", { skip }, () => {
 
   it("keeps signed and ended agreements immutable to desk edit and removal", async () => {
     const a = await collector("immutable");
-    const desk = deskActor("staff", "desk@mechartcap.com");
+    const desk = deskActor("appraiser", "desk@mechartcap.com");
     const first = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Tank" });
     const second = await createTimepiece(db, a.actor, a.customer.id, { brand: "Rolex", model: "Daytona" });
     const signedId = `repo-signed-${suffix}`;

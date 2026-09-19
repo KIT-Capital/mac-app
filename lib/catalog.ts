@@ -1,4 +1,5 @@
 import { deskRoleForEmail } from "@/lib/auth";
+import { isDeskRole } from "@/lib/roles.mjs";
 import { APPLICATION_TERMS } from "@/lib/contract/repo-scale.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 
@@ -126,7 +127,7 @@ export function hasApplication(
   agreements: { email?: string }[] | number = [],
 ) {
   if (!user) return false;
-  if (user.role === "admin" || user.role === "staff") return true;
+  if (isDeskRole(user.role)) return true;
   if (user.applicationSubmitted) return true;
   if (typeof agreements === "number") return agreements > 0;
   const key = user.email?.trim().toLowerCase();
@@ -138,7 +139,7 @@ export function roleFromEmail(email: string) {
 }
 
 export function isDesk(user: { role?: string } | null) {
-  return user?.role === "admin" || user?.role === "staff";
+  return isDeskRole(user?.role);
 }
 
 export function catalogMatch(

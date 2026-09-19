@@ -125,12 +125,15 @@ export const staffAccounts = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
-    passwordHash: text("password_hash").notNull(),
-    passwordSalt: text("password_salt").notNull(),
-    passwordParams: jsonb("password_params").notNull(),
+    /** Null until the person sets their first password (seeded desk people). */
+    passwordHash: text("password_hash"),
+    passwordSalt: text("password_salt"),
+    passwordParams: jsonb("password_params"),
     role: text("role").notNull(),
+    /** Exactly one row: the master super admin (`lib/roles.mjs`). */
+    isMaster: boolean("is_master").notNull().default(false),
     mustRotate: boolean("must_rotate").notNull().default(true),
-    passwordSetAt: timestamp("password_set_at", { withTimezone: true }).notNull().defaultNow(),
+    passwordSetAt: timestamp("password_set_at", { withTimezone: true }),
     sessionValidAfter: timestamp("session_valid_after", { withTimezone: true })
       .notNull()
       .default(sql`'epoch'::timestamptz`),
@@ -139,7 +142,7 @@ export const staffAccounts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    check("staff_accounts_role_check", sql`${table.role} in ('staff', 'admin')`),
+    check("staff_accounts_role_check", sql`${table.role} in ('admin', 'appraiser', 'super_admin')`),
     check("staff_accounts_email_lower_check", sql`${table.email} = lower(${table.email})`),
     check("staff_accounts_name_check", sql`length(${table.name}) > 0`),
     check("staff_accounts_hash_check", sql`length(${table.passwordHash}) > 0`),
@@ -153,6 +156,14 @@ export const staffAccounts = pgTable(
         and (${table.passwordParams}->>'keyLength')::integer = 64
       `,
     ),
+    check("staff_accounts_password_set_check", sql`
+      (${table.passwordHash} is null and ${table.passwordSalt} is null and ${table.passwordParams} is null and ${table.passwordSetAt} is null)
+      or (${table.passwordHash} is not null and ${table.passwordSalt} is not null and ${table.passwordParams} is not null and ${table.passwordSetAt} is not null)
+    `),
+    check("staff_accounts_master_role_check", sql`${table.isMaster} = false or ${table.role} = 'super_admin'`),
+    uniqueIndex("staff_accounts_master_uidx")
+      .on(table.isMaster)
+      .where(sql`${table.isMaster} = true`),
     index("staff_accounts_disabled_at_idx").on(table.disabledAt),
   ],
 );
@@ -172,7 +183,8 @@ export const deskAuditLog = pgTable(
   (table) => [
     index("desk_audit_log_created_at_idx").on(table.createdAt),
     index("desk_audit_log_actor_email_idx").on(table.actorEmail),
-    check("desk_audit_log_actor_role_check", sql`${table.actorRole} in ('staff', 'admin')`),
+    // 'staff' stays valid for rows written before the 2026-09-19 roles migration.
+    check("desk_audit_log_actor_role_check", sql`${table.actorRole} in ('staff', 'admin', 'appraiser', 'super_admin')`),
     check("desk_audit_log_client_address_check", sql`length(${table.clientAddress}) > 0`),
   ],
 );

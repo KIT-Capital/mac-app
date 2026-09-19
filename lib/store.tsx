@@ -49,6 +49,7 @@ import {
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
+import { isDeskRole } from "@/lib/roles.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
   browserSessionStorage,
@@ -207,8 +208,8 @@ function mergeBook(
   const authenticated = selectLiveUser(viewer, readSessionUser(storage), mergedBook.profiles) as
     | Partial<Profile>
     | null;
-  const sessionUser = authenticated?.role === "admin" || authenticated?.role === "staff"
-    ? profileForEmail(viewer.email, { role: authenticated.role })
+  const sessionUser = isDeskRole(authenticated?.role)
+    ? profileForEmail(viewer.email, { role: authenticated?.role })
     : authenticated as Profile | null;
   const counts = ownedCounts(sessionUser?.email, mergedBook.timepieces, mergedBook.agreements);
   try {
@@ -565,21 +566,18 @@ function demoState(): AppState {
   };
 }
 
-function assignedRole(requested?: Profile["role"]) {
-  if (requested === "admin" || requested === "staff") {
-    return requested;
-  }
+function assignedRole(requested?: Profile["role"]): Profile["role"] {
+  if (isDeskRole(requested)) return requested;
+  if (requested === "dealer") return "dealer";
   return "collector";
 }
 
 function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
   const role = assignedRole(patch?.role);
   const preferences = mergePreferences(patch?.preferences);
-  if (role === "admin") {
-    return { ...ADMIN_PROFILE, ...patch, email, role, preferences };
-  }
-  if (role === "staff") {
-    return { ...STAFF_PROFILE, ...patch, email, role, preferences };
+  if (isDeskRole(role)) {
+    const base = role === "appraiser" ? STAFF_PROFILE : ADMIN_PROFILE;
+    return { ...base, ...patch, email, role, preferences };
   }
   return {
     name: patch?.name || "Collector",
@@ -587,7 +585,7 @@ function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
     phone: patch?.phone || "",
     member: patch?.member ?? false,
     avatar: patch?.avatar || "/watches/patek-wrist.jpg",
-    role: "collector",
+    role,
     onboardingComplete: patch?.onboardingComplete ?? false,
     applicationSubmitted: patch?.applicationSubmitted ?? false,
     promoCode: patch?.promoCode ?? null,
@@ -603,13 +601,13 @@ function normalizeUser(
   agreementCount = 0,
 ): Profile | null {
   if (!user) return null;
-  const role = user.role === "admin" || user.role === "staff" ? user.role : "collector";
+  const role = assignedRole(user.role);
   return {
     ...user,
     role,
     preferences: mergePreferences(user.preferences),
     onboardingComplete:
-      user.onboardingComplete ?? (timepieceCount > 0 || role === "admin" || role === "staff"),
+      user.onboardingComplete ?? (timepieceCount > 0 || isDeskRole(role)),
     applicationSubmitted: user.applicationSubmitted ?? agreementCount > 0,
     promoCode: user.promoCode ?? null,
   };

@@ -43,7 +43,7 @@ describe("Stage 2 records isolation", { skip }, () => {
 
     const actorA = toCollectorActor(customerA);
     const actorB = toCollectorActor(customerB);
-    const staff = deskActor("staff", "desk@mechartcap.com");
+    const staff = deskActor("appraiser", "desk@mechartcap.com");
 
     const piece = await createTimepiece(db, actorA, customerA.id, {
       brand: "Audemars Piguet",

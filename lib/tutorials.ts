@@ -62,7 +62,7 @@ export const DESK_TUTORIAL = {
     },
     {
       title: "Repo agreements",
-      body: "Every live agreement uses the same six labels: open, past due, bought back, in liquidation, liquidated, renewed. Open and past due are derived from the term. Staff record one current end. Only admin Renew closes a live repo at that month’s scheduled repurchase dollars and opens the successor.",
+      body: "Every live agreement uses the same six labels: open, past due, bought back, in liquidation, liquidated, renewed. Open and past due are derived from the term. Desk staff record one current end. Only the desk Renew control closes a live repo at that month’s scheduled repurchase dollars and opens the successor.",
     },
     {
       title: "Photo vault and outbound mail",
@@ -70,7 +70,7 @@ export const DESK_TUTORIAL = {
     },
     {
       title: "Access & roles",
-      body: "Admin adds or disables staff accounts. Staff cannot manage access. Forced password rotation opens only the password page until the new password is set.",
+      body: "Desk roles are admin, appraiser, and super admin. Admins and appraisers add or disable admin accounts. Only a super admin adds appraisers or super admins, and only the master account edits other super admins. Forced password rotation opens only the password page until the new password is set.",
     },
     {
       title: "Collector app",

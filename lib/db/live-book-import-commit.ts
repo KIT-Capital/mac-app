@@ -6,8 +6,9 @@ import {
   lockStaffForDeskMutation,
   writeDeskAudit,
 } from "./staff-accounts";
-import type { Actor } from "./records";
+import { asDeskActor, type Actor } from "./records";
 import { assertIsolation, isDeskActor } from "./isolation.mjs";
+import { isDeskRole } from "../roles.mjs";
 import {
   customers,
   liveAgreementEnds,
@@ -39,11 +40,12 @@ export async function commitLiveBookImport(
     throw new Error("LIVE_BOOK_FLAG_ON");
   }
   const plan = await db.transaction(async (tx) => {
-    const auditActor = actor.role !== "collector" && actor.staffId
+    const desk = asDeskActor(actor);
+    const auditActor = desk?.staffId
       ? await lockStaffForDeskMutation(tx, {
-        id: actor.staffId,
-        email: actor.email,
-        role: actor.role,
+        id: desk.staffId,
+        email: desk.email,
+        role: desk.role,
       })
       : null;
     if (!auditActor && (options.env ?? process.env).APP_ENV?.trim() !== "development") {
@@ -249,7 +251,7 @@ export async function commitLiveBookImport(
       auditActor ?? {
         id: `development:${actor.email}`,
         email: actor.email,
-        role: actor.role === "admin" ? "admin" : "staff",
+        role: isDeskRole(actor.role) ? actor.role : "admin",
       },
       "live-book.import",
       "live-book",
@@ -276,11 +278,12 @@ export async function commitLivePreview(
   }
   const id = `preview-${input.timepieceId}-legacy`;
   return db.transaction(async (tx) => {
-    const auditActor = actor.role !== "collector" && actor.staffId
+    const desk = asDeskActor(actor);
+    const auditActor = desk?.staffId
       ? await lockStaffForDeskMutation(tx, {
-        id: actor.staffId,
-        email: actor.email,
-        role: actor.role,
+        id: desk.staffId,
+        email: desk.email,
+        role: desk.role,
       })
       : null;
     if (!auditActor && (options.env ?? process.env).APP_ENV?.trim() !== "development") {
@@ -305,7 +308,7 @@ export async function commitLivePreview(
       auditActor ?? {
         id: `development:${actor.email}`,
         email: actor.email,
-        role: actor.role === "admin" ? "admin" : "staff",
+        role: isDeskRole(actor.role) ? actor.role : "admin",
       },
       "live-preview.import",
       input.timepieceId,

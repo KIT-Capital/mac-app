@@ -25,12 +25,12 @@ export const ADMIN_PROFILE: Profile = {
 };
 
 export const STAFF_PROFILE: Profile = {
-  name: "Desk Partner",
+  name: "Desk Appraiser",
   email: "desk@mechartcap.com",
   phone: "+1 (833) 209-0972",
   member: true,
   avatar: "/brand/logo-ff-mark.png",
-  role: "staff",
+  role: "appraiser",
   onboardingComplete: true,
   preferences: { ...DEFAULT_PREFERENCES },
 };

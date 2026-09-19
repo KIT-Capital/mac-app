@@ -115,10 +115,14 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 
 ## `GET` / `POST` `/api/desk/staff`
 
-- Admin-only in live mode. `GET` lists staff identity and status fields only;
-  hashes, salts, and parameters never leave the server.
-- `POST` supports `add`, `disable`, `enable`, and `reset`. Add/reset return a
-  generated temporary password exactly once; invite mail never contains it.
+- Desk roles only, in live mode. `GET` lists identity and status fields
+  (`role`, `isMaster`, `passwordSet`, `manageable`) plus the viewer’s role;
+  super-admin rows appear only to super admins; hashes, salts, and parameters
+  never leave the server.
+- `POST` supports `add`, `disable`, `enable`, and `reset`, fenced by
+  `lib/roles.mjs` (`ROLE_FORBIDDEN`, 403). `add` accepts `admin`, `appraiser`,
+  or `super_admin`. Add/reset return a generated temporary password exactly
+  once; invite mail never contains it.
 - Every write appends an immutable audit row in the same transaction.
 
 ## Collector sessions
@@ -168,14 +172,14 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   The desk always receives the authoritative values.
 - Live reads include the server-authenticated viewer role and identity. The client
   uses that viewer to replace stale tab identity instead of trusting sessionStorage;
-  desk viewers are rebuilt from the trusted staff/admin profiles.
+  desk viewers are rebuilt from the trusted desk-role profiles.
 - `POST` accepts a validated operation action, never a whole-book snapshot.
   Collector actions are limited to own profile, intake-safe piece fields, own
   pending repos, collector signature, eligible added pieces, and permitted amount
-  raises. Desk controls valuation, status, ends, and marking signed; renewal is
-  admin-only.
-- Desk-data actions are `settings.update` (admin only), `catalog.upsert`,
-  `catalog.remove`, `shell.upsert`, and `shell.remove` (staff or admin).
+  raises. Desk controls valuation, status, ends, marking signed, and renewal
+  (every desk role: admin, appraiser, super admin).
+- Desk-data actions are `settings.update`, `catalog.upsert`, `catalog.remove`,
+  `shell.upsert`, and `shell.remove` (any desk role).
   Settings and shell scale terms below Scenario 60 floors are refused with
   `AGREEMENT_SCALE_INVALID`. Settings and shell mutations append an immutable
   desk audit row in the same transaction. Catalog mutations are audited as money

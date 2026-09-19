@@ -19,7 +19,7 @@ const createdCustomerIds: string[] = [];
 
 describe("Stage 4 prepare + snapshots", { skip }, () => {
   const db = createDb();
-  const desk = deskActor("staff", "desk@mechartcap.com");
+  const desk = deskActor("appraiser", "desk@mechartcap.com");
 
   after(async () => {
     if (createdCustomerIds.length === 0) return;

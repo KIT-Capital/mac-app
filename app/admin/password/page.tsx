@@ -1,5 +1,6 @@
 "use client";
 
+import type { DeskRole } from "@/lib/types";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MacLockup } from "@/components/mac-logo";
@@ -31,7 +32,7 @@ export default function StaffPasswordPage() {
     }).catch(() => null);
     const body = await response?.json().catch(() => null) as {
       error?: string;
-      role?: "admin" | "staff";
+      role?: DeskRole;
       email?: string;
     } | null;
     if (!response?.ok || !body?.role || !body.email) {

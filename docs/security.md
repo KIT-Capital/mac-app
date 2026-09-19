@@ -64,9 +64,19 @@ before any body is read (R4).
 
 ## Desk session
 
-Staff accounts live in `staff_accounts` with an async scrypt hash (N=2^17,
-r=8, p=1, 256 MiB maximum), a per-row salt, role, disabled time, and forced
-rotation flag. Unknown and disabled emails verify against a fixed dummy hash.
+Desk accounts live in `staff_accounts` with an async scrypt hash (N=2^17,
+r=8, p=1, 256 MiB maximum), a per-row salt, role, master flag, disabled time,
+and forced rotation flag. Roles are `admin`, `appraiser`, and `super_admin`
+(`lib/roles.mjs`; the retired `staff` role is read as `admin`). Exactly one row
+is the master super admin, `rc@mechartcap.com`; it cannot be disabled, reset,
+or demoted by anyone. The three seeded desk people (Ricardo Cidale, Dov Tuzman,
+Rosario David) are inserted by migration with **no password**; a row without a
+password verifies against the fixed dummy hash and is refused even on a match,
+so it can never sign in until its first password is set. Unknown and disabled
+emails use the same dummy path. A passwordless row cannot be given a temporary
+password by another desk member (`PASSWORD_NOT_SET`); it gets a first sign-in
+link in the passwords unit. If the bootstrap email names a seeded passwordless
+row, bootstrap sets that row's password and keeps its seeded role.
 Failed password attempts atomically reserve both per-email and per-address
 Postgres windows before scrypt, limiting concurrent memory use; successful
 verification releases both reservations.
@@ -85,12 +95,19 @@ credential change.
 session-only: no `maxAge` or `expires`.
 
 The first live admin may be inserted from the two `DESK_BOOTSTRAP_*` values only
-while the staff table is empty. The temporary password must be changed on
-`/admin/password`; the bootstrap values are removed afterward. Staff add,
-disable, enable, reset, password rotation, and covered desk operations append an
-immutable `desk_audit_log` row in the same transaction.
-Disabling administrators is serialized and the last active administrator
-cannot be disabled; recovery never silently re-runs bootstrap.
+while no desk row has a password (seeded rows without one do not count). The
+temporary password must be changed on `/admin/password`; the bootstrap values
+are removed afterward. Staff add, disable, enable, reset, password rotation, and
+covered desk operations append an immutable `desk_audit_log` row in the same
+transaction. Disabling is serialized and the last active sign-in-capable desk
+row cannot be disabled; recovery never silently re-runs bootstrap.
+
+Desk-account verbs are fenced by `lib/roles.mjs` and refused with
+`ROLE_FORBIDDEN`: admins and appraisers create and manage admin rows; only a
+super admin creates appraisers or super admins; only the master edits, disables,
+or resets another super admin; super-admin rows are listed only to super
+admins. Every desk role holds the former admin verbs (settings, renew, ends).
+Appraisal-number and MAC-signature fences ship in later units of the roles plan.
 
 ## Data
 

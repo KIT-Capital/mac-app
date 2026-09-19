@@ -76,12 +76,12 @@ test.describe("desk", () => {
     expect(liveBookRequests).toEqual([]);
   });
 
-  test("staff cannot see the Renew control", async ({ page }) => {
+  test("an appraiser is admin-level on the desk and sees the Renew control", async ({ page }) => {
     await signIn(page, "desk@mechartcap.com", DESK_PASSWORD);
     await expect(page).toHaveURL(/\/admin/);
     await page.goto("/admin/agreements");
     await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).click();
-    await expect(page.getByRole("button", { name: "Renew", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Renew", exact: true })).toBeVisible();
   });
 
   test("desk-only mail kinds require a desk session", async ({ request }) => {
@@ -135,7 +135,11 @@ test.describe("desk", () => {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ mode: "live", members: [] }),
+          body: JSON.stringify({
+            mode: "live",
+            viewer: { role: "admin", isMaster: false },
+            members: [],
+          }),
         });
         return;
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import type { DeskRole } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -38,7 +39,7 @@ export default function LoginPage() {
         return;
       }
       const authenticated = await session.json() as {
-        role: "admin" | "staff";
+        role: DeskRole;
         mustRotate?: boolean;
       };
       if (authenticated.mustRotate) {
