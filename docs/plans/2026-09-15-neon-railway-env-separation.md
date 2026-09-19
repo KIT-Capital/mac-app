@@ -18,7 +18,7 @@ Recorded in `docs/config-and-env-map.md`. Host allowlists are the control: `neon
 
 ## Findings that stay open until approved
 
-1. Railway staging (`584887ff-73b2-4afc-b681-a296ff5d309a`) now has Doppler `stg` mapping: `APP_ENV=staging`, Neon `ep-plain-dream-a5n3yxex`. Restarted 2026-09-15; `DATABASE_URL_UNPOOLED` stayed off the app.
+1. Railway staging (`584887ff-73b2-4afc-b681-a296ff5d309a`) now has Doppler `stg` mapping: `APP_ENV=staging`, Neon `ep-calm-heart-a5ttpc4d`. The endpoint changed during the 2026-09-19 staging restore rehearsal; `DATABASE_URL_UNPOOLED` stayed off the app.
 2. `DATABASE_URL_UNPOOLED` is off the Railway app service in all three environments. Keep it in Doppler for a migrate-only process.
 3. No Railway PR/ephemeral environments exist.
 4. All three Railway environments deploy `KIT-Capital/mac-app@main` @ `076823e`.

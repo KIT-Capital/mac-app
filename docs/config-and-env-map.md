@@ -1,6 +1,6 @@
 # Config and env map
 
-**Tier: REFERENCE** · Last verified: 2026-09-18
+**Tier: REFERENCE** · Last verified: 2026-09-19
 
 Key **names** only. Values belong in Doppler or Railway variables. See `.env.example`. Never print values.
 
@@ -25,7 +25,7 @@ Key **names** only. Values belong in Doppler or Railway variables. See `.env.exa
 | Neon org | KIT Capital / `org-snowy-silence-89826884` | Do not create another project |
 | Neon project | MAC App / `withered-lake-05570428` | `aws-us-east-2` · Postgres 18 · database `neondb` |
 | Neon `development` | `br-summer-truth-a52brhnv` | Schema-only · endpoint `ep-red-union-a5fze04l` |
-| Neon `staging` | `br-sweet-poetry-a5j7m69j` | Schema-only · endpoint `ep-plain-dream-a5n3yxex` |
+| Neon `staging` | `br-sweet-poetry-a5j7m69j` | Schema-only · endpoint `ep-calm-heart-a5ttpc4d` |
 | Neon `production` | `br-wispy-mode-a5z57bho` | Default, protected · endpoint `ep-wild-fire-a5a5m53v` |
 | Local `.neon` | branch `development` | Gitignored pin |
 
@@ -38,9 +38,9 @@ Live `SELECT current_database()` through each stored URL returned `neondb`. `neo
 | Doppler `dev` | `development` | `development` | `ep-red-union-a5fze04l` | `neondb` |
 | Doppler `dev_personal` | `development` | `development` | `ep-red-union-a5fze04l` | `neondb` |
 | Doppler `prd` | `production` | `production` | `ep-wild-fire-a5a5m53v` | `neondb` |
-| Doppler `stg` | `staging` | `staging` | `ep-plain-dream-a5n3yxex` | `neondb` |
+| Doppler `stg` | `staging` | `staging` | `ep-calm-heart-a5ttpc4d` | `neondb` |
 | Railway Development | `development` | `development` | `ep-red-union-a5fze04l` | `neondb` |
-| Railway staging | `staging` | `staging` | `ep-plain-dream-a5n3yxex` | `neondb` |
+| Railway staging | `staging` | `staging` | `ep-calm-heart-a5ttpc4d` | `neondb` |
 | Railway production | `production` | `production` | `ep-wild-fire-a5a5m53v` | `neondb` |
 
 Railway staging now matches Doppler `stg`. `DATABASE_URL_UNPOOLED` was not copied onto the app service.
