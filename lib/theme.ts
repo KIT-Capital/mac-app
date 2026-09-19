@@ -1,3 +1,6 @@
+import { DEFAULT_REQUIRED_PHOTO_KINDS } from "./timepiece-shots.mjs";
+import type { PhotoKind } from "./types";
+
 export const MAC = {
   navy: "#0E2A44",
   gold: "#FCB040",
@@ -7,6 +10,23 @@ export const MAC = {
   field: "#0A0A0A",
   parchment: "#F3EEE6",
 } as const;
+
+/** Settings the desk persists server-side. The browser store and the Desk
+ * config page share this list so a new field cannot reach one and not the other. */
+export const SERVER_SETTING_KEYS = [
+  "maxLtv",
+  "startingRate",
+  "setupFee",
+  "earlyRepurchaseAmount",
+  "brokerFee",
+  "minMonths",
+  "earlyStartMonth",
+  "earlyUntilMonth",
+  "typicalTerm",
+  "membershipMonthly",
+  "vaultLocation",
+  "requiredPhotoKinds",
+] as const;
 
 export const DEFAULT_SETTINGS = {
   companyName: "Mechanical Art Capital",
@@ -28,7 +48,7 @@ export const DEFAULT_SETTINGS = {
   minPieceValue: 40_000,
   closeBusinessDays: 2,
   vaultLocation: "Manhattan vault",
-  requireFourPhotos: true,
+  requiredPhotoKinds: [...DEFAULT_REQUIRED_PHOTO_KINDS] as PhotoKind[],
   ageMinimum: 18,
   allowVideo: true,
   appearance: "dark" as const,

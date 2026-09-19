@@ -204,7 +204,7 @@ export type AppSettings = {
   minPieceValue: number;
   closeBusinessDays: number;
   vaultLocation: string;
-  requireFourPhotos: boolean;
+  requiredPhotoKinds: PhotoKind[];
   ageMinimum: number;
   allowVideo: boolean;
   appearance: Appearance;

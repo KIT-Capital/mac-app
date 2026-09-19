@@ -43,7 +43,8 @@ import {
   timepieces,
 } from "./schema";
 
-import { canEditAppraisal, isDeskRole, patchNeedsAppraisal } from "../roles.mjs";
+import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
+import { normalizeRequiredPhotoKinds } from "../timepiece-shots.mjs";
 import type { DeskRole } from "../types";
 
 type Operation = ReturnType<typeof parseLiveBookOperation>;
@@ -144,6 +145,7 @@ function settingsRowValues(source: Record<string, unknown>) {
     typicalTerm: Number(source.typicalTerm),
     membershipMonthlyCents: Math.round(Number(source.membershipMonthly) * 100),
     vaultLocation: String(source.vaultLocation),
+    requiredPhotoKinds: normalizeRequiredPhotoKinds(source.requiredPhotoKinds as string[] | undefined),
   };
 }
 
@@ -161,6 +163,7 @@ function settingsRowPatch(patch: Record<string, unknown>) {
     typicalTerm: "typicalTerm",
     membershipMonthly: "membershipMonthlyCents",
     vaultLocation: "vaultLocation",
+    requiredPhotoKinds: "requiredPhotoKinds",
   };
   return Object.fromEntries(
     Object.entries(fields)
@@ -342,6 +345,10 @@ async function executeLiveBookOperationCore(
   if (action === "settings.update") {
     requireDesk(actor);
     const patch = operation.patch as Record<string, unknown>;
+    // Desk-wide photo policy is a super-admin decision (R6).
+    if (patch.requiredPhotoKinds !== undefined && !isSuperAdmin(actor)) {
+      throw new Error("ROLE_FORBIDDEN");
+    }
     await db.execute(sql`select pg_advisory_xact_lock(hashtext('mac-desk-settings'))`);
     const [current] = await db.select().from(deskSettings)
       .where(eq(deskSettings.id, "default"))
@@ -361,6 +368,7 @@ async function executeLiveBookOperationCore(
           typicalTerm: current.typicalTerm,
           membershipMonthly: current.membershipMonthlyCents / 100,
           vaultLocation: current.vaultLocation,
+          requiredPhotoKinds: normalizeRequiredPhotoKinds(current.requiredPhotoKinds),
         }
       : DEFAULT_SETTINGS;
     const nextSettings = { ...currentSettings, ...patch };

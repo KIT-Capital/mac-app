@@ -3,7 +3,7 @@ import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
 import { ownerKey } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
-import { TIMEPIECE_SHOTS } from "@/lib/timepiece-shots.mjs";
+import { PHOTO_KINDS, TIMEPIECE_SHOTS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import type {
   Agreement,
   AgreementEnd,
@@ -51,10 +51,10 @@ export type LiveBookState = Pick<
   "timepieces" | "agreements" | "users" | "photos" | "profiles" | "settings" | "catalog" | "shells"
 > & { applicationPurchaseShares: ApplicationPurchaseShares };
 
-const PHOTO_KINDS = new Set(["front", "back", "left", "right", "clasp", "more", "buckle", "box", "papers", "other"]);
+const ALLOWED_KINDS = new Set(PHOTO_KINDS);
 const text = (row: Row, key: string, fallback = "") => typeof row[key] === "string" ? row[key] : fallback;
 const optionalText = (row: Row, key: string) => text(row, key) || undefined;
-const photoKind = (value: string) => (PHOTO_KINDS.has(value) ? value : "other") as PhotoKind;
+const photoKind = (value: string) => (ALLOWED_KINDS.has(value) ? value : "other") as PhotoKind;
 const shotOrder = new Map(TIMEPIECE_SHOTS.map((shot, index) => [shot.kind, index]));
 const bps = (value: unknown, fallback: number) =>
   typeof value === "number" ? value / 10_000 : fallback;
@@ -137,6 +137,9 @@ function settings(rows: Row[]): AppSettings {
         ? row.membershipMonthlyCents / 100
         : DEFAULT_SETTINGS.membershipMonthly,
     vaultLocation: text(row, "vaultLocation", DEFAULT_SETTINGS.vaultLocation),
+    requiredPhotoKinds: normalizeRequiredPhotoKinds(
+      row.requiredPhotoKinds as string[] | undefined,
+    ) as PhotoKind[],
   };
 }
 
@@ -345,7 +348,13 @@ export function mapLiveBookRows(
     profiles,
     settings: discloseDeskTerms
       ? authoritativeSettings
-      : { ...DEFAULT_SETTINGS, vaultLocation: "" },
+      : {
+          ...DEFAULT_SETTINGS,
+          vaultLocation: "",
+          // Which photos are mandatory is an intake rule, not a desk money term:
+          // a collector must see it before their first application.
+          requiredPhotoKinds: authoritativeSettings.requiredPhotoKinds,
+        },
     catalog: catalog(rows.catalog ?? []),
     shells: discloseDeskTerms ? authoritativeShells : [],
     applicationPurchaseShares: applicationPurchaseShares(

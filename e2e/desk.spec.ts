@@ -315,6 +315,19 @@ test.describe("desk", () => {
     await expect(page.getByRole("button", { name: "Download contract PDF" })).toBeVisible();
   });
 
+  test("required photographs are a super-admin setting", async ({ page }) => {
+    await signInAppraiser(page);
+    await page.getByRole("link", { name: "Configure" }).click();
+    await expect(page.getByText(/A super admin sets which photographs/)).toBeVisible();
+    // The five guided shots are fixed for everyone; the extras are locked to
+    // this appraiser, who may still save the rest of the configuration.
+    await expect(page.getByRole("checkbox", { name: "front", exact: false }).first()).toBeDisabled();
+    await expect(page.getByRole("checkbox", { name: "box", exact: false }).first()).toBeDisabled();
+    await page.getByLabel("Company name").fill("Mechanical Art Capital LLC");
+    await page.getByRole("button", { name: "Save Configuration" }).click();
+    await expect(page.getByText("Configuration saved to this device.")).toBeVisible();
+  });
+
   test("catalog and config save on this device", async ({ page }) => {
     await signInAppraiser(page);
     await page.getByRole("link", { name: "Timepiece Catalog" }).click();

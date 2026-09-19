@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, isNotNull, lt, ne } from "drizzle-orm";
 import { captureOperationalErrorOnce } from "../observability.mjs";
 import { photoObjectKeys } from "../storage/photo-object-key.mjs";
+import { REQUESTABLE_PHOTO_KINDS } from "../timepiece-shots.mjs";
 import type { Database } from "./client";
 import type { Actor } from "./records";
 import { livePreviews, photoObjects, timepieces } from "./schema";
@@ -32,7 +33,12 @@ export type RequestPhotoUploadInput = {
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/heic"]);
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
-const PHOTO_KINDS = new Set(["front", "back", "left", "right", "clasp", "more", "buckle", "box", "papers", "other"]);
+/**
+ * A photo may only be uploaded for a kind the intake screen has a slot for.
+ * That is what bounds a timepiece to seven photographs (R7): seven slots, one
+ * current photo each. A kind with no slot could never be supplied or replaced.
+ */
+const ALLOWED_KINDS = new Set(REQUESTABLE_PHOTO_KINDS);
 
 function appEnv(env: NodeJS.ProcessEnv) {
   const value = String(env.APP_ENV ?? "development").trim();
@@ -150,7 +156,7 @@ export async function requestPhotoUpload(
   input: RequestPhotoUploadInput,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  if (!PHOTO_KINDS.has(input.kind)) throw new Error("PHOTO_UPLOAD_INVALID");
+  if (!ALLOWED_KINDS.has(input.kind)) throw new Error("PHOTO_UPLOAD_INVALID");
   validatePart(input.original);
   validatePart(input.preview);
   const piece = await scopedPiece(db, actor, input.timepieceId);
