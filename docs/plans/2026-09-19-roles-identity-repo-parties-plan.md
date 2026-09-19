@@ -52,7 +52,7 @@ Today collectors use an email link and have no password. Desk roles are only `st
 - R7. Any super admin may **create** another super admin (owner rule: only a super admin can create a super admin). **Editing, disabling, resetting, or deleting** an existing super-admin row is reserved to the **master** super admin. Nobody, master included, may disable, delete, or demote the master row. Admins and appraisers cannot create or manage super-admin or appraiser rows; only a super admin may create appraisers. `lib/roles.mjs` (`canCreateDeskRole`, `canManageDeskAccount`) is the single source for these fences.
 - R8. Seeded day-one desk users, all `@mechartcap.com`, `must_rotate` / first-login set password, no password in git or chat:
   - Super admin — Ricardo Cidale — `rc@mechartcap.com`
-  - Admin — Dov Tuzman — `dov@mechartcap.com`
+  - Appraiser — Dov Tuzman — `dov@mechartcap.com`
   - Admin — Rosario David — `rosario@mechartcap.com`
 
 #### Passwords, email, SMS, WhatsApp

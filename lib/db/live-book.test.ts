@@ -550,7 +550,7 @@ describe("live-book operation repository", { skip }, () => {
   it("reserves appraisal values and catalog writes for appraisers and super admins", async () => {
     const a = await collector("appraisal-fence");
     const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Santos" });
-    const admin = deskActor("admin", "dov@mechartcap.com");
+    const admin = deskActor("admin", "rosario@mechartcap.com");
     const appraiser = deskActor("appraiser", "appraiser@mechartcap.com");
 
     for (const patch of [

@@ -14,7 +14,7 @@ Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation 
 
 ## Roles
 
-**Shipped:** collector on the front; desk roles admin, appraiser, super admin (`lib/roles.mjs`, migration 0020). Master super admin `rc@mechartcap.com` plus two seeded admins, passwords unset until first sign-in. Desk-account fences are live; appraisal and MAC-signature fences ship in later units.
+**Shipped:** collector on the front; desk roles admin, appraiser, super admin (`lib/roles.mjs`, migrations 0020 and 0021). Master super admin `rc@mechartcap.com`, Dov Tuzman appraiser, Rosario David admin, passwords unset until first sign-in. Desk-account and appraisal fences are live: only an appraiser or super admin writes appraisal values, catalog ranges, or a bulk import carrying them, and only they may move a piece off `appraised`. The MAC-signature fence ships with the repo-request units.
 
 - Collector — vault, add piece, appraise request, repurchase application, membership, account, and the How MAC works tutorial. Adding a piece requires the five guided photographs (front, back, left and right sides of the barrel, clasp) and confirmation that the collector has the box and original documentation. Box and papers photographs are optional. Collectors see the shared book label. They do not record an end.
 - Staff / admin — desk console: catalog, assets, agreements, photos, outbound mail, access, config, and the in-wall Tutorial. Staff and admin record, overwrite, or clear a repo end.
