@@ -1,6 +1,6 @@
 # Business logic
 
-**Tier: CONTRACT** · Last verified: 2026-09-17
+**Tier: CONTRACT** · Last verified: 2026-09-19
 
 Mechanical Art Capital is a **repo desk**. It buys qualifying timepieces. The collector may buy them back later on a preset pricing scale. This app is the **repo operations book** and analytics surface — not the official ledger. Official cash lives in QuickBooks. Official inventory lives with the third-party inventory book.
 
@@ -10,10 +10,16 @@ Mechanical Art Capital is a **repo desk**. It buys qualifying timepieces. The co
 - Showing custody location or the buyback scale on collector screens before an application (contact inquiry or repurchase application) is sent.
 - Auto-valuing a piece after Appraise — only the desk edits valuations (Reviewing → Appraised).
 
+Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation value), and exclusive-piece rules: `workflows.md`. Decision `0003-repo-lifecycle-language.md`. Identity and dealer/appraiser/super-admin changes: `plans/2026-09-19-roles-identity-repo-parties-plan.md` (**approved 2026-09-19, shipping unit by unit**).
+
 ## Roles
+
+**Shipped:** collector, staff, admin as below.
 
 - Collector — vault, add piece, appraise request, repurchase application, membership, account, and the How MAC works tutorial. Adding a piece requires the five guided photographs (front, back, left and right sides of the barrel, clasp) and confirmation that the collector has the box and original documentation. Box and papers photographs are optional. Collectors see the shared book label. They do not record an end.
 - Staff / admin — desk console: catalog, assets, agreements, photos, outbound mail, access, config, and the in-wall Tutorial. Staff and admin record, overwrite, or clear a repo end.
+
+**Approved, shipping unit by unit:** collector | dealer on the front of the app; admin | appraiser | super admin on the Desk; exclusive emails; whole-collection buyback only. Implement from the roles plan and `lib/roles.mjs`, not from this summary.
 
 ## Membership
 
@@ -71,7 +77,7 @@ production evidence.
 2. **Photos and documents** — exact original bytes in private MAC storage; thumbnails separate; checksum, uploader, server receipt time; existing JPEG data URLs are **previews only**.
    Live photo intake persists the timepiece metadata row before direct browser-to-storage PUTs, then records only confirmed stored photo ids on the live preview rows. Browser mode keeps resized data-URL previews and does not call the photo API.
 3. **Contracts and signatures** — versioned templates + transaction snapshots; in live mode a stored checksummed unsigned PDF (pending counsel, not for signature); electronic signatures and retained signed PDFs stay deferred; customer download; no customer delete/replace via UI or API; amendments keep originals; sign-complete ≠ archive-success.
-4. **Official books** — QuickBooks holds official cash. A third-party inventory book holds official inventory. This app does **not** post journals, invent chart-of-accounts names, or link QuickBooks. It keeps the repo operations book (end kind, date, and amount) and prototype repurchase-scale prices. Stage 6 in the persistence plan stays deferred — not this product’s books, and not the next UI stage.
+4. **Official books** — QuickBooks holds official cash. A third-party inventory book holds official inventory. This app does **not** post journals, invent chart-of-accounts names, or link QuickBooks. It keeps the repo operations book (end kind, date, and amount) and prototype repurchase-scale prices. Stage 6 in the persistence plan stays deferred — not this product’s books, and not the next UI stage. A proposed **analytics** overlay (`workflows.md`, decision `0004`) may snapshot counts and USD for the Desk dashboard and accountant exports; those files are labeled operations analytics, not the official ledger.
 5. **Reports** — statements, schedules, portfolio and company reports from frozen snapshots; branded PDF/HTML/Excel/image exports; never rewrite an archived signed PDF.
 
 See `docs/plans/2026-09-15-production-persistence.md`,

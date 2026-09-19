@@ -1,0 +1,195 @@
+# Users, timepieces, and repos
+
+**Tier: CONTRACT** · Last verified: 2026-09-19
+
+This is the lifecycle map for Mechanical Art Capital. Money math stays in `business-logic.md`. Visual chrome stays in `design-system.md`. Identity implementation that is **not yet in the app** lives in `plans/2026-09-19-roles-identity-repo-parties-plan.md` and is marked **proposed** below. Do not treat proposed boxes as shipped.
+
+Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-lifecycle-language.md` and `0004-desk-stores-and-tenant-brand.md`. Official cash is QuickBooks. Official inventory is the third-party inventory book. This app is the **operations book** only. Desk analytics are derived facts, not Stage 6.
+
+## How to read the words
+
+| Owner / 47th Street talk | What the app stores and shows on both planes | Notes |
+|---|---|---|
+| Active repo | Book **open**, **past due**, or **in liquidation**, and signature **signed** (activated) | Pieces in it cannot join another active repo |
+| Inactive / closed / done | Book **bought back**, **liquidated**, or **renewed** | Pieces are free unless a renewal moved them to the successor |
+| Activated | Signature **signed**, MAC last (proposed gate) | Not the same as “in the book.” Unsigned rows can still appear as past due (Hale demo) |
+| Repossessed / bought back | Book **bought back** | Retail copy: the person **buys back the whole collection** at that month’s scheduled dollars |
+| In liquidation (process) | Book **in liquidation** | Staff-toggled. Modeled dollars never flip this |
+| Liquidated (sold off) | Book **liquidated** | Staff-toggled. End of that repo’s life |
+| Renewed | Book **renewed** on the old row + a **new** repo | Old repo is done. New repo is a new life |
+| Appraisal (retail) | `valueLow` / `valueHigh` and the future chosen number | What the collector/dealer sees |
+| Liquidation value (desk) | The same dollars | 47th Street wholesale if they do not buy back |
+| Free piece | Not on any active repo | May join a new application |
+
+Forbidden on retail copy: loan, lender, interest, debt, vesting, paid off.
+
+## Users
+
+Two planes. One email cannot be both.
+
+```mermaid
+flowchart TB
+  subgraph retail [Front of the app]
+    C[Collector]
+    D[Dealer]
+  end
+  subgraph deskPlane [Desk]
+    A[Admin]
+    P[Appraiser]
+    S[Super admin]
+    M[Master super admin rc@mechartcap.com]
+  end
+  C --- vault[Own vault and own repos]
+  D --- vault
+  A --- book[See the whole operations book]
+  P --- book
+  S --- book
+  M --- book
+```
+
+**Shipped today:** `collector`, `staff`, `admin`. Collectors use an email link. Desk uses a password. Hidden “MAC desk staff” on login.
+
+**Approved, not yet shipped** (`2026-09-19` roles plan; each unit lands as its own PR): collector and dealer self-identify on signup and may change on profile; that tag is **frozen on each signed repo**. Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Passwords for everyone. SMS and WhatsApp for retail via Twilio (Norfolk AI now, MAC later). Master super admin is Ricardo Cidale. Seeded admins: Dov Tuzman, Rosario David (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
+
+Retail users **see** agreements, pieces, appraised values, and an “in an activated repo” flag. They do **not** edit a signed repo and they do **not** record a book end.
+
+## Timepiece life
+
+A piece belongs to one retail person. It never belongs to two **active** repos.
+
+```mermaid
+stateDiagram-v2
+  [*] --> InVault: photos and box/papers confirmation
+  InVault --> Reviewing: retail asks to be appraised
+  Reviewing --> Appraised: desk Appraise writes range\n(proposed: appraiser or super admin only)
+  Appraised --> Locked: MAC signs a repo that lists this piece
+  Locked --> InVault: repo bought back or liquidated\nand piece not moved to a successor
+  Locked --> SuccessorLocked: admin Renew moves the collection
+  Appraised --> Appraised: may sit in several unsigned drafts\nuntil one activates
+```
+
+Rules:
+
+- Five required photos (front, back, left, right, clasp). Box and papers photos optional.
+- Catalog typical range may be copied on Appraise. Collector copy = appraisal. Desk meaning = liquidation value.
+- LTV / purchase cap math is prototype UI until an owner money-math plan. Do not invent a second retail-appraisal column.
+- After activation, the repo snapshot is frozen. Do not edit those dollars on that repo. Free pieces not on an activated repo may still be appraised.
+- **No partial buyback.** To get optionality, the person opens **several smaller repos**, not one repo they pick apart.
+
+## Repo life
+
+A repo is the center of the product: one retail party (collector or dealer) + MAC + a named collection + a frozen whole-collection repurchase table (Scenario 60).
+
+```mermaid
+flowchart TD
+  apply[Retail application: pieces + term + amount up to LTV cap]
+  draft[Signature draft / pending]
+  checks[Desk confirms conditions]
+  seller[Retail signs]
+  mac[MAC signs last - appraiser or super admin proposed]
+  active[Activated: open or later past due]
+  buy[Whole-collection buyback]
+  liqStart[Staff: in liquidation]
+  liqDone[Staff: liquidated]
+  renew[Admin Renew]
+  doneBuy[Book bought back - inactive]
+  doneLiq[Book liquidated - inactive]
+  doneRen[Old book renewed - inactive]
+  newRepo[New 12-month repo at that month's dollars]
+
+  apply --> draft
+  draft --> checks
+  checks --> seller
+  seller --> mac
+  mac --> active
+  active --> buy
+  active --> liqStart
+  active --> renew
+  buy --> doneBuy
+  liqStart --> liqDone
+  renew --> doneRen
+  doneRen --> newRepo
+  newRepo --> active
+```
+
+### Signature axis (separate from the book)
+
+`draft` → `pending_signature` → `signed`
+
+Signing does not write a book end. A book end does not change the signature flag.
+
+**Shipped:** collector HTML Sign or desk Mark signed. Unsigned rows still appear in the book (Hale can read **past due**).
+
+**Proposed:** MAC signs last; desk checklist first; only appraiser or super admin signs for MAC; admin cannot. Software sign is not counsel approval. E-sign vendor still deferred.
+
+### Book axis
+
+| Label | How it is set | Active for exclusive pieces? |
+|---|---|---|
+| open | Derived: term not ended, no staff end | Yes, if signed |
+| past due | Derived: day after term date, no staff end | Yes, if signed |
+| in liquidation | Staff end | Yes |
+| bought back | Staff end (paid whole-collection close) | No |
+| liquidated | Staff end | No |
+| renewed | Admin Renew only | No (successor is the live repo) |
+
+Staff may overwrite or clear the current end. There is no end history in this app. Clearing returns open or past due.
+
+**Open** last day of term is still open. **Past due** starts the next calendar day. Term clock is calendar months from `createdAt`, not from `signedAt`.
+
+Renew: close old at that month’s whole-collection dollars, open new 12-month repo with those pieces, optional extra **free** pieces to meet LTV, snapshot the party tag **at renewal**. Does not post cash.
+
+### Many repos, one person
+
+There is **no cap** on how many active repos one collector or dealer may have. Each repo has its own life. A dealer may lock on the order of 100 pieces in one repo. A timepiece still cannot sit in two active repos.
+
+## Activation and custody (operations, not the official inventory)
+
+When MAC has signed:
+
+- Those pieces are **locked**.
+- This app **assumes** they are in MAC’s possession and in a MAC-controlled vault.
+- Official inventory remains the third-party book. This app does not write that book or QuickBooks.
+
+## Channels (proposed)
+
+Email, password, SMS (Twilio), WhatsApp for **retail** notices and a Desk inbox. Desk staff are not WhatsApp users. Neon Auth stays off. WorkOS is not the core login (decision `0002` must not be read as permission to enable it).
+
+## Desk stores (proposed)
+
+Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md` (approved 2026-09-19; units ship one PR at a time).
+
+```mermaid
+flowchart LR
+  cat[Catalog: model + reference\none photo, no serial]
+  mem[Members: MAC12345-22]
+  piece[Client timepiece: serial\nphotos, video, chosen price]
+  repo[Repos: heart of Desk]
+  dash[Analytics dashboard\nexport for accountants]
+  cat --> piece
+  mem --> piece
+  mem --> repo
+  piece --> repo
+  repo --> dash
+  mem --> dash
+  piece --> dash
+```
+
+- **Catalog** — reusable model. Only an appraiser or super admin adds or edits rows; admins read. **MAC Sparkle** asks a pricing source (Exa, Radar, or another provider) for a **guess** of today’s market band for the one row being edited; range only; appraiser saves. Last edited recorded. No retail Sparkle yet.
+- **Members** — collectors and dealers. Member ID `{PREFIX}{#####}-{YY}`. Feeds analysis and agreement forms.
+- **Client timepieces** — named to a member. Range + one appraised price + date. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
+- **Repos** — assembled from **free** appraised pieces. Whole-collection table. Heart of the Desk.
+- **Analytics** — graphs and exports. Not the official ledger. Never label a close **paid off**.
+
+White-label: same four stores scoped by tenant. Super Admin sets that tenant’s palette, logo, and prefix. MAC default chrome stays Logo-FF.
+
+## What the code must not do
+
+- Auto-toggle **in liquidation** from a liquidation-value field.
+- Let a locked piece join another live repo.
+- Let retail buy back two watches from a ten-watch repo.
+- Let a desk email own a retail vault.
+- Describe the product as a loan.
+- Put a serial number on a catalog row.
+- Treat Exa (or any model) as the official range without an appraiser save.
+- Post QuickBooks journals from the dashboard.
