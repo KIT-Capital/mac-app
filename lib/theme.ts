@@ -1,3 +1,6 @@
+import { DEFAULT_REQUIRED_PHOTO_KINDS } from "./timepiece-shots.mjs";
+import type { PhotoKind } from "./types";
+
 export const MAC = {
   navy: "#0E2A44",
   gold: "#FCB040",
@@ -28,7 +31,7 @@ export const DEFAULT_SETTINGS = {
   minPieceValue: 40_000,
   closeBusinessDays: 2,
   vaultLocation: "Manhattan vault",
-  requireFourPhotos: true,
+  requiredPhotoKinds: [...DEFAULT_REQUIRED_PHOTO_KINDS] as PhotoKind[],
   ageMinimum: 18,
   allowVideo: true,
   appearance: "dark" as const,

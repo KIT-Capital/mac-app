@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, isNotNull, lt, ne } from "drizzle-orm";
 import { captureOperationalErrorOnce } from "../observability.mjs";
 import { photoObjectKeys } from "../storage/photo-object-key.mjs";
+import { MAX_TIMEPIECE_PHOTOS, PHOTO_KINDS } from "../timepiece-shots.mjs";
 import type { Database } from "./client";
 import type { Actor } from "./records";
 import { livePreviews, photoObjects, timepieces } from "./schema";
@@ -32,7 +33,7 @@ export type RequestPhotoUploadInput = {
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/heic"]);
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
-const PHOTO_KINDS = new Set(["front", "back", "left", "right", "clasp", "more", "buckle", "box", "papers", "other"]);
+const ALLOWED_KINDS = new Set(PHOTO_KINDS);
 
 function appEnv(env: NodeJS.ProcessEnv) {
   const value = String(env.APP_ENV ?? "development").trim();
@@ -143,6 +144,15 @@ async function reuseStoredPhoto(db: Database, row: typeof photoObjects.$inferSel
   return { photoId: row.id, status: "stored" as const };
 }
 
+/** A piece holds at most MAX_TIMEPIECE_PHOTOS live photos (R7). */
+async function assertPhotoRoom(db: Database, timepieceId: string) {
+  const held = await db
+    .select({ id: photoObjects.id })
+    .from(photoObjects)
+    .where(and(eq(photoObjects.timepieceId, timepieceId), ne(photoObjects.status, "abandoned")));
+  if (held.length >= MAX_TIMEPIECE_PHOTOS) throw new Error("PHOTO_LIMIT");
+}
+
 export async function requestPhotoUpload(
   db: Database,
   store: ObjectStore,
@@ -150,7 +160,7 @@ export async function requestPhotoUpload(
   input: RequestPhotoUploadInput,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  if (!PHOTO_KINDS.has(input.kind)) throw new Error("PHOTO_UPLOAD_INVALID");
+  if (!ALLOWED_KINDS.has(input.kind)) throw new Error("PHOTO_UPLOAD_INVALID");
   validatePart(input.original);
   validatePart(input.preview);
   const piece = await scopedPiece(db, actor, input.timepieceId);
@@ -173,6 +183,10 @@ export async function requestPhotoUpload(
     if (raced?.status === "stored") return reuseStoredPhoto(db, raced);
     throw new Error("PHOTO_NOT_FOUND");
   }
+
+  // Only a genuinely new photo counts against the cap: the branches above
+  // resume an upload the piece already holds (R7).
+  await assertPhotoRoom(db, piece.id);
 
   const id = randomUUID();
   const keys = photoObjectKeys({ appEnv: appEnv(env), customerId: piece.customerId, photoId: id });

@@ -1,0 +1,2 @@
+ALTER TABLE "desk_settings" ADD COLUMN "required_photo_kinds" text[] DEFAULT '{"front","back","left","right","clasp"}'::text[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "desk_settings" ADD CONSTRAINT "desk_settings_required_photo_kinds_check" CHECK ("desk_settings"."required_photo_kinds" @> '{"front","back","left","right","clasp"}'::text[]);

@@ -85,7 +85,7 @@ const REQUIRED_SHOT_PROMPTS = [
   "Upload a photo of the back of the timepiece",
   "Upload a photo of the left side of the barrel",
   "Upload a photo of the right side of the barrel",
-  "Upload a photo of the clasp",
+  "Upload a photo of the clasp or band",
 ] as const;
 
 export async function completeTimepieceIntakePhotos(page: Page, uniqueFiles = false) {

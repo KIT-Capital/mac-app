@@ -417,6 +417,52 @@ describe("direct photo uploads", { skip }, () => {
     );
   });
 
+  it("caps a timepiece at seven photos and still reuses an existing checksum", async () => {
+    const customer = await registerCollector(db, {
+      email: `collector-photo-cap.${suffix}@mac.test`,
+      name: "Photo Cap",
+    });
+    createdCustomerIds.push(customer.id);
+    const actor = toCollectorActor(customer);
+    const piece = await createTimepiece(db, actor, customer.id, {
+      brand: "Rolex",
+      model: "Daytona",
+    });
+    const kinds = ["front", "back", "left", "right", "clasp", "box", "papers"] as const;
+    for (const kind of kinds) {
+      const upload = await requestPhotoUpload(db, store, actor, {
+        timepieceId: piece.id, kind, ...parts(`cap-${kind}-${suffix}`).input,
+      });
+      assert.equal(upload.status, "pending");
+    }
+
+    await assert.rejects(
+      () => requestPhotoUpload(db, store, actor, {
+        timepieceId: piece.id, kind: "more", ...parts(`cap-eighth-${suffix}`).input,
+      }),
+      { message: "PHOTO_LIMIT" },
+    );
+
+    // The cap counts photos, not requests: re-requesting one already on the
+    // piece is how a retry resumes, and must keep working at the limit.
+    const retry = await requestPhotoUpload(db, store, actor, {
+      timepieceId: piece.id, kind: "front", ...parts(`cap-front-${suffix}`).input,
+    });
+    assert.equal(retry.status, "pending");
+
+    // An abandoned row frees its place.
+    const [abandoned] = await db
+      .select({ id: photoObjects.id })
+      .from(photoObjects)
+      .where(and(eq(photoObjects.timepieceId, piece.id), eq(photoObjects.kind, "papers")))
+      .limit(1);
+    await db.update(photoObjects).set({ status: "abandoned" }).where(eq(photoObjects.id, abandoned.id));
+    const eighth = await requestPhotoUpload(db, store, actor, {
+      timepieceId: piece.id, kind: "more", ...parts(`cap-eighth-${suffix}`).input,
+    });
+    assert.equal(eighth.status, "pending");
+  });
+
   it("keeps pending photo metadata attached to its timepiece", async () => {
     const customer = await registerCollector(db, {
       email: `collector-photo-remove.${suffix}@mac.test`,

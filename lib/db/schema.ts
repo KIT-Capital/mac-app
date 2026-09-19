@@ -205,10 +205,18 @@ export const deskSettings = pgTable(
     typicalTerm: integer("typical_term").notNull(),
     membershipMonthlyCents: integer("membership_monthly_cents").notNull(),
     vaultLocation: text("vault_location").notNull(),
+    requiredPhotoKinds: text("required_photo_kinds")
+      .array()
+      .notNull()
+      .default(sql`'{"front","back","left","right","clasp"}'::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    check(
+      "desk_settings_required_photo_kinds_check",
+      sql`${table.requiredPhotoKinds} @> '{"front","back","left","right","clasp"}'::text[]`,
+    ),
     check("desk_settings_singleton_check", sql`${table.id} = 'default'`),
     check("desk_settings_max_ltv_check", sql`${table.maxLtvBps} > 0 and ${table.maxLtvBps} <= 6000`),
     check("desk_settings_money_check", sql`

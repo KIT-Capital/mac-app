@@ -5,8 +5,14 @@ import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome } from "@/components/admin-chrome";
 import { Field, PillButton } from "@/components/field";
 import { settingsToTerms } from "@/lib/contract/repo-scale.mjs";
+import { isSuperAdmin } from "@/lib/roles.mjs";
 import { useStore } from "@/lib/store";
-import type { AppSettings } from "@/lib/types";
+import {
+  DEFAULT_REQUIRED_PHOTO_KINDS,
+  TIMEPIECE_SHOTS,
+  normalizeRequiredPhotoKinds,
+} from "@/lib/timepiece-shots.mjs";
+import type { AppSettings, PhotoKind } from "@/lib/types";
 
 const SERVER_FIELD_KEYS = [
   "maxLtv",
@@ -20,10 +26,12 @@ const SERVER_FIELD_KEYS = [
   "typicalTerm",
   "membershipMonthly",
   "vaultLocation",
+  "requiredPhotoKinds",
 ] as const satisfies readonly (keyof AppSettings)[];
 
 export default function AdminConfigPage() {
-  const { bookMode, settings, updateSettings } = useStore();
+  const { bookMode, settings, updateSettings, user } = useStore();
+  const canEditPhotoPolicy = isSuperAdmin(user);
   const [form, setForm] = useState(settings);
   const [result, setResult] = useState<"saved" | "failed" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -184,16 +192,47 @@ export default function AdminConfigPage() {
             </Field>
           ) : null}
         </div>
-        {bookMode === "browser" ? (
-          <label className="flex items-center gap-3 text-sm text-white/70">
-            <input
-              type="checkbox"
-              checked={form.requireFourPhotos}
-              onChange={(e) => updateField("requireFourPhotos", e.target.checked)}
-            />
-            Require the five guided shots (front, back, left, right, clasp)
-          </label>
-        ) : null}
+        <fieldset className="space-y-3 border-t border-white/10 pt-5">
+          <legend className="text-[11px] tracking-[0.16em] text-white/50 uppercase">
+            Required photographs
+          </legend>
+          <p className="max-w-2xl text-sm text-white/55">
+            {canEditPhotoPolicy
+              ? "The five guided shots are always required. Tick any further photograph a collector must supply before they can save a timepiece."
+              : "A super admin sets which photographs a collector must supply."}
+          </p>
+          <div className="flex flex-wrap gap-4">
+            {TIMEPIECE_SHOTS.map((shot) => {
+              const fixed = DEFAULT_REQUIRED_PHOTO_KINDS.includes(shot.kind);
+              const checked = form.requiredPhotoKinds.includes(shot.kind as PhotoKind);
+              return (
+                <label
+                  key={shot.kind}
+                  className="flex items-center gap-2 text-sm text-white/70"
+                  title={fixed ? "Always required" : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={fixed || checked}
+                    disabled={fixed || !canEditPhotoPolicy}
+                    onChange={(e) =>
+                      updateField(
+                        "requiredPhotoKinds",
+                        normalizeRequiredPhotoKinds(
+                          e.target.checked
+                            ? [...form.requiredPhotoKinds, shot.kind]
+                            : form.requiredPhotoKinds.filter((kind) => kind !== shot.kind),
+                        ) as PhotoKind[],
+                      )
+                    }
+                  />
+                  {shot.kind}
+                  {fixed ? <span className="text-white/35">(always)</span> : null}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
         {result === "saved" ? (
           <p className="text-sm text-[#FCB040]">
             {bookMode === "live"

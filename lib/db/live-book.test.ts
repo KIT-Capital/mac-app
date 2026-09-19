@@ -547,6 +547,44 @@ describe("live-book operation repository", { skip }, () => {
     assert.equal(state.agreements[0].bookEnd?.kind, "bought_back");
   });
 
+  it("reserves the required-photo policy for super admins and round-trips it", async () => {
+    const appraiser = deskActor("appraiser", "dov@mechartcap.com");
+    const superAdmin = deskActor("super_admin", "rc@mechartcap.com");
+    const five = ["front", "back", "left", "right", "clasp"];
+
+    for (const actor of [appraiser, deskActor("admin", "rosario@mechartcap.com")]) {
+      await assert.rejects(
+        () => executeLiveBookOperation(db, actor, {
+          action: "settings.update",
+          patch: { requiredPhotoKinds: [...five, "box"] },
+        }),
+        { message: "ROLE_FORBIDDEN" },
+      );
+    }
+
+    await executeLiveBookOperation(db, superAdmin, {
+      action: "settings.update",
+      patch: { requiredPhotoKinds: [...five, "box"] },
+    });
+    const withBox = await readLiveBookState(db, superAdmin);
+    assert.deepEqual(withBox.settings.requiredPhotoKinds, [...five, "box"]);
+
+    // A patch of unrelated fields must not silently reset the policy.
+    await executeLiveBookOperation(db, superAdmin, {
+      action: "settings.update",
+      patch: { vaultLocation: "Manhattan vault" },
+    });
+    const afterOther = await readLiveBookState(db, superAdmin);
+    assert.deepEqual(afterOther.settings.requiredPhotoKinds, [...five, "box"]);
+
+    await executeLiveBookOperation(db, superAdmin, {
+      action: "settings.update",
+      patch: { requiredPhotoKinds: five },
+    });
+    const restored = await readLiveBookState(db, superAdmin);
+    assert.deepEqual(restored.settings.requiredPhotoKinds, five);
+  });
+
   it("reserves appraisal values and catalog writes for appraisers and super admins", async () => {
     const a = await collector("appraisal-fence");
     const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Santos" });

@@ -339,7 +339,7 @@ function AddFormEditor() {
         slots,
         hasBox,
         hasPapers,
-        requireFourPhotos: settings.requireFourPhotos,
+        requiredPhotoKinds: settings.requiredPhotoKinds,
       }),
     ];
     if (!resolvedBrand) missing.push("a manufacturer");
@@ -450,12 +450,12 @@ function AddFormEditor() {
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-6">
           <div>
             <p className="text-[13px] text-mac-muted">
-              Upload each required photo so the desk can see the barrel from every side. Box and original
-              documentation photos are optional, but you must confirm you have both.
+              Upload each required photo so the desk can see the barrel from every side. You must
+              confirm you have the box and the original documentation either way.
             </p>
             <div className="mt-4 space-y-3">
               {TIMEPIECE_SHOTS.map((shot, i) => {
-                const required = isShotRequired(shot, settings.requireFourPhotos);
+                const required = isShotRequired(shot, settings.requiredPhotoKinds);
                 return (
                   <label key={shot.kind} className="flex cursor-pointer items-center gap-3">
                     <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-mac-line bg-mac-card text-[22px] font-light text-mac-faint">
