@@ -49,7 +49,8 @@ import {
   validateSaleAmountRaise,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
-import { canEditAppraisal, isDeskRole, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
   browserSessionStorage,
@@ -65,6 +66,7 @@ import type {
   AppState,
   CatalogEntry,
   ManagedUser,
+  PhotoKind,
   PhotoRecord,
   Profile,
   Timepiece,
@@ -108,6 +110,22 @@ type Store = AppState & {
   removePhoto: (id: string) => Promise<OperationAck>;
   resetDemo: () => void;
 };
+
+/**
+ * Keep at most one photo per intake slot, in slot order, dropping any kind the
+ * intake screen has no slot for. Mirrors what `requestPhotoUpload` accepts.
+ */
+function slotPhotosFor(watch: Timepiece) {
+  const claimed = new Map<PhotoKind, string>();
+  watch.images.forEach((url, index) => {
+    const kind = watch.photoKinds?.[index] ?? REQUESTABLE_PHOTO_KINDS[index];
+    if (!url || !kind || !REQUESTABLE_PHOTO_KINDS.includes(kind)) return;
+    if (!claimed.has(kind as PhotoKind)) claimed.set(kind as PhotoKind, url);
+  });
+  return REQUESTABLE_PHOTO_KINDS
+    .filter((kind) => claimed.has(kind as PhotoKind))
+    .map((kind) => ({ kind: kind as PhotoKind, url: claimed.get(kind as PhotoKind) as string }));
+}
 
 const StoreContext = createContext<Store | null>(null);
 
@@ -842,11 +860,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         updateStore((prev) => ({
           ...prev,
           timepieces: [watch, ...prev.timepieces],
+          // One photo per intake slot, matching the live book's bound (R7).
           photos: [
-            ...watch.images.map((url, index) => ({
+            ...slotPhotosFor(watch).map(({ url, kind }, index) => ({
               id: nextId(`ph-${watch.id}-${index}`),
               url,
-              kind: watch.photoKinds?.[index] ?? (["front", "back", "left", "right", "clasp"] as const)[index] ?? "other",
+              kind,
               assetId: watch.id,
               caption: `${watch.brand} ${watch.model}`,
               uploadedAt: new Date().toISOString().slice(0, 10),
@@ -1090,6 +1109,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return acknowledgement.ok;
       },
       updateSettings: (patch) => {
+        // The live book reserves the photo policy for a super admin and repairs
+        // the value; the default book must answer the same way (R6, R25).
+        // The config form submits every field, so only a real change is fenced.
+        if (patch.requiredPhotoKinds !== undefined) {
+          const next = normalizeRequiredPhotoKinds(patch.requiredPhotoKinds) as PhotoKind[];
+          const current = normalizeRequiredPhotoKinds(state.settings.requiredPhotoKinds);
+          const changed = next.length !== current.length
+            || next.some((kind, index) => kind !== current[index]);
+          if (changed && !isSuperAdmin(state.user)) {
+            return Promise.resolve({ ok: false, error: "ROLE_FORBIDDEN" } as OperationAck);
+          }
+          patch = { ...patch, requiredPhotoKinds: next };
+        }
         const serverPatch = Object.fromEntries(
           SERVER_SETTING_KEYS
             .filter((key) => patch[key] !== undefined)
