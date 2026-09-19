@@ -10,7 +10,7 @@ Mechanical Art Capital is a **repo desk**. It buys qualifying timepieces. The co
 - Showing custody location or the buyback scale on collector screens before an application (contact inquiry or repurchase application) is sent.
 - Auto-valuing a piece after Appraise — only the desk edits valuations (Reviewing → Appraised).
 
-Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation value), and exclusive-piece rules: `workflows.md`. Decision `0003-repo-lifecycle-language.md`. Identity and dealer/appraiser/super-admin changes: `plans/2026-09-19-roles-identity-repo-parties-plan.md` (**proposed** until owner yes).
+Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation value), and exclusive-piece rules: `workflows.md`. Decision `0003-repo-lifecycle-language.md`. Identity and dealer/appraiser/super-admin changes: `plans/2026-09-19-roles-identity-repo-parties-plan.md` (**approved 2026-09-19, shipping unit by unit**).
 
 ## Roles
 
@@ -19,7 +19,7 @@ Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation 
 - Collector — vault, add piece, appraise request, repurchase application, membership, account, and the How MAC works tutorial. Adding a piece requires the five guided photographs (front, back, left and right sides of the barrel, clasp) and confirmation that the collector has the box and original documentation. Box and papers photographs are optional. Collectors see the shared book label. They do not record an end.
 - Staff / admin — desk console: catalog, assets, agreements, photos, outbound mail, access, config, and the in-wall Tutorial. Staff and admin record, overwrite, or clear a repo end.
 
-**Proposed:** collector | dealer on the front of the app; admin | appraiser | super admin on the Desk; exclusive emails; whole-collection buyback only. Do not implement from this section — implement from the roles plan after approval.
+**Approved, shipping unit by unit:** collector | dealer on the front of the app; admin | appraiser | super admin on the Desk; exclusive emails; whole-collection buyback only. Implement from the roles plan and `lib/roles.mjs`, not from this summary.
 
 ## Membership
 

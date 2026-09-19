@@ -117,7 +117,7 @@ Snapshots are derived from the four operational stores (nightly + on repo sign/e
 
 Replace the current four-stat overview with a dense home:
 
-- Outstanding sale dollars and count of **active** repos (open + past due + in liquidation)
+- Outstanding sale dollars and count of **active** repos: signature **signed** and book **open**, **past due**, or **in liquidation**. Unsigned drafts and demo rows are excluded and shown separately as “drafts”.
 - Bought-back vs liquidated vs renewed dollars and counts (trailing 12 months)
 - Members: new vs total, collector vs dealer
 - Pieces: free / in draft repo / locked
@@ -158,7 +158,7 @@ Remove “Collector app” as the professional desk exit if roles-plan Desk menu
 ## Delivery units (after owner yes)
 
 1. **U-tenant** — `tenant_id` on catalog, customers, timepieces, agreements; default `MAC`; prefix + member ID allocation
-2. **U-catalog-exa** — one photo, no serial, last edited, sparkle suggestion, appraiser-only writes
+2. **U-catalog-exa** — one photo, no serial, last edited, sparkle suggestion, writes only by appraiser or super admin
 3. **U-members** — member ID display, desk members list, agreement populate from profile
 4. **U-client-pieces** — chosen price, appraisal date, locked flag, optional video
 5. **U-repos-heart** — chrome rename, assemble-from-free-pieces rules already in workflows

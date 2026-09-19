@@ -49,7 +49,7 @@ flowchart TB
 
 **Shipped today:** `collector`, `staff`, `admin`. Collectors use an email link. Desk uses a password. Hidden “MAC desk staff” on login.
 
-**Proposed** (`2026-09-19` plan, not in code until owner yes): collector and dealer self-identify on signup and may change on profile; that tag is **frozen on each signed repo**. Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Passwords for everyone. SMS and WhatsApp for retail via Twilio (Norfolk AI now, MAC later). Master super admin is Ricardo Cidale. Seeded admins: Dov Tuzman, Rosario David (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
+**Approved, not yet shipped** (`2026-09-19` roles plan; each unit lands as its own PR): collector and dealer self-identify on signup and may change on profile; that tag is **frozen on each signed repo**. Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Passwords for everyone. SMS and WhatsApp for retail via Twilio (Norfolk AI now, MAC later). Master super admin is Ricardo Cidale. Seeded admins: Dov Tuzman, Rosario David (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
 
 Retail users **see** agreements, pieces, appraised values, and an “in an activated repo” flag. They do **not** edit a signed repo and they do **not** record a book end.
 
@@ -175,7 +175,7 @@ flowchart LR
   piece --> dash
 ```
 
-- **Catalog** — reusable model. Appraiser only to add/edit. **MAC Sparkle** asks a pricing source (Exa, Radar, or another provider) for a **guess** of today’s market band for the one row being edited; range only; appraiser saves. Last edited recorded. No retail Sparkle yet.
+- **Catalog** — reusable model. Only an appraiser or super admin adds or edits rows; admins read. **MAC Sparkle** asks a pricing source (Exa, Radar, or another provider) for a **guess** of today’s market band for the one row being edited; range only; appraiser saves. Last edited recorded. No retail Sparkle yet.
 - **Members** — collectors and dealers. Member ID `{PREFIX}{#####}-{YY}`. Feeds analysis and agreement forms.
 - **Client timepieces** — named to a member. Range + one appraised price + date. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
 - **Repos** — assembled from **free** appraised pieces. Whole-collection table. Heart of the Desk.
