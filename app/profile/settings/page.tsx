@@ -7,7 +7,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { isReservedDeskEmail } from "@/lib/auth";
-import { readImageFile } from "@/lib/image";
+import { readImagePreview } from "@/lib/image";
 import { useStore } from "@/lib/store";
 
 export default function SettingsPage() {
@@ -34,8 +34,8 @@ export default function SettingsPage() {
   async function onPortrait(file?: File) {
     if (!file) return;
     try {
-      const data = await readImageFile(file);
-      updateProfile({ avatar: data });
+      const data = await readImagePreview(file);
+      updateProfile({ avatar: data.dataUrl });
       setPortraitError("");
     } catch {
       setPortraitError("That portrait could not be read.");

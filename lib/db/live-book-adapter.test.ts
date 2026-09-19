@@ -108,6 +108,39 @@ describe("live-book adapter mapping", () => {
     assert.equal(desk.agreements.length, 2);
   });
 
+  it("deduplicates previews by kind and maps them in guided shot order", () => {
+    const state = mapLiveBookRows({
+      customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
+      timepieces: [{ id: "piece-a", customerId: "cust-a", brand: "Rolex", model: "Explorer" }],
+      agreements: [],
+      members: [],
+      ends: [],
+      previews: [
+        { id: "papers-old", timepieceId: "piece-a", kind: "papers", previewUrl: "data:image/jpeg;base64,old", photoObjectId: null, createdAt: new Date("2026-01-01") },
+        { id: "front-new-legacy", timepieceId: "piece-a", kind: "front", previewUrl: "data:image/jpeg;base64,new", photoObjectId: null, createdAt: new Date("2026-09-18") },
+        { id: "back-direct", timepieceId: "piece-a", kind: "back", previewUrl: null, photoObjectId: "photo-back", createdAt: new Date("2026-01-01") },
+        { id: "front-direct", timepieceId: "piece-a", kind: "front", previewUrl: null, photoObjectId: "photo-front", createdAt: new Date("2026-01-01") },
+        { id: "front-old-legacy", timepieceId: "piece-a", kind: "front", previewUrl: "data:image/jpeg;base64,old", photoObjectId: null, createdAt: new Date("2025-01-01") },
+        { id: "unknown-z", timepieceId: "piece-a", kind: "unknown", previewUrl: "data:image/jpeg;base64,z", photoObjectId: null, createdAt: new Date("2026-02-01") },
+        { id: "papers-new", timepieceId: "piece-a", kind: "papers", previewUrl: "data:image/jpeg;base64,papers", photoObjectId: null, createdAt: new Date("2026-09-18") },
+      ],
+    });
+
+    assert.deepEqual(state.timepieces[0].images, [
+      "photo-front",
+      "photo-back",
+      "data:image/jpeg;base64,papers",
+      "data:image/jpeg;base64,z",
+    ]);
+    assert.deepEqual(state.timepieces[0].photoKinds, ["front", "back", "papers", "other"]);
+    assert.deepEqual(state.photos.map((photo) => [photo.id, photo.url, photo.kind]), [
+      ["front-direct", "photo-front", "front"],
+      ["back-direct", "photo-back", "back"],
+      ["papers-new", "data:image/jpeg;base64,papers", "papers"],
+      ["unknown-z", "data:image/jpeg;base64,z", "other"],
+    ]);
+  });
+
   it("maps a recorded end without changing the agreement status field", () => {
     const state = mapLiveBookRows({
       customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],

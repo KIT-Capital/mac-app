@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useRef, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { LineField, NativeSelect } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
@@ -20,8 +20,10 @@ import {
   isDesk,
 } from "@/lib/catalog";
 import { nextId } from "@/lib/ids";
-import { readImageFile } from "@/lib/image";
+import { fetchWithTimeout } from "@/lib/fetch-timeout.mjs";
+import { readImageFile, type ImageReadResult } from "@/lib/image";
 import { ownerKey } from "@/lib/ownership";
+import { storePhoto } from "@/lib/photo-upload.mjs";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 import {
@@ -68,7 +70,7 @@ function AddFormEditor() {
   const router = useRouter();
   const params = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
-  const { addTimepiece, updateTimepiece, catalog, user, settings, timepieces } = useStore();
+  const { addTimepiece, updateTimepiece, bookMode, catalog, user, settings, timepieces } = useStore();
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
   const editingId = params.get("id");
   const existing = timepieces.find((w) => {
@@ -77,6 +79,15 @@ function AddFormEditor() {
     return ownerKey(w.ownerEmail) === ownerKey(user?.email);
   });
   const [images, setImages] = useState<string[]>(() => slotsFromExisting(existing?.images, existing?.photoKinds));
+  const [uploads, setUploads] = useState<(ImageReadResult | null)[]>(() => TIMEPIECE_SHOTS.map(() => null));
+  const [slotStates, setSlotStates] = useState<("selected" | "uploading" | "stored" | "failed")[]>(() =>
+    TIMEPIECE_SHOTS.map((_, index) => images[index] ? "stored" : "selected"),
+  );
+  const [piecePersisted, setPiecePersisted] = useState(Boolean(existing));
+  const submissionLock = useRef(false);
+  const selectionGenerations = useRef(TIMEPIECE_SHOTS.map(() => 0));
+  const uploadLocks = useRef(TIMEPIECE_SHOTS.map(() => false));
+  const [submitting, setSubmitting] = useState(false);
   const [hasBox, setHasBox] = useState(() => Boolean(existing));
   const [hasPapers, setHasPapers] = useState(() => Boolean(existing));
   const [videoName, setVideoName] = useState("");
@@ -111,7 +122,10 @@ function AddFormEditor() {
   const resolvedBrand = missingBrand ? customBrand.trim() : brand;
   const models = MODELS_BY_BRAND[brand] ?? catalog.filter((c) => c.brand === brand).map((c) => c.model);
 
-  const packedShots = packShots(images).map((shot) => ({
+  const persistedImages = images.map((image, index) =>
+    bookMode === "live" && slotStates[index] !== "stored" ? "" : image,
+  );
+  const packedShots = packShots(persistedImages).map((shot) => ({
     url: shot.url,
     kind: photoKind(shot.kind),
   }));
@@ -167,26 +181,148 @@ function AddFormEditor() {
 
   async function onPick(index: number, file?: File) {
     if (!file) return;
+    selectionGenerations.current[index] += 1;
+    const generation = selectionGenerations.current[index];
     try {
       const data = await readImageFile(file);
+      if (selectionGenerations.current[index] !== generation) return;
       setImages((prev) => {
         const copy = [...prev];
-        copy[index] = data;
+        copy[index] = data.previewDataUrl;
         return copy;
       });
+      if (bookMode === "live") {
+        setUploads((prev) => {
+          const copy = [...prev];
+          copy[index] = data;
+          return copy;
+        });
+        setSlotStates((prev) => {
+          const copy = [...prev];
+          copy[index] = "selected";
+          return copy;
+        });
+      } else {
+        setSlotStates((prev) => {
+          const copy = [...prev];
+          copy[index] = "stored";
+          return copy;
+        });
+      }
       setError("");
     } catch {
       setError("That photo could not be read.");
     }
   }
 
-  async function persist(watch: Timepiece, notify = false) {
-    const stamped: Timepiece = {
+  async function uploadSlot(index: number, timepieceId: string) {
+    if (uploadLocks.current[index]) return null;
+    const image = uploads[index];
+    if (!image) return null;
+    uploadLocks.current[index] = true;
+    setSlotStates((prev) => {
+      const copy = [...prev];
+      copy[index] = "uploading";
+      return copy;
+    });
+    try {
+      const photoId = await storePhoto({
+        requestUpload: async () => {
+          const response = await fetchWithTimeout("/api/photos", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "request-upload",
+              timepieceId,
+              kind: TIMEPIECE_SHOTS[index].kind,
+              original: {
+                size: image.original.size,
+                type: image.original.type,
+                sha256: image.originalSha256,
+              },
+              preview: {
+                size: image.preview.size,
+                type: image.preview.type,
+                sha256: image.previewSha256,
+              },
+            }),
+          });
+          const body = await response.json().catch(() => null) as {
+            upload?: {
+              photoId: string;
+              status: "pending" | "stored";
+              original?: { url: string; headers: Record<string, string> };
+              preview?: { url: string; headers: Record<string, string> };
+            };
+            error?: string;
+          } | null;
+          if (!response.ok || !body?.upload) throw new Error(body?.error || "PHOTO_UPLOAD_FAILED");
+          return body.upload;
+        },
+        confirmUpload: async (id: string) => {
+          const response = await fetchWithTimeout("/api/photos", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "confirm", photoId: id }),
+          });
+          const body = await response.json().catch(() => null) as {
+            photo?: { status?: string };
+            error?: string;
+          } | null;
+          if (!response.ok || !body?.photo) throw new Error(body?.error || "PHOTO_UPLOAD_FAILED");
+          return body.photo;
+        },
+        parts: image,
+      });
+      setImages((prev) => {
+        const copy = [...prev];
+        copy[index] = photoId;
+        return copy;
+      });
+      setSlotStates((prev) => {
+        const copy = [...prev];
+        copy[index] = "stored";
+        return copy;
+      });
+      return photoId;
+    } catch {
+      setSlotStates((prev) => {
+        const copy = [...prev];
+        copy[index] = "failed";
+        return copy;
+      });
+      return null;
+    } finally {
+      uploadLocks.current[index] = false;
+    }
+  }
+
+  function stampedWatch(watch: Timepiece): Timepiece {
+    return {
       ...watch,
       assetCode:
         watch.assetCode ||
         new Date().toISOString().slice(0, 10).replaceAll("-", "") + `-${Date.now().toString().slice(-4)}`,
     };
+  }
+
+  function finishPersistence(watch: Timepiece, notify: boolean) {
+    if (notify && user) {
+      void sendAppEmail({
+        kind: "appraisal",
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        watch: `${watch.brand} ${watch.model}`,
+      });
+    }
+    router.push(onboarding ? "/collection/continue" : `/collection/${watch.id}`);
+  }
+
+  async function persistBrowser(watch: Timepiece, notify = false) {
+    const stamped = stampedWatch(watch);
     const saved = existing
       ? await updateTimepiece(existing.id, stamped)
       : await addTimepiece(stamped);
@@ -194,22 +330,13 @@ function AddFormEditor() {
       setError(saved.error || "That timepiece could not be saved.");
       return;
     }
-    if (notify && user) {
-      void sendAppEmail({
-        kind: "appraisal",
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        watch: `${stamped.brand} ${stamped.model}`,
-      });
-    }
-    router.push(onboarding ? "/collection/continue" : `/collection/${stamped.id}`);
+    finishPersistence(stamped, notify);
   }
 
-  function missingFields() {
+  function missingFields(slots: unknown[] = images) {
     const missing = [
       ...intakePhotoErrors({
-        slots: images,
+        slots,
         hasBox,
         hasPapers,
         requireFourPhotos: settings.requireFourPhotos,
@@ -220,23 +347,97 @@ function AddFormEditor() {
     return missing;
   }
 
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
-    const missing = missingFields();
+  async function persistLive(status: Timepiece["status"], notify = false) {
+    if (!piecePersisted) {
+      const initialMissing = missingFields(images);
+      if (initialMissing.length) {
+        setError(`Add ${formatIntakeList(initialMissing)}.`);
+        return;
+      }
+    }
+    const identityMissing = [];
+    if (!resolvedBrand) identityMissing.push("a manufacturer");
+    if (!model.trim()) identityMissing.push("a model name");
+    if (identityMissing.length) {
+      setError(`Add ${formatIntakeList(identityMissing)}.`);
+      return;
+    }
+
+    const metadata = stampedWatch({ ...draft, images: [], photoKinds: [], status: existing?.status ?? "not_evaluated" });
+    const saved = piecePersisted
+      ? await updateTimepiece(metadata.id, metadata)
+      : await addTimepiece(metadata);
+    if (!saved.ok) {
+      setError(saved.error || "That timepiece could not be saved.");
+      return;
+    }
+    setPiecePersisted(true);
+
+    const results = await Promise.all(
+      uploads.map((upload, index) =>
+        upload && slotStates[index] !== "stored" ? uploadSlot(index, metadata.id) : null,
+      ),
+    );
+    const nextImages = [...persistedImages];
+    const nextStates = [...slotStates];
+    results.forEach((photoId, index) => {
+      if (photoId) {
+        nextImages[index] = photoId;
+        nextStates[index] = "stored";
+      } else if (uploads[index] && slotStates[index] !== "stored") {
+        nextStates[index] = "failed";
+      }
+    });
+    const liveSlots = nextStates.map((slotStatus, index) => ({ status: slotStatus, value: nextImages[index] }));
+    const missing = missingFields(liveSlots);
     if (missing.length) {
       setError(`Add ${formatIntakeList(missing)}.`);
       return;
     }
-    await persist(draft);
+
+    const shots = packShots(nextImages).map((shot) => ({ url: shot.url, kind: photoKind(shot.kind) }));
+    const finalWatch = {
+      ...metadata,
+      status,
+      images: shots.map((shot) => shot.url),
+      photoKinds: shots.map((shot) => shot.kind),
+    };
+    const finalized = await updateTimepiece(metadata.id, finalWatch);
+    if (!finalized.ok) {
+      setError(finalized.error || "That timepiece could not be saved.");
+      return;
+    }
+    finishPersistence(finalWatch, notify);
+  }
+
+  async function submit(status: Timepiece["status"], notify = false) {
+    if (submissionLock.current) return;
+    submissionLock.current = true;
+    setSubmitting(true);
+    try {
+      if (bookMode === "live") {
+        await persistLive(status, notify);
+        return;
+      }
+      const missing = missingFields();
+      if (missing.length) {
+        setError(`Add ${formatIntakeList(missing)}.`);
+        return;
+      }
+      await persistBrowser({ ...draft, status }, notify);
+    } finally {
+      submissionLock.current = false;
+      setSubmitting(false);
+    }
+  }
+
+  async function onSave(e: FormEvent) {
+    e.preventDefault();
+    await submit(existing?.status ?? "not_evaluated");
   }
 
   async function onAppraise() {
-    const missing = missingFields();
-    if (missing.length) {
-      setError(`Add ${formatIntakeList(missing)}.`);
-      return;
-    }
-    await persist({ ...draft, status: "reviewing" }, true);
+    await submit("reviewing", true);
   }
 
   return (
@@ -259,25 +460,47 @@ function AddFormEditor() {
                   <label key={shot.kind} className="flex cursor-pointer items-center gap-3">
                     <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-mac-line bg-mac-card text-[22px] font-light text-mac-faint">
                       {images[i] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={images[i]} alt={shot.prompt} className="h-full w-full object-cover" />
+                        <WatchPhoto src={images[i]} watch={draft} alt={shot.prompt} />
                       ) : (
                         <>
                           <WatchPhoto src={null} watch={draft} alt="" className="opacity-55" />
                           <span className="absolute inset-0 flex items-center justify-center text-white">+</span>
                         </>
                       )}
+                      {slotStates[i] === "uploading" ? (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[9px] tracking-[0.14em] text-white uppercase">
+                          Uploading
+                        </span>
+                      ) : null}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] text-mac-fg">{shot.prompt}</span>
                       <span className="mt-1 block text-[10px] tracking-[0.14em] text-mac-faint uppercase">
-                        {required ? "Required" : "Optional"}
+                        {slotStates[i] === "failed"
+                          ? "Upload failed — choose again or retry"
+                          : slotStates[i] === "stored" && images[i]
+                            ? "Stored"
+                            : required ? "Required" : "Optional"}
                       </span>
+                      {bookMode === "live" && slotStates[i] === "failed" && piecePersisted ? (
+                        <button
+                          type="button"
+                          className="mt-1 text-[11px] text-[#FCB040] underline underline-offset-4"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void uploadSlot(i, draft.id);
+                          }}
+                        >
+                          Retry upload
+                        </button>
+                      ) : null}
                     </span>
                     <input
                       type="file"
                       accept="image/*"
                       aria-label={shot.prompt}
+                      disabled={submitting || slotStates[i] === "uploading"}
                       className="sr-only"
                       onChange={(e) => onPick(i, e.target.files?.[0])}
                     />
@@ -503,6 +726,7 @@ function AddFormEditor() {
         <div className="grid grid-cols-2 gap-3 border-t border-mac-line bg-mac-bg px-5 py-4">
           <button
             type="submit"
+            disabled={submitting}
             className={`mac-tap flex h-12 items-center justify-center text-[12px] font-semibold tracking-[0.18em] uppercase ${
               light ? "bg-black text-white" : "bg-white text-black"
             }`}
@@ -511,6 +735,7 @@ function AddFormEditor() {
           </button>
           <button
             type="button"
+            disabled={submitting}
             onClick={onAppraise}
             className="mac-tap flex h-12 items-center justify-center bg-[#0E2A44] text-[12px] font-semibold tracking-[0.18em] text-white uppercase"
           >

@@ -4,21 +4,21 @@ import { useState } from "react";
 import { AdminChrome } from "@/components/admin-chrome";
 import { NativeSelect } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
-import { readImageFile } from "@/lib/image";
+import { readImagePreview } from "@/lib/image";
 import { useStore } from "@/lib/store";
 import type { PhotoKind } from "@/lib/types";
 
 export default function AdminPhotosPage() {
-  const { photos, timepieces, upsertPhoto, removePhoto, user } = useStore();
+  const { photos, timepieces, upsertPhoto, removePhoto, user, bookMode } = useStore();
   const [kind, setKind] = useState<PhotoKind>("front");
   const [assetId, setAssetId] = useState(timepieces[0]?.id || "");
 
   async function onUpload(file?: File) {
     if (!file) return;
-    const url = await readImageFile(file);
+    const image = await readImagePreview(file);
     upsertPhoto({
       id: `ph-${Date.now()}`,
-      url,
+      url: image.dataUrl,
       kind,
       assetId: assetId || undefined,
       caption: file.name,
@@ -51,10 +51,12 @@ export default function AdminPhotosPage() {
             ))}
           </NativeSelect>
         </label>
-        <label className="mac-tap flex h-11 items-center rounded-xl bg-[#FCB040] px-5 text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm cursor-pointer hover:bg-[#ffbe59]">
-          Upload Photo
-          <input type="file" accept="image/*" className="sr-only" onChange={(e) => onUpload(e.target.files?.[0])} />
-        </label>
+        {bookMode !== "live" ? (
+          <label className="mac-tap flex h-11 items-center rounded-xl bg-[#FCB040] px-5 text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm cursor-pointer hover:bg-[#ffbe59]">
+            Upload Photo
+            <input type="file" accept="image/*" className="sr-only" onChange={(e) => onUpload(e.target.files?.[0])} />
+          </label>
+        ) : null}
       </div>
       {photos.length === 0 ? (
         <p className="text-sm text-white/45">No photographs yet. Restore the demo collection or upload one.</p>
