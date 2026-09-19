@@ -8,6 +8,10 @@ import {
   resolveSendRecipient,
 } from "@/lib/agreement-document-mail.mjs";
 import { buildAgreementSnapshot, renderAgreementSnapshotPdf } from "@/lib/contract/repo-agreement-snapshot.mjs";
+import {
+  captureOperationalError,
+  captureOperationalErrorOnce,
+} from "@/lib/observability.mjs";
 import { agreementObjectKey } from "@/lib/storage/agreement-object-key.mjs";
 import { sha256Hex } from "@/lib/storage/object-store.mjs";
 import type { Database } from "./client";
@@ -112,6 +116,14 @@ async function reconcileBuilding(db: Database, store: DocumentStore, row: typeof
   if (!(await store.head(row.objectKey))) return row;
   const bytes = await store.get(row.objectKey);
   if (sha256Hex(bytes) !== row.checksum || bytes.byteLength !== row.bytes) {
+    await captureOperationalErrorOnce(
+      new Error("DOCUMENT_CHECKSUM_MISMATCH"),
+      {
+        operation: "agreement_document.reconcile",
+        errorCode: "DOCUMENT_CHECKSUM_MISMATCH",
+        recordId: row.id,
+      },
+    );
     const [updated] = await db
       .update(agreementDocuments)
       .set({ status: "failed", failureCode: "CHECKSUM_MISMATCH" })
@@ -252,6 +264,17 @@ export async function buildAgreementDocument(
       if (recovered.status === "stored") return recovered;
     }
     const failureCode = error instanceof Error ? error.message : "DOCUMENT_BUILD_FAILED";
+    const monitorCode = /^[A-Z0-9_]{1,80}$/.test(failureCode)
+      ? failureCode
+      : "DOCUMENT_BUILD_FAILED";
+    await captureOperationalErrorOnce(
+      error,
+      {
+        operation: "agreement_document.build",
+        errorCode: monitorCode,
+        recordId: documentId,
+      },
+    );
     const [failed] = await db
       .update(agreementDocuments)
       .set({ status: "failed", failureCode: failureCode.slice(0, 80), objectKey })
@@ -295,6 +318,14 @@ export async function mintAgreementDocumentUrl(
   }
   const bytes = await store.get(reconciled.objectKey);
   if (sha256Hex(bytes) !== reconciled.checksum || bytes.byteLength !== reconciled.bytes) {
+    await captureOperationalErrorOnce(
+      new Error("DOCUMENT_CHECKSUM_MISMATCH"),
+      {
+        operation: "agreement_document.download",
+        errorCode: "DOCUMENT_CHECKSUM_MISMATCH",
+        recordId: reconciled.id,
+      },
+    );
     throw new Error("DOCUMENT_UNAVAILABLE");
   }
   const minted = await store.presignGet(reconciled.objectKey, 300);
@@ -363,6 +394,14 @@ export async function sendAgreementDocument(
   }
   const bytes = await store.get(reconciled.objectKey);
   if (sha256Hex(bytes) !== reconciled.checksum || bytes.byteLength !== reconciled.bytes) {
+    await captureOperationalErrorOnce(
+      new Error("DOCUMENT_CHECKSUM_MISMATCH"),
+      {
+        operation: "agreement_document.send",
+        errorCode: "DOCUMENT_CHECKSUM_MISMATCH",
+        recordId: reconciled.id,
+      },
+    );
     throw new Error("DOCUMENT_UNAVAILABLE");
   }
   const recipient = resolveSendRecipient(actor, input);
@@ -409,6 +448,14 @@ export async function sendAgreementDocument(
       .update(agreementDocumentSends)
       .set({ result, failureCode: failureCode.slice(0, 80) })
       .where(eq(agreementDocumentSends.id, sendId));
+    await captureOperationalError(
+      error,
+      {
+        operation: "agreement_document.send",
+        errorCode: result === "timeout" ? "DOCUMENT_SEND_TIMEOUT" : "DOCUMENT_SEND_FAILED",
+        recordId: sendId,
+      },
+    );
     throw new Error(failureCode);
   }
 }

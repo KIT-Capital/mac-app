@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNotNull, lt, ne } from "drizzle-orm";
+import { captureOperationalErrorOnce } from "../observability.mjs";
 import { photoObjectKeys } from "../storage/photo-object-key.mjs";
 import type { Database } from "./client";
 import type { Actor } from "./records";
@@ -219,11 +220,23 @@ async function matchingMetadata(store: ObjectStore, row: typeof photoObjects.$in
   ]);
   if (!original || !preview) return { state: "missing" as const };
   if (!original.sha256 || !preview.sha256) return { state: "unverified" as const };
-  if (original.bytes !== row.originalBytes || preview.bytes !== row.previewBytes) return { state: "size" as const };
+  if (original.bytes !== row.originalBytes || preview.bytes !== row.previewBytes) {
+    await captureOperationalErrorOnce(
+      new Error("PHOTO_SIZE_MISMATCH"),
+      { operation: "photo.confirm", errorCode: "PHOTO_SIZE_MISMATCH", recordId: row.id },
+    );
+    return { state: "size" as const };
+  }
   if (
     original.sha256.toLowerCase() !== row.originalChecksum.toLowerCase()
     || preview.sha256.toLowerCase() !== row.previewChecksum.toLowerCase()
-  ) return { state: "checksum" as const };
+  ) {
+    await captureOperationalErrorOnce(
+      new Error("PHOTO_CHECKSUM_MISMATCH"),
+      { operation: "photo.confirm", errorCode: "PHOTO_CHECKSUM_MISMATCH", recordId: row.id },
+    );
+    return { state: "checksum" as const };
+  }
   return { state: "match" as const };
 }
 
