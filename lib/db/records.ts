@@ -13,8 +13,13 @@ import {
 import { centsToDollars, dollarsToCents } from "./money.mjs";
 import { customers, timepieces } from "./schema";
 
+/**
+ * Server actors. The retail side stays `collector` until unit U-party converts
+ * every `role === "collector"` scoping site (photos, documents, adapter,
+ * mutations) to a retail test; only then does `dealer` become an Actor.
+ */
 export type Actor =
-  | { role: RetailRole; customerId: string; email: string }
+  | { role: Extract<RetailRole, "collector">; customerId: string; email: string }
   | { role: DeskRole; email: string; staffId?: string; isMaster?: boolean };
 
 const DEFAULT_PREFERENCES = {

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import {
   consumeAccessRateLimit,
   releaseAccessRateLimit,
@@ -404,12 +404,19 @@ export async function setStaffDisabled(
     }
     const { trusted, target } = await lockStaffPair(tx, actor, targetId);
     if (disabled && !target.disabledAt) {
+      // Someone else must remain who can sign in today or be reset by a peer:
+      // a non-super-admin, or a super admin whose password is not a lost temporary one.
       const otherActive = await tx.select({ id: staffAccounts.id })
         .from(staffAccounts)
         .where(and(
           isNull(staffAccounts.disabledAt),
           isNotNull(staffAccounts.passwordHash),
           ne(staffAccounts.id, targetId),
+          or(
+            eq(staffAccounts.mustRotate, false),
+            ne(staffAccounts.role, "super_admin"),
+            eq(staffAccounts.isMaster, true),
+          ),
         ))
         .limit(1);
       if (!otherActive.length) throw new Error("LAST_ACTIVE_ADMIN_REQUIRED");

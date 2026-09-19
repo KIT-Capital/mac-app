@@ -39,4 +39,7 @@ VALUES
 ON CONFLICT ("email") DO UPDATE SET
   "role" = EXCLUDED."role",
   "is_master" = EXCLUDED."is_master",
+  -- A row promoted to master must be able to sign in: clear any prior disable.
+  "disabled_at" = CASE WHEN EXCLUDED."is_master" THEN NULL ELSE "staff_accounts"."disabled_at" END,
+  "session_valid_after" = CASE WHEN EXCLUDED."is_master" THEN now() ELSE "staff_accounts"."session_valid_after" END,
   "updated_at" = now();

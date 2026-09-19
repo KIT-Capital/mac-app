@@ -574,7 +574,8 @@ describe("live-book operation repository", { skip }, () => {
       () => executeLiveBookOperation(db, a.actor, operation),
       { message: "DESK_REQUIRED" },
     );
-    await executeLiveBookOperation(db, deskActor("admin", "admin@mechartcap.com"), operation);
+    // Super admins and appraisers hold the former admin verbs.
+    await executeLiveBookOperation(db, deskActor("super_admin", "rc@mechartcap.com"), operation);
     const state = await readLiveBookState(db, a.actor);
     assert.equal(state.agreements.find((row) => row.id === repoId)?.bookEnd?.kind, "renewed");
     assert.deepEqual(state.agreements.find((row) => row.id === operation.successorId)?.watchIds, [piece.id]);
