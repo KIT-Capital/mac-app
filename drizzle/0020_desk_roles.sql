@@ -18,6 +18,17 @@ ALTER TABLE "staff_accounts" ADD CONSTRAINT "staff_accounts_password_set_check" 
     );--> statement-breakpoint
 ALTER TABLE "staff_accounts" ADD CONSTRAINT "staff_accounts_master_role_check" CHECK ("staff_accounts"."is_master" = false or "staff_accounts"."role" = 'super_admin');--> statement-breakpoint
 ALTER TABLE "staff_accounts" ADD CONSTRAINT "staff_accounts_role_check" CHECK ("staff_accounts"."role" in ('admin', 'appraiser', 'super_admin'));--> statement-breakpoint
+-- Retail and desk identities never share an email. Refuse to seed a desk row
+-- for an email that already owns a retail (customers) account; the owner resolves it first.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM "customers"
+    WHERE "email" IN ('rc@mechartcap.com', 'dov@mechartcap.com', 'rosario@mechartcap.com')
+  ) THEN
+    RAISE EXCEPTION 'SEEDED_DESK_EMAIL_HAS_RETAIL_ACCOUNT';
+  END IF;
+END $$;--> statement-breakpoint
 -- Seeded desk people (lib/roles.mjs SEEDED_DESK_ACCOUNTS). Names and emails only; no password.
 -- An existing row keeps its password and gets the seeded role. Nothing else is touched.
 INSERT INTO "staff_accounts" ("id", "name", "email", "role", "is_master", "must_rotate")
