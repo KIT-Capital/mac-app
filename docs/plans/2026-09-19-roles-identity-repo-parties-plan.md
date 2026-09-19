@@ -67,7 +67,7 @@ Today collectors use an email link and have no password. Desk roles are only `st
 - R12. Onboarding asks collector vs dealer in plain language: consumer collector vs watch business raising cash against a collection.
 - R13. Profile lets the retail user change collector ↔ dealer. Desk admin/super admin may change it. Appraiser may change it (appraiser ≥ admin for people except the super-admin CRUD fence).
 - R14. After sign-in, a desk-role user sees a **Desk** item at the **bottom** of the main collector-style menu (not a secret “MAC desk staff” control on the login form). That item is the only professional entrance to `/admin`. Retail users never see it.
-- R15. Retail users may view, not edit, their agreements, their pieces, appraised values shown as appraisal copy, and a flag that a piece is or is not in an **activated** (signed, live) repo.
+- R15. Retail users may view, not edit, their agreements; may edit their own pieces while those pieces are neither in an active repo nor locked by a pending appraisal review; may view appraisal ranges and values using appraisal copy; and see whether a piece is in an **activated** (signed, live) repo. Detailed appraisal attempts and physical-inspection rules live in the approved Desk stores plan and `docs/workflows.md`.
 
 #### Desk permissions
 
@@ -75,7 +75,7 @@ Today collectors use an email link and have no password. Desk roles are only `st
 - R17. Admin may create, edit, disable, and reset **admin** and **retail** users, and may operate the desk, **except**:
   - no create/edit/delete/disable of **appraiser** or **super_admin** rows
   - no create/edit/delete of catalog appraisal ranges or of per-piece appraised / liquidation numbers
-- R18. Appraiser may do everything an admin may do, and may set catalog typical ranges and per-piece appraised values (desk meaning: liquidation) on pieces and on repos that are **not yet activated**. After MAC has signed, those numbers are frozen on that repo snapshot (existing immutable-agreement rule). Appraiser may still appraise free pieces that are not in an activated repo.
+- R18. Appraiser may do everything an admin may do, and may set catalog typical ranges and per-piece appraised values (desk meaning: liquidation) on pieces and on repos that are **not yet activated**. The range is advisory only; an appraiser-entered value may sit outside it with a warning and no blocking consequence. Remote decisions and values remain provisional and editable by the appraiser within the same attempt until personal inspection confirms the final acceptance and value. After MAC has signed, those dollars are frozen on that repo snapshot (existing immutable-agreement rule). Appraiser may still appraise free pieces that are not in an activated repo.
 - R19. Super admin (and master) may do all of the above, create users of every desk role subject to R6–R7, assign roles, reset passwords, and lock retail accounts.
 
 #### Repo life (product center)
@@ -90,7 +90,7 @@ Today collectors use an email link and have no password. Desk roles are only `st
 
 #### Language
 
-- R27. Collector-facing: appraisal range + chosen appraisal; buy back / repurchase the whole collection. Desk-facing: the same dollars are liquidation values; staff may think in 47th Street wholesale and repossession of the whole collection. Never show collectors “liquidation” on those fields. Never describe the product as a loan.
+- R27. Collector-facing: informational appraisal range + appraiser-entered appraisal value; buy back / repurchase the whole collection. The value is not required to sit inside the range. Desk-facing: that entered value is the liquidation value; staff may think in 47th Street wholesale and repossession of the whole collection. Never show collectors “liquidation” on those fields. Never describe the product as a loan.
 
 ### Invariants
 

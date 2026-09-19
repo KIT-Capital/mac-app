@@ -17,8 +17,9 @@ Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-l
 | In liquidation (process) | Book **in liquidation** | Staff-toggled. Modeled dollars never flip this |
 | Liquidated (sold off) | Book **liquidated** | Staff-toggled. End of that repo’s life |
 | Renewed | Book **renewed** on the old row + a **new** repo | Old repo is done. New repo is a new life |
-| Appraisal (retail) | `valueLow` / `valueHigh` and the future chosen number | What the collector/dealer sees |
-| Liquidation value (desk) | The same dollars | 47th Street wholesale if they do not buy back |
+| Appraisal range (retail) | Informational low/high band | Shown to the collector/dealer and appraiser; never constrains the appraiser |
+| Appraisal value (retail) | Appraiser-entered dollar value | May sit outside the range with a warning only |
+| Liquidation value (desk) | The same appraiser-entered dollar value | 47th Street wholesale if the retail party does not buy back |
 | Free piece | Not on any active repo | May join a new application |
 
 Forbidden on retail copy: loan, lender, interest, debt, vesting, paid off.
@@ -60,19 +61,38 @@ A piece belongs to one retail person. It never belongs to two **active** repos.
 ```mermaid
 stateDiagram-v2
   [*] --> InVault: photos and box/papers confirmation
-  InVault --> Reviewing: retail asks to be appraised
-  Reviewing --> Appraised: desk Appraise writes range\n(proposed: appraiser or super admin only)
-  Appraised --> Locked: MAC signs a repo that lists this piece
+  InVault --> Reviewing: retail submits snapshot + note
+  Reviewing --> Returned: appraiser requests better information
+  Returned --> InVault: retail edits piece
+  Reviewing --> ProvisionalAccepted: appraiser accepts + enters value
+  Reviewing --> Refused: does not meet appraisal criteria\nfinal on record, attempt consumed
+  ProvisionalAccepted --> Refused: appraiser reverses\nbefore inspection, same attempt
+  Refused --> InVault: retail improves piece\nand attempts remain
+  Refused --> Reviewing: audited reopen\nof that same attempt
+  ProvisionalAccepted --> FinalAccepted: physical inspection confirms\nacceptance + final value
+  FinalAccepted --> Reviewing: audited reopen\nof that same attempt
+  FinalAccepted --> Locked: MAC signs a repo that lists this piece
   Locked --> InVault: repo bought back or liquidated\nand piece not moved to a successor
   Locked --> SuccessorLocked: admin Renew moves the collection
-  Appraised --> Appraised: may sit in several unsigned drafts\nuntil one activates
+  FinalAccepted --> FinalAccepted: may sit in several unsigned drafts\nuntil one activates
 ```
 
 Rules:
 
 - Five required photos (front, back, left, right, clasp). Box and papers photos optional.
-- Catalog typical range may be copied on Appraise. Collector copy = appraisal. Desk meaning = liquidation value.
-- LTV / purchase cap math is prototype UI until an owner money-math plan. Do not invent a second retail-appraisal column.
+- The retail submission includes **notes to the appraiser**, maximum 256 characters.
+- Submission freezes one review snapshot of the piece information, submitted photo references, and note. Retail edits are locked while that snapshot is under review.
+- The appraiser or super admin may save an unfinished review without consuming an appraisal opportunity, or return it for better information without consuming an opportunity.
+- A completed **Accept** or **Does not meet appraisal criteria** decision consumes one of at most **three** appraisal opportunities for that timepiece. Refused pieces remain in the database, remain tied to their current retail owner, and may be improved and resubmitted while opportunities remain.
+- Accept requires an appraiser-entered appraisal value. The appraiser may enter any non-negative dollar value. The catalog range is informational only; an out-of-range value receives a non-blocking warning and remains saveable.
+- Physical inspection sits only on the purchase path, so **only an Accept is provisional**. A remote Accept reads **Provisional — physical inspection required**; inside that same attempt the appraiser may revise the value or reverse the decision to a refusal until personally inspecting the piece.
+- Physical-inspection confirmation freezes that attempt's final **Accept** decision and final appraisal value. MAC may not purchase the piece or activate a repo containing it before that confirmation.
+- A **refusal is final the moment it is recorded**. MAC never takes custody of a refused piece, so there is nothing to inspect: the refusal consumes its attempt, immediately unlocks retail edits, and stands as that attempt's result.
+- One reopen path covers both endings. Changing a recorded refusal **or** a final inspected acceptance takes the same explicit, audited **reopen** of that attempt. A reopen revises that attempt in place and never consumes another of the three; a reopened refusal that becomes an Accept is provisional again until inspection.
+- Grid cards and the full timepiece view show the current appraisal state and remaining opportunities. A refusal uses the retail phrase **Does not meet appraisal criteria** and a clear refusal icon; do not imply that the timepiece ceased to exist.
+- After a completed decision, the underlying piece becomes editable again unless it is bound to an active repo. Later edits do not rewrite the completed submission snapshot; a new review requires a new submission.
+- Catalog typical range may be copied or suggested by Sparkle. Collector copy = appraisal range. Desk meaning = indicative liquidation band.
+- LTV / purchase cap math is prototype UI until an owner money-math plan. The appraiser-entered value does not silently change that formula in this documentation unit.
 - After activation, the repo snapshot is frozen. Do not edit those dollars on that repo. Free pieces not on an activated repo may still be appraised.
 - **No partial buyback.** To get optionality, the person opens **several smaller repos**, not one repo they pick apart.
 
@@ -163,7 +183,7 @@ Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md
 flowchart LR
   cat[Catalog: model + reference\none photo, no serial]
   mem[Members: MAC12345-22]
-  piece[Client timepiece: serial\nphotos, video, chosen price]
+  piece[Client timepiece: serial\nphotos, video, appraisal history]
   repo[Repos: heart of Desk]
   dash[Analytics dashboard\nexport for accountants]
   cat --> piece
@@ -177,8 +197,8 @@ flowchart LR
 
 - **Catalog** — reusable model. Only an appraiser or super admin adds or edits rows; admins read. **MAC Sparkle** asks a pricing source (Exa, Radar, or another provider) for a **guess** of today’s market band for the one row being edited; range only; appraiser saves. Last edited recorded. No retail Sparkle yet.
 - **Members** — collectors and dealers. Member ID `{PREFIX}{#####}-{YY}`. Feeds analysis and agreement forms.
-- **Client timepieces** — named to a member. Range + one appraised price + date. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
-- **Repos** — assembled from **free** appraised pieces. Whole-collection table. Heart of the Desk.
+- **Client timepieces** — named to a member. Informational range + appraiser-entered value + up to three attempt snapshots + physical-inspection finalization. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
+- **Repos** — assembled from **free** pieces. MAC purchase and activation require final inspected acceptance for every included piece. Whole-collection table. Heart of the Desk.
 - **Analytics** — graphs and exports. Not the official ledger. Never label a close **paid off**.
 
 White-label: same four stores scoped by tenant. Super Admin sets that tenant’s palette, logo, and prefix. MAC default chrome stays Logo-FF.
