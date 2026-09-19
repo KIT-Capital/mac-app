@@ -68,6 +68,8 @@ Doppler is authoritative. One path only:
 
 Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover `RESEND_API` is gone. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler (`dev` / `stg` / `prd` / `dev_personal`) and all three Railway environments. `NEXT_PUBLIC_SITE_URL` is `https://mac-app-staging.up.railway.app` on Doppler `stg` / Railway staging, and `https://mechart.app` on Doppler `prd` / Railway production and Development. Production now also has `RESEND_REPLY_TO` from Doppler `prd`. Development may retain `DESK_SESSION_SECRET` as the single-key compatibility alias; staging and production use `DESK_SESSION_KEYS`.
 
+Sentry code is installed but project creation remains an owner gate. Once approved, put `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, and `SENTRY_PROJECT` in each Doppler/Railway environment. `SENTRY_AUTH_TOKEN` is build-only for source-map upload and must never be exposed as `NEXT_PUBLIC_*`. With both DSNs unset, capture helpers are no-ops and builds continue normally.
+
 ## Key catalog
 
 | Name | Where used | Status | Notes |
@@ -86,6 +88,11 @@ Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover
 | `RESEND_API_KEY` | `/api/mail` + collector access mail | Implemented; required when live book is on | Preview remains available for ordinary mail, never for identity verification |
 | `RESEND_FROM_EMAIL` | Outbound From | Implemented | `info@mechartcap.com`; internal recipient routing does not change From |
 | `RESEND_REPLY_TO` | Outbound Reply-To | Implemented | Default `financing@mechartcap.com` |
+| `SENTRY_DSN` | Node and edge error monitoring | Owner go-live gate | Runtime DSN; unset means server capture is disabled |
+| `NEXT_PUBLIC_SENTRY_DSN` | Browser error monitoring | Owner go-live gate | Public DSN baked into the client build by design |
+| `SENTRY_AUTH_TOKEN` | Sentry source-map upload | Owner go-live gate | Build-only secret; never expose to the browser |
+| `SENTRY_ORG` | Sentry source-map upload | Owner go-live gate | Organization slug, not a credential |
+| `SENTRY_PROJECT` | Sentry source-map upload | Owner go-live gate | Project slug, not a credential |
 | `PORT` | Railway / `next start` | Implemented | Injected by Railway |
 | `NODE_ENV` | Next.js | Implemented | Must not select the database |
 | `DATABASE_URL` | Neon pooled URL | Verified | Must be the `-pooler` host for the `APP_ENV` endpoint |

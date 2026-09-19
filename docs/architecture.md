@@ -13,6 +13,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) remains the development and Playwright default and the development rollback store, with `user` always stored as `null`. The `MAC_LIVE_BOOK` owner switch moves repo-book reads and operation-level writes together to Neon after verified collector or desk access; it may be on in development, staging, and production, and production requires it. In live mode desk pricing/custody settings, catalog references, and agreement shells are server-authoritative Neon rows; empty catalog/shell tables stay empty and an absent settings singleton is returned as Scenario 60/default constants without inserting it. Appearance and other personal preferences remain profile/client state. New data-URL previews remain browser-local. Do not delete or auto-migrate the browser book.
 - **Store modes** — `unknown` (not yet answered), `browser`, `live`, and **`unavailable`**. The server is authoritative. `unavailable` means a staging or production live prerequisite is missing: `/api/live-book` answers `503 { mode: "unavailable", error }`, the store publishes an empty hydrated state with no user, refuses writes without a fetch, and stops every automatic re-check (focus, visibility, new subscribers); `components/app-frame.tsx` renders `components/unavailable-page.tsx` in place of every route so no page-level fetch fires. "Try again" is one full reload. **Implemented.**
 - **Health** — `GET /api/health` (`app/api/health/route.ts`, helper `lib/health.mjs`) is the Railway health check: `force-dynamic`, `no-store`, `{ ok, appEnv, checks: { database, liveBook } }` with codes only. **Implemented.**
+- **Monitoring** — `@sentry/nextjs` initializes browser, Node, and edge runtimes when their DSNs are present. Uncaught request/render errors and explicit mail, R2, and checksum failures are captured; `/api/health` transactions are dropped. `lib/observability.mjs` removes cookies, tokens, signed URLs, recipient addresses, and object keys before events leave the app. Source maps upload only when the build receives the owner-managed Sentry token and project names. Code is **implemented**; project creation, owner email alert, and a real Railway Development event are **pending owner verification**.
 - **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
@@ -41,6 +42,8 @@ proxy.ts             server 403 for /admin without desk cookie
 components/          shells + shadcn + unavailable page
 lib/                 auth, store, mail, theme, env mapping, production readiness, Drizzle schema and repositories
 instrumentation.ts   Neon mapping guard + production readiness on Node server start
+instrumentation-client.ts browser Sentry initialization and navigation tracing
+lib/observability.mjs Sentry capture helpers and sensitive-data scrubber
 drizzle/             development-only migrations (probe through report snapshots)
 e2e/                 Playwright
 neon.ts              Neon config-as-code (Auth off)
@@ -55,13 +58,13 @@ Railway start command is `node tools/harness/start-mac-app.mjs start --hostname 
 
 Neon + Drizzle repositories and a default-off live-book adapter exist on the
 `development` branch. Browser state remains the default until the owner switch is
-enabled after import. `lib/storage/r2-object-store.mjs` can put originals when R2
+enabled after import. `lib/storage/r2-object-store.mjs` stores originals when R2
 names are set; production refuses a silent memory fallback. WorkOS and a Railway
 worker are not wired. Official cash and inventory stay outside this app.
 
 ## Out of scope for Phase 1 Kit equip
 
-Framework rewrite, tRPC/MCP product surface, R2, Sentry, and enabling Neon Auth
-remain out of the Kit equip change. The UI cutover stays behind an explicit
+Framework rewrite, tRPC/MCP product surface, and enabling Neon Auth remain out
+of the Kit equip change. The UI cutover stays behind an explicit
 development flag. Dual-write is not an allowed holding pattern: import first,
 then switch reads and operation-level writes together.

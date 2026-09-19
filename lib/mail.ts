@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 import { markMailFailed } from "@/lib/mail-delivery.mjs";
+import { captureOperationalError } from "@/lib/observability.mjs";
 import {
   MAIL_KINDS,
   type MailKind,
@@ -153,6 +154,7 @@ export async function dispatchCollectorAccessMail(
     mail,
     options,
     input.tokenId ? `collector-access/${input.tokenId}` : undefined,
+    input.tokenId,
   );
 }
 
@@ -359,6 +361,7 @@ async function deliver(
   mail: ComposedMail,
   options: MailDeliveryOptions = {},
   idempotencyKey?: string,
+  recordId?: string,
 ): Promise<OutboxItem> {
   const env = options.env ?? process.env;
   const apiKey = env.RESEND_API_KEY?.trim();
@@ -401,6 +404,10 @@ async function deliver(
     if (error) {
       markMailFailed(item, error);
       if (accessMail) throw new Error("COLLECTOR_ACCESS_EMAIL_FAILED");
+      await captureOperationalError(
+        error,
+        { operation: "mail.send", errorCode: "MAIL_SEND_FAILED", recordId: recordId ?? item.id },
+      );
       remember(item);
       return item;
     }
@@ -410,6 +417,14 @@ async function deliver(
     if (!accessMail) remember(item);
     return item;
   } catch (error) {
+    await captureOperationalError(
+      error,
+      {
+        operation: accessMail ? "collector_access_mail.send" : "mail.send",
+        errorCode: accessMail ? "COLLECTOR_ACCESS_EMAIL_FAILED" : "MAIL_SEND_FAILED",
+        recordId: recordId ?? item.id,
+      },
+    );
     if (accessMail) {
       throw new Error("COLLECTOR_ACCESS_EMAIL_FAILED", { cause: error });
     }
