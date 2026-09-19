@@ -364,7 +364,7 @@ export const photoObjects = pgTable(
     index("photo_objects_timepiece_id_idx").on(table.timepieceId),
     uniqueIndex("photo_objects_timepiece_checksum_uidx")
       .on(table.timepieceId, table.originalChecksum)
-      .where(sql`${table.status} <> 'abandoned'`),
+      .where(sql`${table.status} <> 'abandoned' and ${table.previewKey} is not null`),
   ],
 );
 

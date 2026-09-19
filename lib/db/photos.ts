@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, lt, ne } from "drizzle-orm";
+import { and, eq, isNotNull, lt, ne } from "drizzle-orm";
 import { photoObjectKeys } from "../storage/photo-object-key.mjs";
 import type { Database } from "./client";
 import type { Actor } from "./records";
@@ -92,6 +92,7 @@ async function activePhotoByChecksum(db: Database, timepieceId: string, checksum
         eq(photoObjects.timepieceId, timepieceId),
         eq(photoObjects.originalChecksum, checksum),
         ne(photoObjects.status, "abandoned"),
+        isNotNull(photoObjects.previewKey),
       ),
     )
     .limit(1);
@@ -252,10 +253,12 @@ export async function sweepPendingPhotos(
     const result = await matchingMetadata(store, row);
     if (result.state === "unverified") continue;
     const status = result.state === "match" ? "stored" : "abandoned";
-    await db
+    const transitioned = await db
       .update(photoObjects)
       .set({ status, ...(status === "stored" ? { receivedAt: now } : {}) })
-      .where(and(eq(photoObjects.id, row.id), eq(photoObjects.status, "pending")));
+      .where(and(eq(photoObjects.id, row.id), eq(photoObjects.status, "pending")))
+      .returning({ id: photoObjects.id });
+    if (transitioned.length === 0) continue;
     if (status === "stored") stored += 1;
     else abandoned += 1;
   }

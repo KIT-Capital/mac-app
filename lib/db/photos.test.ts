@@ -168,7 +168,7 @@ describe("direct photo uploads", { skip }, () => {
     await assert.rejects(() => mintPhotoPreviewUrl(db, store, actorB, upload.photoId), { message: "PHOTO_NOT_FOUND" });
   });
 
-  it("defaults legacy photo rows to stored", async () => {
+  it("keeps a legacy stored row while creating a direct-upload replacement", async () => {
     const customer = await registerCollector(db, {
       email: `collector-photo-legacy.${suffix}@mac.test`,
       name: "Photo Legacy",
@@ -200,7 +200,11 @@ describe("direct photo uploads", { skip }, () => {
       original: { size: 42, type: "image/jpeg", sha256: checksum },
       preview: { size: 21, type: "image/jpeg", sha256: "ef".repeat(32) },
     });
-    assert.deepEqual(upload, { photoId: legacy.id, status: "stored" });
+    assert.equal(upload.status, "pending");
+    assert.notEqual(upload.photoId, legacy.id);
+    const [unchanged] = await db.select().from(photoObjects).where(eq(photoObjects.id, legacy.id));
+    assert.equal(unchanged.status, "stored");
+    assert.equal(unchanged.previewKey, null);
   });
 
   it("allows desk staff to upload and view a collector photo", async () => {
@@ -284,6 +288,25 @@ describe("direct photo uploads", { skip }, () => {
       { checked: 1, stored: 0, abandoned: 0 },
     );
     assert.deepEqual(await sweepPendingPhotos(db, store), { checked: 1, stored: 1, abandoned: 0 });
+    await db
+      .update(photoObjects)
+      .set({ status: "pending", receivedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) })
+      .where(eq(photoObjects.id, next.photoId));
+    let metadataReads = 0;
+    assert.deepEqual(
+      await sweepPendingPhotos(db, { ...store, async headMetadata(key) {
+        const metadata = await store.headMetadata(key);
+        metadataReads += 1;
+        if (metadataReads === 2) {
+          await db
+            .update(photoObjects)
+            .set({ status: "stored" })
+            .where(eq(photoObjects.id, next.photoId));
+        }
+        return metadata;
+      } }),
+      { checked: 1, stored: 0, abandoned: 0 },
+    );
   });
 
   it("keeps pending photo metadata attached to its timepiece", async () => {
