@@ -65,9 +65,12 @@ stateDiagram-v2
   Reviewing --> Returned: appraiser requests better information
   Returned --> InVault: retail edits piece
   Reviewing --> ProvisionalAccepted: appraiser accepts + enters value
-  Reviewing --> ProvisionalRefused: does not meet appraisal criteria
-  ProvisionalRefused --> InVault: retail improves piece\nand attempts remain
+  Reviewing --> Refused: does not meet appraisal criteria\nfinal on record, attempt consumed
+  ProvisionalAccepted --> Refused: appraiser reverses\nbefore inspection, same attempt
+  Refused --> InVault: retail improves piece\nand attempts remain
+  Refused --> Reviewing: audited reopen\nof that same attempt
   ProvisionalAccepted --> FinalAccepted: physical inspection confirms\nacceptance + final value
+  FinalAccepted --> Reviewing: audited reopen\nof that same attempt
   FinalAccepted --> Locked: MAC signs a repo that lists this piece
   Locked --> InVault: repo bought back or liquidated\nand piece not moved to a successor
   Locked --> SuccessorLocked: admin Renew moves the collection
@@ -82,8 +85,10 @@ Rules:
 - The appraiser or super admin may save an unfinished review without consuming an appraisal opportunity, or return it for better information without consuming an opportunity.
 - A completed **Accept** or **Does not meet appraisal criteria** decision consumes one of at most **three** appraisal opportunities for that timepiece. Refused pieces remain in the database, remain tied to their current retail owner, and may be improved and resubmitted while opportunities remain.
 - Accept requires an appraiser-entered appraisal value. The appraiser may enter any non-negative dollar value. The catalog range is informational only; an out-of-range value receives a non-blocking warning and remains saveable.
-- A completed remote decision and value are **provisional**. Retail copy says **Provisional — physical inspection required**. The appraiser may revise both decision and value within that same attempt until personally inspecting the actual timepiece.
-- Physical-inspection confirmation freezes that attempt's final **Accept** decision and final appraisal value. MAC may not purchase the piece or activate a repo containing it before that confirmation. Reopening a final inspected attempt must be explicit and audited.
+- Physical inspection sits only on the purchase path, so **only an Accept is provisional**. A remote Accept reads **Provisional — physical inspection required**; inside that same attempt the appraiser may revise the value or reverse the decision to a refusal until personally inspecting the piece.
+- Physical-inspection confirmation freezes that attempt's final **Accept** decision and final appraisal value. MAC may not purchase the piece or activate a repo containing it before that confirmation.
+- A **refusal is final the moment it is recorded**. MAC never takes custody of a refused piece, so there is nothing to inspect: the refusal consumes its attempt, immediately unlocks retail edits, and stands as that attempt's result.
+- One reopen path covers both endings. Changing a recorded refusal **or** a final inspected acceptance takes the same explicit, audited **reopen** of that attempt. A reopen revises that attempt in place and never consumes another of the three; a reopened refusal that becomes an Accept is provisional again until inspection.
 - Grid cards and the full timepiece view show the current appraisal state and remaining opportunities. A refusal uses the retail phrase **Does not meet appraisal criteria** and a clear refusal icon; do not imply that the timepiece ceased to exist.
 - After a completed decision, the underlying piece becomes editable again unless it is bound to an active repo. Later edits do not rewrite the completed submission snapshot; a new review requires a new submission.
 - Catalog typical range may be copied or suggested by Sparkle. Collector copy = appraisal range. Desk meaning = indicative liquidation band.
