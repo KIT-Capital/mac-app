@@ -138,7 +138,7 @@ async function buildSnapshot(
       originalChecksum: photoObjects.originalChecksum,
     })
     .from(photoObjects)
-    .where(eq(photoObjects.timepieceId, piece.id));
+    .where(and(eq(photoObjects.timepieceId, piece.id), eq(photoObjects.status, "stored")));
   return {
     templateId: "mac-repo-v1",
     customer: { id: customer.id, email: customer.email, name: customer.name },

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { sha256Hex } from "../storage/object-store.mjs";
-import type { ObjectStore } from "./photos";
 import { getAgreement, getCurrentVersion, isVersionExecutable } from "./agreements";
 import type { Database } from "./client";
 import { assertIsolation, canPrepareAgreement, canReadAgreement } from "./isolation.mjs";
@@ -11,6 +10,10 @@ import { archivedDocuments, signatureEnvelopes } from "./schema";
 export type SignatureWebhook = {
   externalId: string;
   event: "collector_signed" | "mac_signed" | "complete";
+};
+
+type ArchiveObjectStore = {
+  put: (key: string, body: Uint8Array, checksum: string) => Promise<void>;
 };
 
 export async function sendForSignature(db: Database, actor: Actor, agreementId: string) {
@@ -91,7 +94,7 @@ export async function applySignatureWebhook(db: Database, payload: SignatureWebh
 
 export async function archiveSignedPdf(
   db: Database,
-  store: ObjectStore,
+  store: ArchiveObjectStore,
   actor: Actor,
   envelopeId: string,
   pdf: Uint8Array,
