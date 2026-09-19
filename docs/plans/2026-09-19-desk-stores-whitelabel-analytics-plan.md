@@ -40,6 +40,7 @@ erDiagram
   Tenant ||--o{ Member : owns
   Member ||--o{ ClientTimepiece : registers
   CatalogReference ||--o{ ClientTimepiece : "optional match"
+  ClientTimepiece ||--o{ AppraisalAttempt : reviewed_as
   Member ||--o{ Repo : party
   Repo ||--|{ RepoPiece : locks
   ClientTimepiece ||--o{ RepoPiece : listed
@@ -84,15 +85,30 @@ Watches registered to a member ID. Similar to catalog **plus**:
 - Multiple photos (existing five required + optional box/papers/more)
 - Optional **video** (R2, presigned PUT, no server file proxy). Cap duration in implementation (start at 60 seconds) unless the owner raises it
 - Condition and full descriptive fields as today
-- Appraisal **range**, one **chosen appraised price** inside the range, **appraised at**
+- Informational appraisal **range**, one appraiser-entered **appraisal value** (not constrained to the range), **appraised at**
 - Flags: in a repo collection (unsigned or signed), **locked in an activated repo** (belongs to MAC **in this app** until the repo is deactivated by whole-collection buyback, liquidated, or renewed)
 - Optional link to a catalog reference (brand/model/reference match). Serial lives here, never on the catalog
 
-Retail sees appraisal copy. Desk sees the same dollars as liquidation values.
+Retail sees appraisal copy. Desk sees the same appraiser-entered dollars as liquidation value. The range is FYI for both planes: entering a value below or above it produces a warning only and never blocks or changes the value.
+
+##### Appraisal attempts and physical inspection
+
+- Retail submits an unlocked timepiece for appraisal with its current information, current photo references, and **notes to the appraiser** (maximum 256 characters). Submission creates a frozen review snapshot and locks retail edits while review is pending.
+- Each timepiece may receive at most **three completed appraisal attempts**. A completed appraiser decision — **Accept** or **Does not meet appraisal criteria** — consumes one attempt. Saving an unfinished review, withdrawing it, or returning it for better information does not.
+- The appraiser (or super admin) must see the actual submitted photos and all submitted timepiece information. They may save for later, return the submission, accept it, or refuse it.
+- **Accept** requires one non-negative appraisal value. The appraiser may enter any value; the advisory range never constrains it. A below-range or above-range value gets a non-blocking warning.
+- **Does not meet appraisal criteria** requires no appraisal value. The refused timepiece and its completed attempt remain in the database, tied to the current retail owner. Retail sees that status and a clear refusal icon on collection grids and the full timepiece view.
+- After a completed decision, retail may again edit any piece that is not in an active repo, add or replace photos, change information or notes, and resubmit while attempts remain. Those edits never rewrite an earlier attempt's snapshot.
+- A remote decision and value are **provisional**. Retail copy says **Provisional — physical inspection required**. Within the same attempt, the appraiser may revise both the decision and value until personally inspecting the actual timepiece.
+- Physical-inspection confirmation freezes the attempt's final **Accept** decision and final appraisal value. MAC may not purchase the piece or activate a repo containing it before every included piece has a final inspected acceptance. Reopening a final attempt is an explicit audited action, never a silent edit, and does not create another attempt by itself.
+- Appraisal cards and details show the current state (`not submitted`, `under review`, `returned`, `provisionally accepted`, `does not meet appraisal criteria`, or `final after inspection`) and the number of completed attempts out of three.
+- Each attempt is its own record. Do not overwrite the timepiece row as a substitute for appraisal history, and do not event-source every keystroke.
+- This lifecycle depends on roles-plan **U-appraise-acl**. No appraisal write or review endpoint ships before that server fence is enforced.
+- Money math remains outside this unit. The new appraisal value does not silently replace the current LTV input; connecting it to the cash-offer formula requires the separate owner-approved money-math decision already reserved in `docs/workflows.md`.
 
 #### 4. Repos (heart of the Desk)
 
-Assembled **after** appraisal: the member picks **free** pieces (not already on an active repo) into a new repo. That generates cash to them (sale amount). At end of term they buy back the **whole** collection, the desk records liquidation, or admin renews (closes old, opens new).
+Assembled from **free** pieces (not already on an active repo) after appraisal. Draft assembly may begin from a provisionally accepted piece, but MAC cannot purchase or activate the repo until every included piece is physically inspected and finally accepted. At activation the member receives the sale amount. At end of term they buy back the **whole** collection, the desk records liquidation, or admin renews (closes old, opens new).
 
 Each repo stores: member ID + snapshotted party kind, list of timepiece ids, sale amount, frozen Scenario 60 **whole-collection** table and dates, signatures, book label.
 
@@ -160,10 +176,11 @@ Remove “Collector app” as the professional desk exit if roles-plan Desk menu
 1. **U-tenant** — `tenant_id` on catalog, customers, timepieces, agreements; default `MAC`; prefix + member ID allocation
 2. **U-catalog-exa** — one photo, no serial, last edited, sparkle suggestion, writes only by appraiser or super admin
 3. **U-members** — member ID display, desk members list, agreement populate from profile
-4. **U-client-pieces** — chosen price, appraisal date, locked flag, optional video
-5. **U-repos-heart** — chrome rename, assemble-from-free-pieces rules already in workflows
-6. **U-analytics** — snapshot facts, dashboard graphs, CSV/XLSX export
-7. **U-brand** — super-admin brand overlay; master creates tenants
+4. **U-client-pieces** — piece details, catalog link, locked flag, optional video
+5. **U-appraisal-lifecycle** — after roles-plan U-appraise-acl: three immutable submission snapshots per piece; 256-character retail note; review lock/return; Accept or Does not meet appraisal criteria; unrestricted value with range warning; provisional decision; physical-inspection finalization; grid/detail statuses; audited reopen
+6. **U-repos-heart** — chrome rename, assemble-from-free-pieces rules, and server refusal to purchase/activate until every included piece is finally accepted after physical inspection
+7. **U-analytics** — snapshot facts, dashboard graphs, CSV/XLSX export
+8. **U-brand** — super-admin brand overlay; master creates tenants
 
 ---
 
@@ -176,4 +193,4 @@ Remove “Collector app” as the professional desk exit if roles-plan Desk menu
 
 ## Owner confirmation
 
-**Approved 2026-09-19** together with the roles plan. Settled: Sparkle is per-row, range-only, suggestion-only, appraiser-only; retail Sparkle later; analytics is exportable operations facts, not QuickBooks; `PTK` stays an example until a tenant exists. Open: which vendor “Radar” is — ask before wiring that provider.
+**Approved 2026-09-19** together with the roles plan. Appraisal lifecycle amendment approved 2026-09-19: the range is FYI only; appraisal value is unrestricted; Accept/Refuse decisions; three completed attempts; frozen submission evidence; provisional until personal inspection; final inspected acceptance before MAC purchase or repo activation. Settled: Sparkle is per-row, range-only, suggestion-only, appraiser-only; retail Sparkle later; analytics is exportable operations facts, not QuickBooks; `PTK` stays an example until a tenant exists. Open: which vendor “Radar” is — ask before wiring that provider; which appraisal dollar drives the LTV/cash-offer formula remains a separate owner-approved money-math decision.
