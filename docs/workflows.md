@@ -50,7 +50,7 @@ flowchart TB
 
 **Shipped today:** `collector`, `staff`, `admin`. Collectors use an email link. Desk uses a password. Hidden “MAC desk staff” on login.
 
-**Approved, not yet shipped** (`2026-09-19` roles plan; each unit lands as its own PR): collector and dealer self-identify on signup and may change on profile; that tag is **frozen on each signed repo**. Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Passwords for everyone. SMS and WhatsApp for retail via Twilio (Norfolk AI now, MAC later). Master super admin is Ricardo Cidale. Seeded admins: Dov Tuzman, Rosario David (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
+**Approved, not yet shipped** (`2026-09-19` roles plan; each unit lands as its own PR): collector and dealer self-identify on signup and may change on profile; that tag is **frozen on each signed repo**. Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Passwords for everyone. SMS and WhatsApp for retail via Twilio (Norfolk AI now, MAC later). Master super admin is Ricardo Cidale. Seeded desk people: Dov Tuzman (appraiser), Rosario David (admin) (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
 
 Retail users **see** agreements, pieces, appraised values, and an “in an activated repo” flag. They do **not** edit a signed repo and they do **not** record a book end.
 

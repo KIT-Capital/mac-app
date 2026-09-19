@@ -134,7 +134,7 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 
 ### Acceptance Examples
 
-- AE1. Appraiser Dov accepts a piece; appraiser Rosario opens it and sees no Reopen control; super admin Ricardo does. Covers R1.
+- AE1. Appraiser Dov accepts a piece; a second appraiser opens it and sees no Reopen control; super admin Ricardo does. Admin Rosario sees the review read-only. Covers R1.
 - AE2. A piece with three completed decisions (any mix) shows "Appraisal closed" and no Request appraisal button; the server refuses a fourth submission. Covers R2.
 - AE3. A piece under review refuses a photo add and a field edit from its owner with `REVIEW_LOCKED`; after Return, both succeed; the seventh photo is accepted and the eighth refused. Covers R7, R8.
 - AE4. A collector with four appraised pieces selects three and a 12-month term; the maximum equals the sum of the three per-piece caps and the table shows twelve rows before any Apply. Covers R10, R26.

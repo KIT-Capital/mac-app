@@ -857,9 +857,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }), { operation: { action: "timepiece.create", timepiece: watch }, deferLive: true }),
       updateTimepiece: async (id, patch) => {
         const desk = isDeskRole(state.user?.role);
-        // Same fence the live book enforces (R5): admins operate the desk but
-        // never write appraisal numbers, in either book.
-        if (desk && patchNeedsAppraisal(patch) && !canEditAppraisal(state.user)) {
+        // Same fences the live book enforces, so both books answer alike (R25):
+        // admins never write appraisal numbers (R5), and moving a piece off
+        // `appraised` erases an appraiser's decision, so it needs the same role (R1).
+        const demotesAppraisal =
+          state.timepieces.find((w) => w.id === id)?.status === "appraised" &&
+          patch.status !== undefined &&
+          patch.status !== "appraised";
+        if (
+          desk &&
+          (patchNeedsAppraisal(patch) || demotesAppraisal) &&
+          !canEditAppraisal(state.user)
+        ) {
           return { ok: false, error: "ROLE_FORBIDDEN" };
         }
         return updateStore((prev) => ({
