@@ -1,6 +1,6 @@
 # Design system
 
-**Tier: CONTRACT** · Last verified: 2026-09-14
+**Tier: CONTRACT** · Last verified: 2026-09-19
 
 Mechanical Art Capital visual contract. Source: Limus Design 14 November 2022 and official Logo-FF. Details and screen list live in `design-reference.md`. This file is what agents must not “improve” locally.
 
@@ -34,6 +34,10 @@ Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plu
 - Collector tutorial: `/guide` (“How MAC works”), opened from Account, the phone menu, or first-time setup. Not a sixth top tab.
 - Desk tutorial: `/admin/guide`, listed as Tutorial inside the admin wall. Collectors cannot open it.
 - Opt-in phone review: `?view=phone` stages the collector at iPhone width on a computer. Default chrome stays full-bleed with no device frame. `?view=desktop` or **Show full screen** leaves that review.
+
+## Tenant overlay (proposed)
+
+Default tenant is Mechanical Art Capital. Do not restyle it. Decision `0004`: a **non-MAC** tenant may store its own navy/gold/champagne equivalents, wordmark, and logo objects. Only that tenant’s Super Admin writes those tokens. Implementation waits on `docs/plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Geist remains the face. Catalog sparkle (appraiser, gold) is an allowed control once that plan ships; it must not appear as a second brand mark.
 
 ## Language (overrides the 2022 deck)
 

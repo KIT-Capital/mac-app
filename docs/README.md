@@ -1,6 +1,6 @@
 # Docs index
 
-**Tier: CONTRACT** · Last verified: 2026-09-16
+**Tier: CONTRACT** · Last verified: 2026-09-19
 
 This is a **router, not a summary**. Mechanical Art Capital is a Next.js collector/desk app. Norfolk Kit client-safe tooling is equipped at `bf25a84ca761379ecfc8656793fec1f377f4b28a`. `product-os.lock.json` is **proposed**, not signed or adopted.
 
@@ -15,9 +15,12 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | Hosting, Railway, DNS, mail domain | `hosting.md` · `config-and-env-map.md` |
 | API routes or client store | `api.md` · `architecture.md` |
 | Auth, sessions, desk cookie | `security.md` · `architecture.md` |
-| Repo desk, repurchase, appraisal language | `business-logic.md` · `design-reference.md` |
+| Repo desk, repurchase, appraisal language | `business-logic.md` · `workflows.md` · `design-reference.md` |
+| Users, timepiece lock, repo active/inactive, buyback vs liquidated | `workflows.md` · `business-logic.md` · `decisions/0003-repo-lifecycle-language.md` |
+| Roles, dealer vs collector, Desk vs retail, SMS/WhatsApp | `workflows.md` · `plans/2026-09-19-roles-identity-repo-parties-plan.md` · `security.md` |
+| Desk catalog vs members vs client pieces vs repos, dashboard, white-label | `workflows.md` · `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md` · `decisions/0004-desk-stores-and-tenant-brand.md` · `design-system.md` |
 | Collector or desk in-app tutorial | `design-reference.md` · `business-logic.md` · `api.md` |
-| Repo operations book (open / past due / ends) | `business-logic.md` · `api.md` · `plans/2026-09-16-001-feat-repo-operations-book-plan.md` |
+| Repo operations book (open / past due / ends) | `business-logic.md` · `workflows.md` · `api.md` · `plans/2026-09-16-001-feat-repo-operations-book-plan.md` |
 | Live book exclusive piece, **renewed**, development cutover | `business-logic.md` · `plans/2026-09-17-001-feat-live-book-cutover-plan.md` |
 | Stored sale-and-repurchase PDFs (live mode) | `business-logic.md` · `api.md` · `plans/2026-09-17-002-feat-immutable-repo-agreements-plan.md` · `superpowers/specs/2026-09-17-immutable-repo-agreements-design.md` |
 | Secrets, env key names | `config-and-env-map.md` |
@@ -31,6 +34,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | `SYSTEM-GOVERNANCE-RULE.md` | CONTRACT | How docs govern; precedence; tiers |
 | `architecture.md` | CONTRACT | Next.js structure, storage, deploy |
 | `business-logic.md` | CONTRACT | Repo desk, not a loan |
+| `workflows.md` | CONTRACT | User / timepiece / repo lifecycle and glossary |
 | `api.md` | CONTRACT | Route handlers and client store |
 | `design-system.md` | CONTRACT | MAC visual contract |
 | `design-reference.md` | CONTRACT | 2022 Limus deck + language overrides |
