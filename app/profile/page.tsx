@@ -4,10 +4,12 @@ import Link from "next/link";
 import { Asterisk, Camera, Mail, Pencil, Phone, Power, RefreshCw, Settings, SlidersHorizontal, Star } from "lucide-react";
 import { BurgerButton } from "@/components/burger-menu";
 import { WatchPhoto } from "@/components/watch-photo";
+import { COLLECTOR_GUIDE } from "@/lib/nav";
 import { endClientSession } from "@/lib/session-client";
 import { useStore } from "@/lib/store";
 
 const TILES = [
+  COLLECTOR_GUIDE,
   { href: "/profile/membership", label: "Membership", icon: Star },
   { href: "/profile/promo", label: "Promo Codes", icon: Asterisk },
   { href: "/profile/preferences", label: "Preferences", icon: SlidersHorizontal },

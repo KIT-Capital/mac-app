@@ -407,6 +407,39 @@ test.describe("collector layouts", () => {
     await expect(page.getByRole("heading", { name: "Sign In to Your Collection" })).toBeVisible();
   });
 
+  test("collector guide is sale-and-repurchase and stays off the top tabs", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInHale(page);
+    const bar = page.getByRole("navigation", { name: "Collector" });
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole("link")).toHaveCount(5);
+    await expect(bar.getByRole("link", { name: "How MAC works" })).toHaveCount(0);
+    await page.setViewportSize({ width: 480, height: 1100 });
+    await openMenu(page);
+    await page.getByRole("link", { name: "How MAC works" }).click();
+    await expect(page.getByRole("heading", { name: "How MAC works" }).first()).toBeVisible();
+    await expect(page.getByText(/sale and repurchase/i)).toBeVisible();
+    await expect(page.getByText(/loan/i)).toHaveCount(0);
+    await expect(page.getByText(/Get Estimate/i)).toHaveCount(0);
+    await expect(page.getByText(/Manhattan/i)).toHaveCount(0);
+  });
+
+  test("new collectors can open the guide during setup", async ({ page }) => {
+    await page.goto("/signup");
+    await page.getByLabel("Full Legal Name").fill("Guide Reader");
+    await page.getByLabel("Email Address").fill(`guide.reader.${Date.now()}@example.com`);
+    await page.getByLabel("Direct Phone Number").fill("+1 (212) 555-0199");
+    await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
+    await page.getByRole("checkbox", { name: /privacy policy/i }).check();
+    await page.getByRole("button", { name: "Create Account" }).click();
+    await expect(page).toHaveURL(/\/collection\/setup/);
+    await page.getByRole("link", { name: "How MAC works" }).click();
+    await expect(page).toHaveURL(/\/guide/);
+    await expect(page.getByText(/sale and repurchase/i)).toBeVisible();
+    await page.getByRole("link", { name: "Back" }).first().click();
+    await expect(page).toHaveURL(/\/collection\/setup/);
+  });
+
   test("iPad shows the collector bar and a wider vault", async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 1180 });
     await signInHale(page);

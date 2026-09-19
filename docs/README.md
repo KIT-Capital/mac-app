@@ -16,6 +16,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | API routes or client store | `api.md` · `architecture.md` |
 | Auth, sessions, desk cookie | `security.md` · `architecture.md` |
 | Repo desk, repurchase, appraisal language | `business-logic.md` · `design-reference.md` |
+| Collector or desk in-app tutorial | `design-reference.md` · `business-logic.md` · `api.md` |
 | Repo operations book (open / past due / ends) | `business-logic.md` · `api.md` · `plans/2026-09-16-001-feat-repo-operations-book-plan.md` |
 | Live book exclusive piece, **renewed**, development cutover | `business-logic.md` · `plans/2026-09-17-001-feat-live-book-cutover-plan.md` |
 | Stored sale-and-repurchase PDFs (live mode) | `business-logic.md` · `api.md` · `plans/2026-09-17-002-feat-immutable-repo-agreements-plan.md` · `superpowers/specs/2026-09-17-immutable-repo-agreements-design.md` |

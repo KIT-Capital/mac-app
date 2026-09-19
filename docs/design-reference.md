@@ -22,7 +22,9 @@ Keep the slide layouts. Rewrite the loan words.
 3. **Add a timepiece** — guided required photos (front, back, left side of barrel, right side of barrel, clasp) labeled “Upload a photo,” optional box and papers photos, collector statements that they have the box and original documentation, optional video, manufacturer, missing-a-brand, model, reference, condition, box and papers, case metal / type / diameter, dial, buckle, strap or metal bracelet, Save + Appraise. After Appraise, only the desk can edit.
 4. **My Timepieces** — two-column grid, Appraised / Reviewing, PDF export, membership banner, `+` FAB. Tabs: Timepieces, Repurchase, Contact us, Account. Desktop and iPad headers include Log out next to the collector bar.
 5. **Sale & repurchase application** — hero photo, term (months), amount up to the appraisal purchase cap, delivery method, email, owner name, 18+, submit. No % scale or vault until the application is in.
-6. **Account** — Edit Profile / Log Out on the navy header, avatar, name, email, phone, then Membership / Promo Codes / Partners / Settings.
+6. **Account** — Edit Profile / Log Out on the navy header, avatar, name, email, phone, then How MAC works / Membership / Promo Codes / Preferences / Settings.
+7. **How MAC works** — signed-in collector tutorial: sale-and-repurchase steps, no loan words, no vault or scale figures. Phone menu and Account open it; the five top tabs stay the 2022 set.
+8. **Desk tutorial** — `/admin/guide` inside AdminChrome only. Staff walkthrough of overview, configure, catalog, assets, agreements, photos, mail, and access. Not linked from collector chrome.
 
 ## 2021 behavior detail
 

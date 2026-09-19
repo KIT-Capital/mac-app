@@ -6,10 +6,16 @@ import { CollectorShell } from "@/components/collector-shell";
 import { DeskShell } from "@/components/desk-shell";
 import { UnavailablePage } from "@/components/unavailable-page";
 import { isDesk } from "@/lib/catalog";
+import { COLLECTOR_GUIDE } from "@/lib/nav";
 import { useStore } from "@/lib/store";
 
 const PUBLIC = ["/", "/login", "/signup", "/privacy", "/verify", "/admin/password"];
-const ONBOARDING = ["/collection/setup", "/collection/add", "/collection/continue"];
+const ONBOARDING = [
+  "/collection/setup",
+  "/collection/add",
+  "/collection/continue",
+  COLLECTOR_GUIDE.href,
+];
 
 export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();

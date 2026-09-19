@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
+import { COLLECTOR_GUIDE } from "@/lib/nav";
 
 export default function CollectionSetupPage() {
   return (
@@ -28,11 +29,17 @@ export default function CollectionSetupPage() {
           </div>
         </div>
 
-        <div className="pt-8">
+        <div className="space-y-3 pt-8">
           <Link href="/collection/add?onboarding=1">
             <PillButton type="button" variant="gold">
               Add First Timepiece
             </PillButton>
+          </Link>
+          <Link
+            href={COLLECTOR_GUIDE.href}
+            className="block text-center text-[11px] tracking-[0.14em] text-mac-muted uppercase"
+          >
+            {COLLECTOR_GUIDE.label}
           </Link>
         </div>
       </div>

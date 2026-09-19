@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from "react";
 import {
   BookOpen,
   Camera,
+  CircleHelp,
   FileSpreadsheet,
   FileText,
   LayoutDashboard,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/guide", label: "Tutorial", icon: CircleHelp },
   { href: "/admin/config", label: "Configure", icon: Sliders },
   { href: "/admin/access", label: "Access & Roles", icon: Users2 },
   { href: "/admin/catalog", label: "Timepiece Catalog", icon: BookOpen },
