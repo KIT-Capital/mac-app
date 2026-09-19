@@ -186,7 +186,7 @@ describe("collector access rows", { skip }, () => {
     const redeemed = await redeemCollectorAccessToken(db, issued.token);
     sessionIds.push(redeemed.sessionId);
 
-    const desk = deskActor("staff", "desk@mechartcap.com");
+    const desk = deskActor("appraiser", "desk@mechartcap.com");
     await executeLiveBookOperation(db, desk, {
       action: "customer.update",
       id: owner.id,
@@ -213,7 +213,7 @@ describe("collector access rows", { skip }, () => {
     const oldSession = await redeemCollectorAccessToken(db, firstToken.token);
     sessionIds.push(oldSession.sessionId);
 
-    const desk = deskActor("staff", "desk@mechartcap.com");
+    const desk = deskActor("appraiser", "desk@mechartcap.com");
     await executeLiveBookOperation(db, desk, {
       action: "customer.update",
       id: owner.id,
@@ -267,7 +267,7 @@ describe("collector access rows", { skip }, () => {
       throw error;
     }
 
-    const desk = deskActor("staff", "desk@mechartcap.com");
+    const desk = deskActor("appraiser", "desk@mechartcap.com");
     const applicationName = `mac-suspension-race-${randomUUID()}`;
     const databaseUrl = new URL(String(process.env.DATABASE_URL));
     databaseUrl.searchParams.set("application_name", applicationName);

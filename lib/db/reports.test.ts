@@ -25,7 +25,7 @@ const createdCustomerIds: string[] = [];
 
 describe("Stage 7 contract report snapshots", { skip }, () => {
   const db = createDb();
-  const desk = deskActor("staff", "desk@mechartcap.com");
+  const desk = deskActor("appraiser", "desk@mechartcap.com");
   const store = memoryObjectStore();
 
   after(async () => {

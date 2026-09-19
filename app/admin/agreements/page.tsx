@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
-import { money } from "@/lib/catalog";
+import { isDesk, money } from "@/lib/catalog";
 import { bookLabel, utcToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
 import { persistableState } from "@/lib/session-persist.mjs";
@@ -451,7 +451,7 @@ export default function AdminAgreementsPage() {
                 <PillButton type="submit" variant="gold" className="md:w-auto px-6">
                   {a.bookEnd ? "Overwrite end" : "Record end"}
                 </PillButton>
-                {user?.role === "admin" && (!a.bookEnd || a.bookEnd.kind === "in_liquidation") ? (
+                {isDesk(user) && (!a.bookEnd || a.bookEnd.kind === "in_liquidation") ? (
                   <PillButton
                     type="button"
                     variant="navy"

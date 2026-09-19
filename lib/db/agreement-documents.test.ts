@@ -157,7 +157,7 @@ describe("agreement documents repository", { skip }, () => {
       APP_ENV: "development",
     });
     await assert.rejects(
-      () => executeLiveBookOperation(db, deskActor("staff", "desk@mechartcap.com"), {
+      () => executeLiveBookOperation(db, deskActor("appraiser", "desk@mechartcap.com"), {
         action: "agreement.remove",
         id,
       }),
@@ -207,7 +207,7 @@ describe("agreement documents repository", { skip }, () => {
     assert.equal(sent.recipientKind, "self");
     assert.equal(sentBytes, 0);
     await assert.rejects(
-      () => sendAgreementDocument(db, deskActor("staff", "desk@mechartcap.com"), {
+      () => sendAgreementDocument(db, deskActor("appraiser", "desk@mechartcap.com"), {
         documentId: built.id,
         recipientKind: "self",
       }, store, { env: {} }),

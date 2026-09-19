@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import type { WatchStatus } from "../types";
+import type { DeskRole, RetailRole, WatchStatus } from "../types";
 import { isReservedDeskEmail } from "../desk-identities.mjs";
 import type { Database } from "./client";
 import {
@@ -14,8 +14,8 @@ import { centsToDollars, dollarsToCents } from "./money.mjs";
 import { customers, timepieces } from "./schema";
 
 export type Actor =
-  | { role: "collector"; customerId: string; email: string }
-  | { role: "staff" | "admin"; email: string; staffId?: string };
+  | { role: RetailRole; customerId: string; email: string }
+  | { role: DeskRole; email: string; staffId?: string; isMaster?: boolean };
 
 const DEFAULT_PREFERENCES = {
   appearance: "dark",
@@ -235,15 +235,27 @@ export async function createTimepiece(
   return row;
 }
 
+export type DeskActorRecord = Extract<Actor, { role: DeskRole }>;
+
+/** Type-narrowing twin of `isDeskActor` from `isolation.mjs`. */
+export function asDeskActor(actor: Actor | null | undefined): DeskActorRecord | null {
+  return actor && isDeskActor(actor) ? (actor as DeskActorRecord) : null;
+}
+
 export function toCollectorActor(customer: typeof customers.$inferSelect): Actor {
   return collectorActor(customer);
 }
 
-export function deskActor(role: "staff" | "admin", email: string, staffId?: string): Actor {
+export function deskActor(
+  role: DeskRole,
+  email: string,
+  staffId?: string,
+  isMaster = false,
+): Actor {
   if (!isDeskActor({ role, email })) {
     throw new Error("INVALID_DESK_ACTOR");
   }
-  return { role, email, staffId };
+  return { role, email, staffId, isMaster };
 }
 
 export function timepieceDollars(row: typeof timepieces.$inferSelect) {

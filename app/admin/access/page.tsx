@@ -3,9 +3,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
+import { isDesk } from "@/lib/catalog";
+import { DESK_ROLES, canCreateDeskRole, roleLabel } from "@/lib/roles.mjs";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
-import type { ManagedUser, UserStatus } from "@/lib/types";
+import type { DeskRole, ManagedUser, UserStatus } from "@/lib/types";
 
 const BLANK: ManagedUser = {
   id: "",
@@ -22,10 +24,15 @@ type StaffMember = {
   id: string;
   name: string;
   email: string;
-  role: "staff" | "admin";
+  role: DeskRole;
+  isMaster: boolean;
   mustRotate: boolean;
+  passwordSet: boolean;
+  manageable: boolean;
   disabledAt: string | null;
 };
+
+type StaffViewer = { role: DeskRole; isMaster: boolean };
 
 async function fetchStaffMembers() {
   const response = await fetch("/api/desk/staff", {
@@ -34,9 +41,17 @@ async function fetchStaffMembers() {
   }).catch(() => null);
   const body = await response?.json().catch(() => null) as {
     mode?: "browser" | "live";
+    viewer?: StaffViewer;
     members?: StaffMember[];
   } | null;
   return response?.ok && body?.mode ? body : null;
+}
+
+function memberStatus(member: StaffMember) {
+  if (member.disabledAt) return "disabled";
+  if (!member.passwordSet) return "first sign-in pending";
+  if (member.mustRotate) return "password change required";
+  return "active";
 }
 
 export default function AdminAccessPage() {
@@ -47,35 +62,40 @@ export default function AdminAccessPage() {
   const [error, setError] = useState("");
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffMode, setStaffMode] = useState<"browser" | "live" | null>(null);
+  const [staffViewer, setStaffViewer] = useState<StaffViewer | null>(null);
   const [staffDraft, setStaffDraft] = useState({
     name: "",
     email: "",
-    role: "staff" as "staff" | "admin",
+    role: "admin" as DeskRole,
   });
+  const desk = isDesk(user);
+  const creatableRoles = DESK_ROLES.filter((role) => canCreateDeskRole(staffViewer, role));
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [staffBusy, setStaffBusy] = useState(false);
   const staffActionInFlight = useRef(false);
 
   async function loadStaff() {
-    if (user?.role !== "admin") return;
+    if (!desk) return;
     const body = await fetchStaffMembers();
     if (!body?.mode) return;
     setStaffMode(body.mode);
+    setStaffViewer(body.viewer ?? null);
     setStaff(body.members ?? []);
   }
 
   useEffect(() => {
-    if (user?.role !== "admin") return;
+    if (!desk) return;
     let current = true;
     void fetchStaffMembers().then((body) => {
       if (!current || !body?.mode) return;
       setStaffMode(body.mode);
+      setStaffViewer(body.viewer ?? null);
       setStaff(body.members ?? []);
     });
     return () => {
       current = false;
     };
-  }, [user?.role]);
+  }, [desk]);
 
   async function staffAction(body: Record<string, unknown>) {
     if (staffActionInFlight.current) return;
@@ -104,7 +124,7 @@ export default function AdminAccessPage() {
       if (result?.warning === "INVITE_EMAIL_FAILED") {
         setNotice("Staff account created. Hand over the temporary password; invite email failed.");
       }
-      setStaffDraft({ name: "", email: "", role: "staff" });
+      setStaffDraft({ name: "", email: "", role: "admin" });
       await loadStaff();
     } finally {
       staffActionInFlight.current = false;
@@ -192,12 +212,13 @@ export default function AdminAccessPage() {
         ])}
       />
 
-      {user?.role === "admin" && staffMode === "live" ? (
+      {desk && staffMode === "live" ? (
         <section className="mt-12 border-t border-white/10 pt-8">
           <h2 className="text-lg font-medium text-white">Desk staff</h2>
           <p className="mt-1 max-w-2xl text-sm text-white/55">
             Add, disable, or reset desk accounts. Temporary passwords appear once and must be
-            handed over out of band.
+            handed over out of band. Admins manage admins; only a super admin adds appraisers or
+            super admins; only the master account edits other super admins.
           </p>
           {temporaryPassword ? (
             <div className="mt-4 border border-[#FCB040]/40 bg-[#FCB040]/10 p-4">
@@ -246,11 +267,12 @@ export default function AdminAccessPage() {
                 value={staffDraft.role}
                 onChange={(event) => setStaffDraft({
                   ...staffDraft,
-                  role: event.target.value as "staff" | "admin",
+                  role: event.target.value as DeskRole,
                 })}
               >
-                <option className="bg-black" value="staff">Staff</option>
-                <option className="bg-black" value="admin">Admin</option>
+                {creatableRoles.map((role) => (
+                  <option key={role} className="bg-black" value={role}>{roleLabel(role)}</option>
+                ))}
               </NativeSelect>
             </Field>
             <PillButton type="submit" variant="gold" disabled={staffBusy}>
@@ -262,27 +284,31 @@ export default function AdminAccessPage() {
             rows={staff.map((member) => [
               member.name,
               member.email,
-              member.role,
-              member.disabledAt ? "disabled" : member.mustRotate ? "password change required" : "active",
-              <div key={member.id} className="flex gap-3 text-[#FCB040]">
-                <button
-                  type="button"
-                  disabled={staffBusy}
-                  onClick={() => void staffAction({
-                    action: member.disabledAt ? "enable" : "disable",
-                    id: member.id,
-                  })}
-                >
-                  {member.disabledAt ? "Enable" : "Disable"}
-                </button>
-                <button
-                  type="button"
-                  disabled={staffBusy}
-                  onClick={() => void staffAction({ action: "reset", id: member.id })}
-                >
-                  Reset
-                </button>
-              </div>,
+              member.isMaster ? `${roleLabel(member.role)} · master` : roleLabel(member.role),
+              memberStatus(member),
+              member.manageable ? (
+                <div key={member.id} className="flex gap-3 text-[#FCB040]">
+                  <button
+                    type="button"
+                    disabled={staffBusy}
+                    onClick={() => void staffAction({
+                      action: member.disabledAt ? "enable" : "disable",
+                      id: member.id,
+                    })}
+                  >
+                    {member.disabledAt ? "Enable" : "Disable"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={staffBusy}
+                    onClick={() => void staffAction({ action: "reset", id: member.id })}
+                  >
+                    Reset
+                  </button>
+                </div>
+              ) : (
+                <span key={member.id} className="text-white/35">—</span>
+              ),
             ])}
           />
         </section>

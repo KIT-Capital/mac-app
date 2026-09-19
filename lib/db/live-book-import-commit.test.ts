@@ -24,7 +24,7 @@ const createdCustomerIds: string[] = [];
 const createdAgreementIds: string[] = [];
 const createdPieceIds: string[] = [];
 const createdStaffIds: string[] = [];
-const desk = deskActor("staff", `desk.import.${suffix}@mac.test`);
+const desk = deskActor("appraiser", `desk.import.${suffix}@mac.test`);
 const email = `hale.import.${suffix}@mac.test`;
 const customerId = `cust-${email}`;
 const haleExport = {
@@ -205,7 +205,7 @@ describe("commitLiveBookImport", { skip }, () => {
     const staff = await createStaffAccount(db, {
       name: "Import Staff",
       email: staffEmail,
-      role: "staff",
+      role: "appraiser",
       passwordHash: await hashStaffPassword("temporary password 123"),
     });
     createdStaffIds.push(staff.id);
@@ -234,12 +234,12 @@ describe("commitLiveBookImport", { skip }, () => {
     const staff = await createStaffAccount(db, {
       name: "Authenticated Import Staff",
       email: `authenticated-import.${suffix}@mac.test`,
-      role: "staff",
+      role: "appraiser",
       passwordHash: await hashStaffPassword("temporary password 123"),
       mustRotate: false,
     });
     createdStaffIds.push(staff.id);
-    const actor = deskActor("staff", staff.email, staff.id);
+    const actor = deskActor("appraiser", staff.email, staff.id);
     const payload = remappedImport(`import-owner.${suffix}@mac.test`, "authenticated");
     const committed = await commitLiveBookImport(db, actor, payload, {
       confirmLiveImport: true,

@@ -3,6 +3,8 @@ import {
   DESK_SESSION_KEYS_INVALID,
   parseDeskSessionKeys,
 } from "@/lib/desk-session-keys.mjs";
+import { normalizeDeskRole } from "@/lib/roles.mjs";
+import type { DeskRole } from "@/lib/types";
 
 export const DESK_COOKIE = "mac_desk";
 export { DESK_SESSION_KEYS_INVALID, parseDeskSessionKeys };
@@ -15,7 +17,7 @@ function sign(payload: string, secret: string) {
 
 type DeskSession = {
   email: string;
-  role: "admin" | "staff";
+  role: DeskRole;
   kid: string;
   iat: number;
   exp: number;
@@ -24,7 +26,7 @@ type DeskSession = {
 
 export function issueDeskToken(
   email: string,
-  role: "admin" | "staff",
+  role: DeskRole,
   options: {
     env?: Record<string, string | undefined>;
     now?: number;
@@ -85,11 +87,13 @@ export function readDeskToken(
     ) {
       return null;
     }
-    if (parsed.role !== "admin" && parsed.role !== "staff") return null;
+    // Tokens minted before the roles migration may still carry "staff".
+    const role = normalizeDeskRole(parsed.role);
+    if (!role) return null;
     if (!parsed.email) return null;
     return {
       email: parsed.email,
-      role: parsed.role,
+      role,
       kid: key.kid,
       iat: Number(parsed.iat),
       exp: Number(parsed.exp),

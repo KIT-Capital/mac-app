@@ -1,6 +1,7 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { deskRoleForEmail } from "@/lib/auth";
+import { isDeskRole } from "@/lib/roles.mjs";
 import { getDb } from "@/lib/db/client";
 import {
   bootstrapFirstAdmin,
@@ -34,7 +35,7 @@ export function developmentDeskFixture(
   const password = String(passwordInput ?? "");
   const email = emailInput.trim().toLowerCase();
   const role = deskRoleForEmail(email);
-  if (!expected || (role !== "admin" && role !== "staff")) return null;
+  if (!expected || !isDeskRole(role)) return null;
   const supplied = Buffer.from(password);
   const configured = Buffer.from(expected);
   if (
@@ -46,8 +47,9 @@ export function developmentDeskFixture(
   return {
     id: `development:${email}`,
     email,
-    name: role === "admin" ? "Development Admin" : "Development Staff",
+    name: role === "admin" ? "Development Admin" : "Development Appraiser",
     role,
+    isMaster: false,
     mustRotate: false,
     sessionValidAfter: new Date(0),
     disabledAt: null,

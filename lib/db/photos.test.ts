@@ -326,7 +326,7 @@ describe("direct photo uploads", { skip }, () => {
       brand: "Omega",
       model: "Speedmaster",
     });
-    const desk = { role: "staff" as const, email: "desk@mechartcap.com" };
+    const desk = { role: "appraiser" as const, email: "desk@mechartcap.com" };
     const uploadParts = parts(`desk-${suffix}`);
     const upload = await requestPhotoUpload(db, store, desk, {
       timepieceId: piece.id, kind: "front", ...uploadParts.input,

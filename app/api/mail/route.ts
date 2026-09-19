@@ -1,3 +1,4 @@
+import { isDeskRole } from "@/lib/roles.mjs";
 import { headers } from "next/headers";
 import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { getDb } from "@/lib/db/client";
@@ -18,7 +19,7 @@ function clientIp(headerList: Headers) {
 async function deskSession() {
   const resolved = await requestActor();
   if ("error" in resolved) return resolved;
-  return resolved.actor.role === "staff" || resolved.actor.role === "admin"
+  return isDeskRole(resolved.actor.role)
     ? resolved
     : { error: "DESK_SESSION_REQUIRED" };
 }

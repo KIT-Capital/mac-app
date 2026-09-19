@@ -28,7 +28,7 @@ const createdCustomerIds: string[] = [];
 
 describe("Stage 5 sign + archive", { skip }, () => {
   const db = createDb();
-  const desk = deskActor("staff", "desk@mechartcap.com");
+  const desk = deskActor("appraiser", "desk@mechartcap.com");
   const store = memoryObjectStore();
 
   after(async () => {

@@ -43,12 +43,15 @@ import {
   timepieces,
 } from "./schema";
 
+import { isDeskRole } from "../roles.mjs";
+import type { DeskRole } from "../types";
+
 type Operation = ReturnType<typeof parseLiveBookOperation>;
 
 function isDesk(
   actor: Actor,
-): actor is Extract<Actor, { role: "staff" | "admin" }> {
-  return actor.role === "staff" || actor.role === "admin";
+): actor is Extract<Actor, { role: DeskRole }> {
+  return isDeskRole(actor.role);
 }
 
 function requireDesk(actor: Actor) {
@@ -56,7 +59,7 @@ function requireDesk(actor: Actor) {
 }
 
 async function ownedPiece(db: Database, actor: Actor, id: string) {
-  const where = actor.role === "collector"
+  const where = !isDesk(actor)
     ? and(eq(timepieces.id, id), eq(timepieces.customerId, actor.customerId))
     : eq(timepieces.id, id);
   const [piece] = await db.select().from(timepieces).where(where).limit(1);
@@ -65,7 +68,7 @@ async function ownedPiece(db: Database, actor: Actor, id: string) {
 }
 
 async function ownedAgreement(db: Database, actor: Actor, id: string) {
-  const where = actor.role === "collector"
+  const where = !isDesk(actor)
     ? and(eq(liveAgreements.id, id), eq(liveAgreements.customerId, actor.customerId))
     : eq(liveAgreements.id, id);
   const [agreement] = await db.select().from(liveAgreements).where(where).for("update").limit(1);
@@ -328,7 +331,7 @@ async function executeLiveBookOperationCore(
   const action = operation.action;
 
   if (action === "settings.update") {
-    if (actor.role !== "admin") throw new Error("ADMIN_REQUIRED");
+    requireDesk(actor);
     const patch = operation.patch as Record<string, unknown>;
     await db.execute(sql`select pg_advisory_xact_lock(hashtext('mac-desk-settings'))`);
     const [current] = await db.select().from(deskSettings)
@@ -798,7 +801,7 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "agreement.renew") {
-    if (actor.role !== "admin") throw new Error("ADMIN_REQUIRED");
+    requireDesk(actor);
     const agreement = await ownedAgreement(db, actor, String(operation.id));
     const scale = await serverAgreementScale(db, 12);
     const planned = planRenewal(

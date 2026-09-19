@@ -20,10 +20,15 @@ describe("development desk fixture", () => {
         email: "admin@mechartcap.com",
         name: "Development Admin",
         role: "admin",
+        isMaster: false,
         mustRotate: false,
         sessionValidAfter: new Date(0),
         disabledAt: null,
       },
+    );
+    assert.equal(
+      developmentDeskFixture("desk@mechartcap.com", "runtime-only-password", env)?.role,
+      "appraiser",
     );
     assert.equal(
       developmentDeskFixture("admin@mechartcap.com", "wrong", env),

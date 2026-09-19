@@ -29,11 +29,7 @@ export async function resolveDeskActor(
     }
     if (staff.mustRotate) return { error: "PASSWORD_ROTATION_REQUIRED" };
     return {
-      actor: deskActor(
-        staff.role as "staff" | "admin",
-        staff.email,
-        staff.id,
-      ),
+      actor: deskActor(staff.role, staff.email, staff.id, staff.isMaster),
     };
   }
   return { actor: deskActor(desk.role, desk.email) };

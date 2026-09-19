@@ -1,3 +1,4 @@
+import { isDeskRole } from "@/lib/roles.mjs";
 import { createDb } from "@/lib/db/client";
 import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { commitLiveBookImport } from "@/lib/db/live-book-import-commit";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       resolved.error === "PASSWORD_ROTATION_REQUIRED" ? 409 : 403,
     );
   }
-  if (resolved.actor.role !== "admin" && resolved.actor.role !== "staff") {
+  if (!isDeskRole(resolved.actor.role)) {
     return json({ error: "Desk session required." }, 403);
   }
   if (liveBookFlagOn()) {

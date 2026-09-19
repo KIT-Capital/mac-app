@@ -1,5 +1,8 @@
 export type WatchStatus = "not_evaluated" | "reviewing" | "appraised";
-export type Role = "collector" | "staff" | "admin";
+/** Retail roles live on the front of the app; desk roles enter `/admin`. See `lib/roles.mjs`. */
+export type RetailRole = "collector" | "dealer";
+export type DeskRole = "admin" | "appraiser" | "super_admin";
+export type Role = RetailRole | DeskRole;
 export type UserStatus = "active" | "invited" | "suspended";
 export type PhotoKind =
   | "front"

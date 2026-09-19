@@ -22,10 +22,10 @@ export const DEMO_USERS: ManagedUser[] = [
   },
   {
     id: "usr-desk",
-    name: "Desk Partner",
+    name: "Desk Appraiser",
     email: "desk@mechartcap.com",
     phone: "+1 (833) 209-0972",
-    role: "staff",
+    role: "appraiser",
     status: "active",
     member: true,
     lastActive: "2026-09-12",

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import {
   consumeAccessRateLimit,
   releaseAccessRateLimit,
@@ -17,6 +17,13 @@ import {
   serializeStaffPasswordHash,
   verifyStaffPassword,
 } from "../staff-password.mjs";
+import {
+  canCreateDeskRole,
+  canManageDeskAccount,
+  canSeeDeskAccount,
+  isDeskRole,
+} from "../roles.mjs";
+import type { DeskRole } from "../types";
 
 const DUMMY_PASSWORD_HASH =
   "$scrypt$131072$8$1$tsxcUKwlwSA7TXAmc2P9aw$03kovydDWBxIHiIrgjQelFgbKIEnthJAcqkCcSRZCLzhbg6wFBeXhhIUm_0scAiKykAxlvKILgtRl0JBsj0Ong";
@@ -24,36 +31,47 @@ const DUMMY_PASSWORD_HASH =
 export type StaffActor = {
   id: string;
   email: string;
-  role: "staff" | "admin";
+  role: DeskRole;
+  isMaster?: boolean;
 };
 type StaffAccount = Omit<typeof staffAccounts.$inferSelect, "role"> & {
-  role: "staff" | "admin";
+  role: DeskRole;
 };
 type StaffTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 type StaffInput = {
   name: string;
   email: string;
-  role: "staff" | "admin";
+  role: DeskRole;
   passwordHash: string;
   mustRotate?: boolean;
 };
+
+/** A row that can never sign in: seeded people before their first password. */
+export const PASSWORD_NOT_SET = "PASSWORD_NOT_SET";
+/** The actor's role may not create, edit, disable, or reset that target. */
+export const ROLE_FORBIDDEN = "ROLE_FORBIDDEN";
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-function passwordColumns(serialized: string) {
+function passwordColumns(serialized: string, setAt = new Date()) {
   const parsed = parseStaffPasswordHash(serialized);
   if (!parsed) throw new Error("STAFF_PASSWORD_HASH_INVALID");
   return {
     passwordHash: parsed.hash,
     passwordSalt: parsed.salt,
     passwordParams: parsed.params,
+    passwordSetAt: setAt,
   };
 }
 
+/** Rows without a password verify against the fixed dummy hash and never match. */
 function storedPassword(row: typeof staffAccounts.$inferSelect) {
+  if (!row.passwordHash || !row.passwordSalt || !row.passwordParams) {
+    return DUMMY_PASSWORD_HASH;
+  }
   return serializeStaffPasswordHash({
     hash: row.passwordHash,
     salt: row.passwordSalt,
@@ -61,8 +79,12 @@ function storedPassword(row: typeof staffAccounts.$inferSelect) {
   });
 }
 
+export function hasPassword(row: { passwordHash: string | null }) {
+  return Boolean(row.passwordHash);
+}
+
 function typedStaff(row: typeof staffAccounts.$inferSelect): StaffAccount {
-  if (row.role !== "staff" && row.role !== "admin") {
+  if (!isDeskRole(row.role)) {
     throw new Error("STAFF_ROLE_INVALID");
   }
   return { ...row, role: row.role };
@@ -71,7 +93,6 @@ function typedStaff(row: typeof staffAccounts.$inferSelect): StaffAccount {
 async function lockStaffActor(
   tx: StaffTransaction,
   actor: StaffActor,
-  adminOnly = false,
 ) {
   const [row] = await tx.select().from(staffAccounts).where(and(
     eq(staffAccounts.id, actor.id),
@@ -79,9 +100,7 @@ async function lockStaffActor(
     isNull(staffAccounts.disabledAt),
   )).for("update").limit(1);
   if (!row) throw new Error("SESSION_INVALID");
-  const trusted = typedStaff(row);
-  if (adminOnly && trusted.role !== "admin") throw new Error("ADMIN_REQUIRED");
-  return trusted;
+  return typedStaff(row);
 }
 
 async function lockStaffPair(
@@ -101,10 +120,11 @@ async function lockStaffPair(
   );
   if (!actorRow) throw new Error("SESSION_INVALID");
   const trusted = typedStaff(actorRow);
-  if (trusted.role !== "admin") throw new Error("ADMIN_REQUIRED");
-  const target = rows.find((row) => row.id === targetId);
-  if (!target) throw new Error("STAFF_NOT_FOUND");
-  return { trusted, target: typedStaff(target) };
+  const targetRow = rows.find((row) => row.id === targetId);
+  if (!targetRow) throw new Error("STAFF_NOT_FOUND");
+  const target = typedStaff(targetRow);
+  if (!canManageDeskAccount(trusted, target)) throw new Error(ROLE_FORBIDDEN);
+  return { trusted, target };
 }
 
 export async function lockStaffForDeskMutation(
@@ -149,13 +169,19 @@ export async function createStaffAccount(db: Database, input: StaffInput) {
   return typedStaff(row);
 }
 
+/**
+ * Creates the Doppler-held bootstrap admin while nobody on the desk can sign
+ * in yet. Seeded rows without a password do not count: they cannot log in.
+ */
 export async function bootstrapFirstAdmin(
   db: Database,
   env: Record<string, string | undefined> = process.env,
 ) {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mac-staff-bootstrap'))`);
-    const existing = await tx.select({ id: staffAccounts.id }).from(staffAccounts).limit(1);
+    const existing = await tx.select({ id: staffAccounts.id }).from(staffAccounts)
+      .where(isNotNull(staffAccounts.passwordHash))
+      .limit(1);
     if (existing.length) return null;
     const email = normalizeEmail(env.DESK_BOOTSTRAP_ADMIN_EMAIL ?? "");
     const serialized = env.DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH?.trim() ?? "";
@@ -280,17 +306,27 @@ export async function verifyStaffCredentials(
   return typedStaff(row);
 }
 
+/** Every desk role lists the desk; super-admin rows appear only to super admins. */
 export async function listStaffAccounts(db: Database, actor: StaffActor) {
-  if (actor.role !== "admin") throw new Error("ADMIN_REQUIRED");
-  return db.select({
+  if (!isDeskRole(actor.role)) throw new Error("DESK_REQUIRED");
+  const rows = await db.select({
     id: staffAccounts.id,
     name: staffAccounts.name,
     email: staffAccounts.email,
     role: staffAccounts.role,
+    isMaster: staffAccounts.isMaster,
     mustRotate: staffAccounts.mustRotate,
+    passwordHash: staffAccounts.passwordHash,
     disabledAt: staffAccounts.disabledAt,
     createdAt: staffAccounts.createdAt,
-  }).from(staffAccounts);
+  }).from(staffAccounts).orderBy(staffAccounts.createdAt);
+  return rows
+    .filter((row) => canSeeDeskAccount(actor, row))
+    .map(({ passwordHash, ...row }) => ({
+      ...row,
+      passwordSet: Boolean(passwordHash),
+      manageable: canManageDeskAccount(actor, row),
+    }));
 }
 
 export async function addStaffAccount(
@@ -299,17 +335,19 @@ export async function addStaffAccount(
   input: {
     name: string;
     email: string;
-    role: "staff" | "admin";
+    role: DeskRole;
     clientAddress: string;
   },
 ) {
   const email = normalizeEmail(input.email);
   if (!email.includes("@")) throw new Error("STAFF_EMAIL_INVALID");
   if (!input.name.trim()) throw new Error("STAFF_NAME_INVALID");
+  if (!isDeskRole(input.role)) throw new Error("STAFF_ROLE_INVALID");
   const temporaryPassword = randomBytes(18).toString("base64url");
   const serialized = await hashStaffPassword(temporaryPassword);
   const row = await db.transaction(async (tx) => {
-    const trusted = await lockStaffActor(tx, actor, true);
+    const trusted = await lockStaffActor(tx, actor);
+    if (!canCreateDeskRole(trusted, input.role)) throw new Error(ROLE_FORBIDDEN);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
     const [customer, staff] = await Promise.all([
       tx.select({ id: customers.id }).from(customers)
@@ -345,16 +383,16 @@ export async function setStaffDisabled(
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mac-active-admin'))`);
     }
     const { trusted, target } = await lockStaffPair(tx, actor, targetId);
-    if (disabled && target.role === "admin" && !target.disabledAt) {
-      const otherAdmin = await tx.select({ id: staffAccounts.id })
+    if (disabled && !target.disabledAt) {
+      const otherActive = await tx.select({ id: staffAccounts.id })
         .from(staffAccounts)
         .where(and(
-          eq(staffAccounts.role, "admin"),
           isNull(staffAccounts.disabledAt),
+          isNotNull(staffAccounts.passwordHash),
           ne(staffAccounts.id, targetId),
         ))
         .limit(1);
-      if (!otherAdmin.length) throw new Error("LAST_ACTIVE_ADMIN_REQUIRED");
+      if (!otherActive.length) throw new Error("LAST_ACTIVE_ADMIN_REQUIRED");
     }
     const changedAt = new Date();
     const [row] = await tx.update(staffAccounts).set({
@@ -380,9 +418,8 @@ export async function resetStaffPassword(
     const { trusted } = await lockStaffPair(tx, actor, targetId);
     const changedAt = new Date();
     const [updated] = await tx.update(staffAccounts).set({
-      ...passwordColumns(serialized),
+      ...passwordColumns(serialized, changedAt),
       mustRotate: true,
-      passwordSetAt: changedAt,
       sessionValidAfter: changedAt,
       updatedAt: changedAt,
     }).where(eq(staffAccounts.id, targetId)).returning();
@@ -413,14 +450,14 @@ export async function rotateStaffPassword(
   const serialized = await hashStaffPassword(newPassword);
   return db.transaction(async (tx) => {
     const trusted = await lockStaffActor(tx, actor);
+    if (!hasPassword(trusted)) throw new Error(PASSWORD_NOT_SET);
     if (!await verifyStaffPassword(input.currentPassword, storedPassword(trusted))) {
       throw new Error("DESK_PASSWORD_INVALID");
     }
     const changedAt = new Date();
     const [updated] = await tx.update(staffAccounts).set({
-      ...passwordColumns(serialized),
+      ...passwordColumns(serialized, changedAt),
       mustRotate: false,
-      passwordSetAt: changedAt,
       sessionValidAfter: changedAt,
       updatedAt: changedAt,
     }).where(and(

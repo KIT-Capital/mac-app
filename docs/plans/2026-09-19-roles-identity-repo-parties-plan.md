@@ -133,8 +133,8 @@ Today collectors use an email link and have no password. Desk roles are only `st
 
 One PR each. Do not combine auth with signing in one PR.
 
-1. **U-roles** — Role enum, master flag, permission helpers, tests. Seed three desk users. Remove public “MAC desk staff” reveal. Desk menu item for desk sessions only.
-2. **U-passwords** — Retail password on signup/sign-in; self-service email reset for all roles; first-login set password for the three seeded people; lock/disable retail accounts for super admin (and admin on retail only).
+1. **U-roles** — Role enum, master flag, permission helpers (`lib/roles.mjs`), tests. Migration 0020 seeds the three desk people with no password. Desk menu item for desk sessions only (already in the drawer). The login-page “MAC desk staff” reveal stays until U-passwords gives everyone a password box, otherwise desk people could not sign in.
+2. **U-passwords** — One password box for everyone; remove the “MAC desk staff” reveal; retail password on signup/sign-in; self-service email reset for all roles; first-login set-password link for rows with no password (the three seeded people); lock/disable retail accounts for desk roles.
 3. **U-party** — Onboarding collector/dealer; profile edit; snapshot `partyKind` on create and renew; exclusive live piece flag on retail UI.
 4. **U-appraise-acl** — Server refuses catalog/piece value writes unless actor is appraiser or super admin; unsigned repos only for per-repo freeze; admin can read.
 5. **U-mac-sign** — Checklist + MAC signs last + only appraiser/super admin; admin cannot complete MAC sign; retail still cannot edit a signed repo.
