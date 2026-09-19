@@ -80,12 +80,12 @@ const REQUIRED_SHOT_PROMPTS = [
   "Upload a photo of the clasp",
 ] as const;
 
-export async function completeTimepieceIntakePhotos(page: Page) {
-  for (const prompt of REQUIRED_SHOT_PROMPTS) {
+export async function completeTimepieceIntakePhotos(page: Page, uniqueFiles = false) {
+  for (const [index, prompt] of REQUIRED_SHOT_PROMPTS.entries()) {
     await page.getByLabel(prompt, { exact: true }).setInputFiles({
       name: `${prompt}.png`,
       mimeType: "image/png",
-      buffer: INTAKE_PNG,
+      buffer: uniqueFiles ? Buffer.concat([INTAKE_PNG, Buffer.from([index])]) : INTAKE_PNG,
     });
     await expect(page.getByRole("img", { name: prompt })).toBeVisible();
   }

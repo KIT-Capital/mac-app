@@ -140,6 +140,257 @@ test.describe("collector app", () => {
     await expect(page).toHaveURL(/\/collection\/add/);
   });
 
+  test("live intake validates required inputs before creating a timepiece", async ({ page }) => {
+    const email = "photo-preflight@example.com";
+    let mutations = 0;
+    await signInHale(page);
+    await page.route("**/api/live-book", async (route) => {
+      if (route.request().method() === "POST") mutations += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(route.request().method() === "POST"
+          ? { mode: "live", acknowledged: true }
+          : {
+              mode: "live",
+              viewer: { role: "collector", email, customerId: "cust-photo-preflight" },
+              book: {
+                timepieces: [],
+                agreements: [],
+                users: [],
+                photos: [],
+                profiles: {
+                  [email]: {
+                    name: "Photo Preflight",
+                    email,
+                    phone: "",
+                    member: false,
+                    avatar: "",
+                    role: "collector",
+                    onboardingComplete: true,
+                    preferences: {},
+                  },
+                },
+                catalog: [],
+                shells: [],
+                settings: { requireFourPhotos: true },
+                applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.55 },
+              },
+            }),
+      });
+    });
+
+    const liveRead = page.waitForResponse((response) =>
+      response.url().includes("/api/live-book") && response.request().method() === "GET",
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await liveRead;
+    await expect(page.getByText("Richard Mille")).toHaveCount(0);
+    await page.getByRole("link", { name: "Add a timepiece" }).click();
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText(/Add a photo of the front of the timepiece/i)).toBeVisible();
+    expect(mutations).toBe(0);
+  });
+
+  test("live intake uploads and confirms every required photo before saving", async ({ page }) => {
+    const email = "photo-success@example.com";
+    const operations: Array<{ action?: string; patch?: { images?: string[] } }> = [];
+    const photoActions: string[] = [];
+    await signInHale(page);
+    await page.route("**/api/live-book", async (route) => {
+      if (route.request().method() === "POST") {
+        operations.push(route.request().postDataJSON());
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(route.request().method() === "POST"
+          ? { mode: "live", acknowledged: true }
+          : {
+              mode: "live",
+              viewer: { role: "collector", email, customerId: "cust-photo-success" },
+              book: {
+                timepieces: [],
+                agreements: [],
+                users: [],
+                photos: [],
+                profiles: {
+                  [email]: {
+                    name: "Photo Success",
+                    email,
+                    phone: "",
+                    member: false,
+                    avatar: "",
+                    role: "collector",
+                    onboardingComplete: true,
+                    preferences: {},
+                  },
+                },
+                catalog: [],
+                shells: [],
+                settings: { requireFourPhotos: true },
+                applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.55 },
+              },
+            }),
+      });
+    });
+    await page.route("**/api/photos", async (route) => {
+      const body = route.request().postDataJSON() as { action: string; kind?: string; photoId?: string };
+      photoActions.push(body.action);
+      if (body.action === "request-upload") {
+        const photoId = `photo-${body.kind}`;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            mode: "live",
+            upload: {
+              photoId,
+              status: "pending",
+              original: { url: `https://upload.test/${photoId}/original`, headers: {} },
+              preview: { url: `https://upload.test/${photoId}/preview`, headers: {} },
+            },
+          }),
+        });
+        return;
+      }
+      if (body.action === "preview-url") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            mode: "live",
+            url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+            expiresAt: "2030-01-01T00:00:00.000Z",
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ mode: "live", photo: { id: body.photoId, status: "stored" } }),
+      });
+    });
+    await page.route("https://upload.test/**", (route) => route.fulfill({ status: 200, body: "" }));
+
+    const liveRead = page.waitForResponse((response) =>
+      response.url().includes("/api/live-book") && response.request().method() === "GET",
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await liveRead;
+    await page.getByRole("link", { name: "Add a timepiece" }).click();
+    await completeTimepieceIntakePhotos(page, true);
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page).toHaveURL(/\/collection\/tp-/);
+    expect(photoActions.filter((action) => action === "request-upload")).toHaveLength(5);
+    expect(photoActions.filter((action) => action === "confirm")).toHaveLength(5);
+    expect(operations.filter((operation) => operation.action === "timepiece.create")).toHaveLength(1);
+    const updates = operations.filter((operation) => operation.action === "timepiece.update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0].patch?.images).toEqual([
+      "photo-front",
+      "photo-back",
+      "photo-left",
+      "photo-right",
+      "photo-clasp",
+    ]);
+  });
+
+  test("stored photo ids resolve to previews and missing ids fall back to illustrations", async ({ page }) => {
+    const email = "photo-preview@example.com";
+    const previewRequests: string[] = [];
+    await signInHale(page);
+    await page.route("**/api/photos", async (route) => {
+      const body = route.request().postDataJSON() as { action: string; photoId: string };
+      previewRequests.push(body.photoId);
+      if (body.photoId === "photo-missing") {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ mode: "live", error: "PHOTO_NOT_FOUND" }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        }),
+      });
+    });
+    await page.route("**/api/live-book", async (route) => {
+      const watch = (id: string, model: string, image: string) => ({
+        id,
+        ownerEmail: email,
+        brand: "Cartier",
+        model,
+        images: [image],
+        photoKinds: ["front"],
+        status: "not_evaluated",
+        financeable: true,
+        condition: "Excellent",
+        boxPapers: "Box and papers",
+        caseMetal: "Steel",
+        caseType: "Round",
+        caseDiameter: "40mm",
+        dialColor: "White",
+        buckle: "Folding clasp",
+        band: "bracelet",
+        bandMaterial: "Steel",
+        complication: "Date",
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          viewer: { role: "collector", email, customerId: "cust-photo-preview" },
+          book: {
+            timepieces: [
+              watch("piece-preview", "Preview Watch", "photo-preview"),
+              watch("piece-missing", "Missing Watch", "photo-missing"),
+            ],
+            agreements: [],
+            users: [],
+            photos: [],
+            profiles: {
+              [email]: {
+                name: "Photo Preview",
+                email,
+                phone: "",
+                member: false,
+                avatar: "",
+                role: "collector",
+                onboardingComplete: true,
+                preferences: {},
+              },
+            },
+            catalog: [],
+            shells: [],
+            settings: {},
+            applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.55 },
+          },
+        }),
+      });
+    });
+
+    const liveRead = page.waitForResponse((response) =>
+      response.url().includes("/api/live-book") && response.request().method() === "GET",
+    );
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await liveRead;
+    await expect(page.getByText("Preview Watch")).toBeVisible();
+
+    await expect(page.getByRole("img", { name: "Preview Watch" })).toHaveAttribute("src", /^data:image\/png/);
+    await expect(page.getByRole("img", { name: "Missing Watch" })).toHaveAttribute("src", /^\/watches\//);
+    expect(previewRequests.sort()).toEqual(["photo-missing", "photo-preview"]);
+  });
+
   test("promo HOUSE65 persists after navigation", async ({ page }) => {
     await signInHale(page);
     await page.goto("/profile/promo");
@@ -159,6 +410,10 @@ test.describe("collector app", () => {
   });
 
   test("new collector starts empty and does not see the vault", async ({ page }) => {
+    let photoApiRequests = 0;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/photos") photoApiRequests += 1;
+    });
     await page.goto("/signup");
     await page.getByLabel("Full Legal Name").fill("Ada Locke");
     await page.getByLabel("Email Address").fill(`ada.locke.${Date.now()}@example.com`);
@@ -170,6 +425,7 @@ test.describe("collector app", () => {
     await page.getByRole("link", { name: "Add First Timepiece" }).click();
     await completeTimepieceIntakePhotos(page);
     await page.getByRole("button", { name: "Save" }).click();
+    expect(photoApiRequests).toBe(0);
     await page.getByRole("button", { name: "Enter Collection" }).click();
     await expect(page.getByRole("heading", { name: "My Timepieces" })).toBeVisible();
     await expect(page.getByText("Royal Oak Selfwinding")).toBeVisible();

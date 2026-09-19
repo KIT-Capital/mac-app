@@ -3,7 +3,7 @@ import { and, eq, isNotNull, lt, ne } from "drizzle-orm";
 import { photoObjectKeys } from "../storage/photo-object-key.mjs";
 import type { Database } from "./client";
 import type { Actor } from "./records";
-import { photoObjects, timepieces } from "./schema";
+import { livePreviews, photoObjects, timepieces } from "./schema";
 
 type ObjectStore = {
   presignPut: (
@@ -19,6 +19,8 @@ type UploadPart = {
   type: string;
   sha256: string;
 };
+
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export type RequestPhotoUploadInput = {
   timepieceId: string;
@@ -131,6 +133,15 @@ function matchesUpload(row: typeof photoObjects.$inferSelect, input: RequestPhot
   );
 }
 
+function assertMatchingKind(row: typeof photoObjects.$inferSelect, kind: string) {
+  if (row.kind !== kind) throw new Error("PHOTO_CHECKSUM_IN_USE");
+}
+
+async function reuseStoredPhoto(db: Database, row: typeof photoObjects.$inferSelect) {
+  await db.transaction((tx) => setCurrentPreview(tx, row));
+  return { photoId: row.id, status: "stored" as const };
+}
+
 export async function requestPhotoUpload(
   db: Database,
   store: ObjectStore,
@@ -144,8 +155,9 @@ export async function requestPhotoUpload(
   const piece = await scopedPiece(db, actor, input.timepieceId);
 
   const existing = await activePhotoByChecksum(db, piece.id, input.original.sha256);
+  if (existing) assertMatchingKind(existing, input.kind);
   if (existing?.status === "stored") {
-    return { photoId: existing.id, status: "stored" as const };
+    return reuseStoredPhoto(db, existing);
   }
   if (existing) {
     if (!matchesUpload(existing, input)) throw new Error("PHOTO_UPLOAD_INVALID");
@@ -156,7 +168,8 @@ export async function requestPhotoUpload(
       .returning();
     if (refreshed) return uploadUrls(store, refreshed);
     const raced = await activePhotoByChecksum(db, piece.id, input.original.sha256);
-    if (raced?.status === "stored") return { photoId: raced.id, status: "stored" as const };
+    if (raced) assertMatchingKind(raced, input.kind);
+    if (raced?.status === "stored") return reuseStoredPhoto(db, raced);
     throw new Error("PHOTO_NOT_FOUND");
   }
 
@@ -188,8 +201,9 @@ export async function requestPhotoUpload(
     if (constraintName(error) !== "photo_objects_timepiece_checksum_uidx") throw error;
     const raced = await activePhotoByChecksum(db, piece.id, input.original.sha256);
     if (!raced) throw error;
+    assertMatchingKind(raced, input.kind);
     if (raced.status === "stored") {
-      return { photoId: raced.id, status: "stored" as const };
+      return reuseStoredPhoto(db, raced);
     }
     if (!matchesUpload(raced, input)) throw new Error("PHOTO_UPLOAD_INVALID");
     row = raced;
@@ -213,21 +227,65 @@ async function matchingMetadata(store: ObjectStore, row: typeof photoObjects.$in
   return { state: "match" as const };
 }
 
+async function setCurrentPreview(
+  tx: Transaction,
+  row: typeof photoObjects.$inferSelect,
+  preserveDifferentCurrent = false,
+) {
+  await tx
+    .select({ id: timepieces.id })
+    .from(timepieces)
+    .where(eq(timepieces.id, row.timepieceId))
+    .for("update")
+    .limit(1);
+  if (preserveDifferentCurrent) {
+    const [current] = await tx
+      .select({ id: livePreviews.id })
+      .from(livePreviews)
+      .where(and(eq(livePreviews.timepieceId, row.timepieceId), eq(livePreviews.kind, row.kind)))
+      .limit(1);
+    if (current && current.id !== row.id) return;
+  }
+  await tx.delete(livePreviews).where(and(
+    eq(livePreviews.timepieceId, row.timepieceId),
+    eq(livePreviews.kind, row.kind),
+    ne(livePreviews.id, row.id),
+  ));
+  await tx.insert(livePreviews).values({
+    id: row.id,
+    timepieceId: row.timepieceId,
+    kind: row.kind,
+    previewUrl: null,
+    photoObjectId: row.id,
+  }).onConflictDoUpdate({
+    target: livePreviews.id,
+    set: { kind: row.kind, previewUrl: null, photoObjectId: row.id },
+  });
+}
+
 export async function confirmPhotoUpload(db: Database, store: ObjectStore, actor: Actor, photoId: string) {
   const row = await scopedPhoto(db, actor, photoId);
-  if (row.status === "stored") return row;
+  if (row.status === "stored") {
+    await db.transaction((tx) => setCurrentPreview(tx, row, true));
+    return row;
+  }
   if (row.status !== "pending") throw new Error("PHOTO_NOT_FOUND");
   const result = await matchingMetadata(store, row);
   if (result.state === "size") throw new Error("PHOTO_SIZE_MISMATCH");
   if (result.state !== "match") return row;
-  const [stored] = await db
-    .update(photoObjects)
-    .set({ status: "stored", receivedAt: new Date() })
-    .where(and(eq(photoObjects.id, row.id), eq(photoObjects.status, "pending")))
-    .returning();
+  const stored = await db.transaction(async (tx) => {
+    const [transitioned] = await tx
+      .update(photoObjects)
+      .set({ status: "stored", receivedAt: new Date() })
+      .where(and(eq(photoObjects.id, row.id), eq(photoObjects.status, "pending")))
+      .returning();
+    if (!transitioned) return null;
+    await setCurrentPreview(tx, transitioned);
+    return transitioned;
+  });
   if (stored) return stored;
   const current = await scopedPhoto(db, actor, row.id);
-  if (current.status === "stored") return current;
+  if (current.status === "stored") return confirmPhotoUpload(db, store, actor, row.id);
   throw new Error("PHOTO_NOT_FOUND");
 }
 
@@ -253,11 +311,17 @@ export async function sweepPendingPhotos(
     const result = await matchingMetadata(store, row);
     if (result.state === "unverified") continue;
     const status = result.state === "match" ? "stored" : "abandoned";
-    const transitioned = await db
-      .update(photoObjects)
-      .set({ status, ...(status === "stored" ? { receivedAt: now } : {}) })
-      .where(and(eq(photoObjects.id, row.id), eq(photoObjects.status, "pending")))
-      .returning({ id: photoObjects.id });
+    const transitioned = await db.transaction(async (tx) => {
+      const changed = await tx
+        .update(photoObjects)
+        .set({ status, ...(status === "stored" ? { receivedAt: now } : {}) })
+        .where(and(eq(photoObjects.id, row.id), eq(photoObjects.status, "pending")))
+        .returning({ id: photoObjects.id });
+      if (changed.length && status === "stored") {
+        await setCurrentPreview(tx, row);
+      }
+      return changed;
+    });
     if (transitioned.length === 0) continue;
     if (status === "stored") stored += 1;
     else abandoned += 1;

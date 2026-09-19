@@ -72,12 +72,16 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   standard base64 even though request metadata uses lowercase hexadecimal.
   Repeating an identical pending upload for the same piece reuses its photo id.
   A matching stored row returns its id and `stored` status without new PUT URLs.
+  Reusing the same original bytes for a different shot kind returns
+  `PHOTO_CHECKSUM_IN_USE`; one stored photo cannot satisfy two guided slots.
 - The browser PUT must preserve signed `Content-Length`, `Content-Type`,
   `X-Amz-Checksum-Sha256`, and `If-None-Match: *` headers. A 412 means the
   object may already exist and should be followed by `confirm`.
 - `confirm` performs checksum-enabled metadata HEADs for both objects. Missing
   objects or checksum headers remain pending; a size mismatch returns
   `PHOTO_SIZE_MISMATCH`; only matching size and SHA-256 metadata becomes stored.
+  The same transaction attaches the stored photo id to `live_previews` with a
+  null legacy URL. Repeating `confirm` repairs a missing preview attachment.
 - `preview-url` returns only `{ url, expiresAt }` for a stored photo visible to
   the actor. Foreign, pending, abandoned, and unknown ids all return
   `PHOTO_NOT_FOUND`.

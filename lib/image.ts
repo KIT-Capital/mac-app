@@ -6,7 +6,34 @@ export const SAMPLE_WATCH_IMAGES = [
   "/watches/patek-5524g.jpg",
 ];
 
-export function readImageFile(file: File): Promise<string> {
+export type ResizedImage = {
+  blob: Blob;
+  dataUrl: string;
+};
+
+export type ImageReadResult = {
+  original: Blob;
+  preview: Blob;
+  previewDataUrl: string;
+  originalSha256: string;
+  previewSha256: string;
+};
+
+async function sha256(blob: Blob) {
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function blobDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function resizeImage(file: Blob): Promise<ResizedImage> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -24,7 +51,16 @@ export function readImageFile(file: File): Promise<string> {
       }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.82));
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Could not read image"));
+          return;
+        }
+        void blobDataUrl(blob).then(
+          (dataUrl) => resolve({ blob, dataUrl }),
+          reject,
+        );
+      }, "image/jpeg", 0.82);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -32,4 +68,29 @@ export function readImageFile(file: File): Promise<string> {
     };
     img.src = url;
   });
+}
+
+export function readImagePreview(
+  file: Blob,
+  resize: (source: Blob) => Promise<ResizedImage> = resizeImage,
+) {
+  return resize(file);
+}
+
+export async function readImageFile(
+  file: Blob,
+  resize: (source: Blob) => Promise<ResizedImage> = resizeImage,
+): Promise<ImageReadResult> {
+  const resized = await readImagePreview(file, resize);
+  const [originalSha256, previewSha256] = await Promise.all([
+    sha256(file),
+    sha256(resized.blob),
+  ]);
+  return {
+    original: file,
+    preview: resized.blob,
+    previewDataUrl: resized.dataUrl,
+    originalSha256,
+    previewSha256,
+  };
 }
