@@ -205,6 +205,22 @@ export async function bootstrapFirstAdmin(
       await writeDeskAudit(tx, staff, "staff.bootstrap", id, "bootstrap");
       return staff;
     }
+    // The bootstrap email is a seeded desk person who has no password yet:
+    // give that row the bootstrap password and keep its seeded role and name.
+    const [seeded] = await tx.update(staffAccounts).set({
+      ...password,
+      mustRotate: true,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(staffAccounts.email, email),
+      isNull(staffAccounts.passwordHash),
+      isNull(staffAccounts.disabledAt),
+    )).returning();
+    if (seeded) {
+      const staff = typedStaff(seeded);
+      await writeDeskAudit(tx, staff, "staff.bootstrap", staff.id, "bootstrap");
+      return staff;
+    }
     const [concurrent] = await tx.select().from(staffAccounts)
       .where(eq(staffAccounts.email, email))
       .limit(1);
@@ -286,7 +302,8 @@ export async function verifyStaffCredentials(
     ]);
     throw error;
   }
-  if (!valid || !row || row.disabledAt) {
+  // A row without a password can never sign in, whatever the dummy-hash verify said.
+  if (!valid || !row || row.disabledAt || !hasPassword(row)) {
     return null;
   }
   await Promise.all([
@@ -352,11 +369,14 @@ export async function addStaffAccount(
     const [customer, staff] = await Promise.all([
       tx.select({ id: customers.id }).from(customers)
         .where(eq(customers.email, email)).limit(1),
-      tx.select({ id: staffAccounts.id }).from(staffAccounts)
+      tx.select().from(staffAccounts)
         .where(eq(staffAccounts.email, email)).limit(1),
     ]);
     if (customer[0]) throw new Error("STAFF_EMAIL_RESERVED");
-    if (staff[0]) throw new Error("STAFF_EXISTS");
+    if (staff[0]) {
+      // Do not confirm hidden super-admin emails to roles that may not list them.
+      throw new Error(canSeeDeskAccount(trusted, typedStaff(staff[0])) ? "STAFF_EXISTS" : ROLE_FORBIDDEN);
+    }
     const [created] = await tx.insert(staffAccounts).values({
       id: randomUUID(),
       name: input.name.trim(),
@@ -415,7 +435,10 @@ export async function resetStaffPassword(
   const temporaryPassword = randomBytes(18).toString("base64url");
   const serialized = await hashStaffPassword(temporaryPassword);
   const row = await db.transaction(async (tx) => {
-    const { trusted } = await lockStaffPair(tx, actor, targetId);
+    const { trusted, target } = await lockStaffPair(tx, actor, targetId);
+    // A person who has never set a password gets a first sign-in link (U-passwords),
+    // not a temporary password another desk member could use to act as them.
+    if (!hasPassword(target)) throw new Error(PASSWORD_NOT_SET);
     const changedAt = new Date();
     const [updated] = await tx.update(staffAccounts).set({
       ...passwordColumns(serialized, changedAt),

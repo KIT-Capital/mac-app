@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     const code = error instanceof Error ? error.message : "STAFF_ACTION_FAILED";
     const status = code === "SESSION_INVALID" || code === "DESK_REQUIRED" || code === "ROLE_FORBIDDEN" ? 403
       : code === "PASSWORD_ROTATION_REQUIRED" ? 409
-        : code === "STAFF_EXISTS" || code === "LAST_ACTIVE_ADMIN_REQUIRED" ? 409
+        : code === "STAFF_EXISTS" || code === "LAST_ACTIVE_ADMIN_REQUIRED" || code === "PASSWORD_NOT_SET" ? 409
       : code === "STAFF_EMAIL_RESERVED" || code.endsWith("_INVALID") ? 422
         : code === "STAFF_NOT_FOUND" ? 404
           : 500;

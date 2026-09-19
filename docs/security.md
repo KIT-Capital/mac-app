@@ -71,8 +71,12 @@ and forced rotation flag. Roles are `admin`, `appraiser`, and `super_admin`
 is the master super admin, `rc@mechartcap.com`; it cannot be disabled, reset,
 or demoted by anyone. The three seeded desk people (Ricardo Cidale, Dov Tuzman,
 Rosario David) are inserted by migration with **no password**; a row without a
-password verifies against the fixed dummy hash and can never sign in until its
-first password is set. Unknown and disabled emails use the same dummy path.
+password verifies against the fixed dummy hash and is refused even on a match,
+so it can never sign in until its first password is set. Unknown and disabled
+emails use the same dummy path. A passwordless row cannot be given a temporary
+password by another desk member (`PASSWORD_NOT_SET`); it gets a first sign-in
+link in the passwords unit. If the bootstrap email names a seeded passwordless
+row, bootstrap sets that row's password and keeps its seeded role.
 Failed password attempts atomically reserve both per-email and per-address
 Postgres windows before scrypt, limiting concurrent memory use; successful
 verification releases both reservations.

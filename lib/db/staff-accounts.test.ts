@@ -538,7 +538,51 @@ describe("staff accounts repository", { skip }, () => {
       assert.equal(await verifyStaffCredentials(db, row.email, "anything at all 123", {
         address: `seed-${row.id}-${suffix}`,
       }), null);
+      // Even a verifier that says "match" cannot sign a passwordless row in.
+      assert.equal(await verifyStaffCredentials(db, row.email, "dummy preimage", {
+        address: `seed-match-${row.id}-${suffix}`,
+        verifyPassword: async () => true,
+      }), null);
+      await clearAccessRateLimit(db, "desk-password-email", row.email);
     }
+  });
+
+  it("refuses a temporary-password reset for a row that never set a password", async () => {
+    const superAdmin = await account("reset-seed-super", "super_admin");
+    const [seededAdmin] = await db.select().from(staffAccounts).where(and(
+      eq(staffAccounts.role, "admin"),
+      isNull(staffAccounts.passwordHash),
+      inArray(staffAccounts.email, SEEDED_DESK_ACCOUNTS.map((seed) => seed.email)),
+    )).limit(1);
+    if (!seededAdmin) return;
+    await assert.rejects(
+      () => resetStaffPassword(db, superAdmin, seededAdmin.id, "127.0.0.1"),
+      /PASSWORD_NOT_SET/,
+    );
+  });
+
+  it("does not confirm hidden super-admin emails to an admin through add", async () => {
+    const admin = await account("oracle-admin", "admin");
+    const hidden = await account("oracle-super", "super_admin");
+    await assert.rejects(
+      () => addStaffAccount(db, admin, {
+        name: "Probe",
+        email: hidden.email,
+        role: "admin",
+        clientAddress: "127.0.0.1",
+      }),
+      /ROLE_FORBIDDEN/,
+    );
+    const visible = await account("oracle-visible", "admin");
+    await assert.rejects(
+      () => addStaffAccount(db, admin, {
+        name: "Probe",
+        email: visible.email,
+        role: "admin",
+        clientAddress: "127.0.0.1",
+      }),
+      /STAFF_EXISTS/,
+    );
   });
 
   it("fences desk-account verbs by role and protects the master row", async () => {
@@ -590,6 +634,50 @@ describe("staff accounts repository", { skip }, () => {
     assert.equal(adminView.find((row) => row.id === appraiser.id)?.manageable, false);
     const superView = await listStaffAccounts(db, superAdmin);
     assert.ok(superView.some((row) => row.id === masterRow.id && row.manageable === false));
+  });
+
+  it("bootstraps onto a seeded passwordless row with the same email and keeps its role", async () => {
+    const schema = `staff_seed_bootstrap_${randomUUID().replaceAll("-", "")}`;
+    await db.execute(sql.raw(`create schema "${schema}"`));
+    await db.execute(sql.raw(
+      `create table "${schema}".staff_accounts (like public.staff_accounts including all)`,
+    ));
+    await db.execute(sql.raw(
+      `create table "${schema}".desk_audit_log (like public.desk_audit_log including all)`,
+    ));
+    await db.execute(sql.raw(
+      `create table "${schema}".customers (like public.customers including all)`,
+    ));
+    const email = `seed-master.${suffix}@mac.test`;
+    const env = {
+      DESK_BOOTSTRAP_ADMIN_EMAIL: email,
+      DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH: await hashStaffPassword("bootstrap password 123"),
+    };
+    const inSchema = <T>(work: (isolated: ReturnType<typeof createDb>) => Promise<T>) =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql.raw(`set local search_path to "${schema}", public`));
+        return work(tx as unknown as ReturnType<typeof createDb>);
+      });
+    try {
+      await inSchema((isolated) => isolated.insert(staffAccounts).values({
+        id: `seed-${suffix}`,
+        name: "Seeded Master",
+        email,
+        role: "super_admin",
+        isMaster: true,
+        mustRotate: true,
+      }));
+      const result = await inSchema((isolated) => bootstrapFirstAdmin(isolated, env));
+      assert.ok(result);
+      assert.equal(result.id, `seed-${suffix}`);
+      assert.equal(result.role, "super_admin");
+      assert.equal(result.isMaster, true);
+      assert.equal(result.mustRotate, true);
+      assert.ok(result.passwordHash);
+      assert.equal(await inSchema((isolated) => bootstrapFirstAdmin(isolated, env)), null);
+    } finally {
+      await db.execute(sql.raw(`drop schema "${schema}" cascade`));
+    }
   });
 
   it("bootstraps once under concurrency in an isolated schema", async () => {
