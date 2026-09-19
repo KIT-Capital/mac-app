@@ -525,7 +525,7 @@ describe("staff accounts repository", { skip }, () => {
     }
   });
 
-  it("seeds the master and two admins with no password and refuses their sign-in", async () => {
+  it("seeds the master, the appraiser, and the admin with no password and refuses their sign-in", async () => {
     const seeded = await db.select().from(staffAccounts)
       .where(inArray(staffAccounts.email, SEEDED_DESK_ACCOUNTS.map((seed) => seed.email)));
     assert.equal(seeded.length, 3);
@@ -534,6 +534,12 @@ describe("staff accounts repository", { skip }, () => {
     assert.equal(master.role, "super_admin");
     assert.equal(master.isMaster, true);
     assert.equal(seeded.filter((row) => row.isMaster).length, 1);
+    // The migrated rows carry the seeded roles: Dov appraises, Rosario administers.
+    for (const seed of SEEDED_DESK_ACCOUNTS) {
+      const row = seeded.find((candidate) => candidate.email === seed.email);
+      assert.ok(row, `${seed.email} is seeded`);
+      assert.equal(row.role, seed.role, `${seed.email} role`);
+    }
     for (const row of seeded.filter((row) => !row.passwordHash)) {
       assert.equal(row.passwordSetAt, null);
       assert.equal(await verifyStaffCredentials(db, row.email, "anything at all 123", {
