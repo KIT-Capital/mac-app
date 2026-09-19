@@ -70,11 +70,11 @@ function previewTime(row: Row) {
 }
 
 function currentPreviews(rows: Row[]) {
-  const byKind = new Map<PhotoKind, Row>();
+  const byKind = new Map<string, Row>();
   for (const row of rows) {
     const source = text(row, "photoObjectId") || text(row, "previewUrl");
     if (!source) continue;
-    const kind = photoKind(text(row, "kind"));
+    const kind = text(row, "kind");
     const current = byKind.get(kind);
     if (!current) {
       byKind.set(kind, row);
@@ -95,10 +95,15 @@ function currentPreviews(rows: Row[]) {
     }
   }
   return [...byKind.entries()]
-    .sort(([kindA, rowA], [kindB, rowB]) => {
+    .sort(([rawKindA, rowA], [rawKindB, rowB]) => {
+      const kindA = photoKind(rawKindA);
+      const kindB = photoKind(rawKindB);
       const orderA = shotOrder.get(kindA) ?? Number.MAX_SAFE_INTEGER;
       const orderB = shotOrder.get(kindB) ?? Number.MAX_SAFE_INTEGER;
-      return orderA - orderB || kindA.localeCompare(kindB) || text(rowA, "id").localeCompare(text(rowB, "id"));
+      return orderA - orderB
+        || kindA.localeCompare(kindB)
+        || rawKindA.localeCompare(rawKindB)
+        || text(rowA, "id").localeCompare(text(rowB, "id"));
     })
     .map(([, row]) => row);
 }

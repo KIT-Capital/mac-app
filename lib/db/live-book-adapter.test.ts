@@ -122,6 +122,7 @@ describe("live-book adapter mapping", () => {
         { id: "front-direct", timepieceId: "piece-a", kind: "front", previewUrl: null, photoObjectId: "photo-front", createdAt: new Date("2026-01-01") },
         { id: "front-old-legacy", timepieceId: "piece-a", kind: "front", previewUrl: "data:image/jpeg;base64,old", photoObjectId: null, createdAt: new Date("2025-01-01") },
         { id: "unknown-z", timepieceId: "piece-a", kind: "unknown", previewUrl: "data:image/jpeg;base64,z", photoObjectId: null, createdAt: new Date("2026-02-01") },
+        { id: "legacy-preview", timepieceId: "piece-a", kind: "legacy_preview", previewUrl: "data:image/jpeg;base64,legacy", photoObjectId: null, createdAt: new Date("2026-03-01") },
         { id: "papers-new", timepieceId: "piece-a", kind: "papers", previewUrl: "data:image/jpeg;base64,papers", photoObjectId: null, createdAt: new Date("2026-09-18") },
       ],
     });
@@ -130,13 +131,15 @@ describe("live-book adapter mapping", () => {
       "photo-front",
       "photo-back",
       "data:image/jpeg;base64,papers",
+      "data:image/jpeg;base64,legacy",
       "data:image/jpeg;base64,z",
     ]);
-    assert.deepEqual(state.timepieces[0].photoKinds, ["front", "back", "papers", "other"]);
+    assert.deepEqual(state.timepieces[0].photoKinds, ["front", "back", "papers", "other", "other"]);
     assert.deepEqual(state.photos.map((photo) => [photo.id, photo.url, photo.kind]), [
       ["front-direct", "photo-front", "front"],
       ["back-direct", "photo-back", "back"],
       ["papers-new", "data:image/jpeg;base64,papers", "papers"],
+      ["legacy-preview", "data:image/jpeg;base64,legacy", "other"],
       ["unknown-z", "data:image/jpeg;base64,z", "other"],
     ]);
   });

@@ -137,6 +137,11 @@ function assertMatchingKind(row: typeof photoObjects.$inferSelect, kind: string)
   if (row.kind !== kind) throw new Error("PHOTO_CHECKSUM_IN_USE");
 }
 
+async function reuseStoredPhoto(db: Database, row: typeof photoObjects.$inferSelect) {
+  await db.transaction((tx) => setCurrentPreview(tx, row));
+  return { photoId: row.id, status: "stored" as const };
+}
+
 export async function requestPhotoUpload(
   db: Database,
   store: ObjectStore,
@@ -152,7 +157,7 @@ export async function requestPhotoUpload(
   const existing = await activePhotoByChecksum(db, piece.id, input.original.sha256);
   if (existing) assertMatchingKind(existing, input.kind);
   if (existing?.status === "stored") {
-    return { photoId: existing.id, status: "stored" as const };
+    return reuseStoredPhoto(db, existing);
   }
   if (existing) {
     if (!matchesUpload(existing, input)) throw new Error("PHOTO_UPLOAD_INVALID");
@@ -164,7 +169,7 @@ export async function requestPhotoUpload(
     if (refreshed) return uploadUrls(store, refreshed);
     const raced = await activePhotoByChecksum(db, piece.id, input.original.sha256);
     if (raced) assertMatchingKind(raced, input.kind);
-    if (raced?.status === "stored") return { photoId: raced.id, status: "stored" as const };
+    if (raced?.status === "stored") return reuseStoredPhoto(db, raced);
     throw new Error("PHOTO_NOT_FOUND");
   }
 
@@ -198,7 +203,7 @@ export async function requestPhotoUpload(
     if (!raced) throw error;
     assertMatchingKind(raced, input.kind);
     if (raced.status === "stored") {
-      return { photoId: raced.id, status: "stored" as const };
+      return reuseStoredPhoto(db, raced);
     }
     if (!matchesUpload(raced, input)) throw new Error("PHOTO_UPLOAD_INVALID");
     row = raced;

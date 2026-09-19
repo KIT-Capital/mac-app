@@ -183,6 +183,12 @@ describe("direct photo uploads", { skip }, () => {
       ...uploadParts.input,
     });
     assert.deepEqual(storedRetry, { photoId: first.photoId, status: "stored" });
+    assert.deepEqual(
+      (await db.select().from(livePreviews)
+        .where(and(eq(livePreviews.timepieceId, piece.id), eq(livePreviews.kind, "front"))))
+        .map((preview) => preview.photoObjectId),
+      [first.photoId],
+    );
     assert.match((await mintPhotoPreviewUrl(db, store, actor, first.photoId)).url, /\/previews\//);
   });
 
