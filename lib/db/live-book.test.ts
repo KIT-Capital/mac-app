@@ -566,6 +566,15 @@ describe("live-book operation repository", { skip }, () => {
         `admin must not write ${Object.keys(patch)[0]}`,
       );
     }
+    // The collector-named action must not be a side door for a desk actor.
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "timepiece.update",
+        id: piece.id,
+        patch: { status: "appraised" },
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
     const [untouched] = await db.select().from(timepieces).where(eq(timepieces.id, piece.id));
     assert.equal(untouched.valueLowCents, null);
     assert.equal(untouched.status, "not_evaluated");

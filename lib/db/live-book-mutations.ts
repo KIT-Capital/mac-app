@@ -607,10 +607,10 @@ async function executeLiveBookOperationCore(
 
   if (action === "timepiece.update" || action === "timepiece.deskUpdate") {
     const patch = operation.patch as Record<string, unknown>;
-    if (action === "timepiece.deskUpdate") {
-      requireDesk(actor);
-      if (patchNeedsAppraisal(patch)) requireAppraiser(actor);
-    }
+    if (action === "timepiece.deskUpdate") requireDesk(actor);
+    // A desk actor is fenced on either action name; `pieceValues` lets desk
+    // actors set `appraised`, so `timepiece.update` must not be a side door.
+    if (isDesk(actor) && patchNeedsAppraisal(patch)) requireAppraiser(actor);
     const id = String(operation.id);
     await ownedPiece(db, actor, id);
     const values = pieceValues(patch, actor);
