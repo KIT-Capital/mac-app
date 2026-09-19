@@ -8,7 +8,7 @@ import {
 } from "./staff-accounts";
 import { asDeskActor, type Actor } from "./records";
 import { assertIsolation, isDeskActor } from "./isolation.mjs";
-import { isDeskRole } from "../roles.mjs";
+import { canEditAppraisal, isDeskRole } from "../roles.mjs";
 import {
   customers,
   liveAgreementEnds,
@@ -68,6 +68,21 @@ export async function commitLiveBookImport(
     });
     if (!transactionPlan.ok) {
       throw new Error(transactionPlan.error || "IMPORT_REJECTED");
+    }
+    // An import that carries appraised status, eligibility, or dollars is a bulk
+    // appraisal write, so it needs the same fence as timepiece.deskUpdate (R5).
+    // The planner always emits `financeable`, so only a true value counts here.
+    const carriesAppraisal = transactionPlan.timepieces.some((watch) => {
+      const row = watch as Record<string, unknown>;
+      return (
+        row.status === "appraised" ||
+        row.financeable === true ||
+        (row.valueLow !== undefined && row.valueLow !== null) ||
+        (row.valueHigh !== undefined && row.valueHigh !== null)
+      );
+    });
+    if (carriesAppraisal && !canEditAppraisal(auditActor ?? actor)) {
+      throw new Error("ROLE_FORBIDDEN");
     }
     const importedEmails = [...new Set(
       transactionPlan.customers.map((customer) => customer.email),

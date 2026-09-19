@@ -597,6 +597,23 @@ describe("live-book operation repository", { skip }, () => {
     assert.equal(appraised.status, "appraised");
     assert.equal(appraised.valueLowCents, 10_000_000);
 
+    // Demoting an appraised piece would erase the appraiser's decision.
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "timepiece.deskUpdate",
+        id: piece.id,
+        patch: { status: "reviewing" },
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const [stillAppraised] = await db.select().from(timepieces).where(eq(timepieces.id, piece.id));
+    assert.equal(stillAppraised.status, "appraised");
+    await executeLiveBookOperation(db, appraiser, {
+      action: "timepiece.deskUpdate",
+      id: piece.id,
+      patch: { status: "reviewing" },
+    });
+
     const entry = {
       id: `cat-fence-${suffix}`,
       brand: "Cartier",

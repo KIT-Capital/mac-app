@@ -612,7 +612,17 @@ async function executeLiveBookOperationCore(
     // actors set `appraised`, so `timepiece.update` must not be a side door.
     if (isDesk(actor) && patchNeedsAppraisal(patch)) requireAppraiser(actor);
     const id = String(operation.id);
-    await ownedPiece(db, actor, id);
+    const current = await ownedPiece(db, actor, id);
+    // Moving a piece off `appraised` erases an appraiser's recorded decision,
+    // so it needs the same fence as making one (R1, R5).
+    if (
+      isDesk(actor) &&
+      current.status === "appraised" &&
+      patch.status !== undefined &&
+      patch.status !== "appraised"
+    ) {
+      requireAppraiser(actor);
+    }
     const values = pieceValues(patch, actor);
     const update: Record<string, unknown> = { updatedAt: new Date() };
     for (const key of Object.keys(patch)) {
