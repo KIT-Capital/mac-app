@@ -8,6 +8,8 @@ import type {
   Agreement,
   AgreementEnd,
   AgreementShell,
+  AppraisalAttempt,
+  AppraisalAttemptPhoto,
   ApplicationPurchaseShares,
   AppSettings,
   AppState,
@@ -23,6 +25,8 @@ import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
 import {
   customers,
+  appraisalAttemptPhotos,
+  appraisalAttempts,
   agreementShells,
   applications,
   catalogReferences,
@@ -42,13 +46,15 @@ export type LiveBookRows = {
   members: Row[];
   ends: Row[];
   previews: Row[];
+  attempts?: Row[];
+  attemptPhotos?: Row[];
   settings?: Row[];
   catalog?: Row[];
   shells?: Row[];
 };
 export type LiveBookState = Pick<
   AppState,
-  "timepieces" | "agreements" | "users" | "photos" | "profiles" | "settings" | "catalog" | "shells"
+  "timepieces" | "agreements" | "users" | "photos" | "appraisalAttempts" | "appraisalAttemptPhotos" | "profiles" | "settings" | "catalog" | "shells"
 > & { applicationPurchaseShares: ApplicationPurchaseShares };
 
 const ALLOWED_KINDS = new Set(PHOTO_KINDS);
@@ -58,6 +64,8 @@ const photoKind = (value: string) => (ALLOWED_KINDS.has(value) ? value : "other"
 const shotOrder = new Map(TIMEPIECE_SHOTS.map((shot, index) => [shot.kind, index]));
 const bps = (value: unknown, fallback: number) =>
   typeof value === "number" ? value / 10_000 : fallback;
+const iso = (value: unknown) =>
+  value instanceof Date ? value.toISOString() : typeof value === "string" ? value : undefined;
 
 function previewTime(row: Row) {
   const value = row.createdAt;
@@ -239,6 +247,61 @@ export function mapLiveBookRows(
   const agreementRows = rows.agreements.filter((row) => customerIds.has(text(row, "customerId")));
   const agreementIds = new Set(agreementRows.map((row) => text(row, "id")));
   const previewRows = rows.previews.filter((row) => pieceIds.has(text(row, "timepieceId")));
+  const attemptRows = (rows.attempts ?? []).filter((row) =>
+    pieceIds.has(text(row, "timepieceId"))
+  );
+  const attemptIds = new Set(attemptRows.map((row) => text(row, "id")));
+  const attemptPhotoRows = (rows.attemptPhotos ?? []).filter((row) =>
+    attemptIds.has(text(row, "attemptId"))
+  );
+  const retailProjection = Boolean(customerId);
+  const mappedAttempts: AppraisalAttempt[] = attemptRows.map((row) => ({
+    id: text(row, "id"),
+    timepieceId: text(row, "timepieceId"),
+    ...(!retailProjection ? { customerId: text(row, "customerId") } : {}),
+    attemptNo: typeof row.attemptNo === "number" ? row.attemptNo : 0,
+    decisionNo: typeof row.decisionNo === "number" ? row.decisionNo : null,
+    status:
+      row.status === "returned" || row.status === "accepted" || row.status === "refused"
+        ? row.status
+        : "under_review",
+    note: text(row, "note"),
+    responseNote: optionalText(row, "responseNote"),
+    snapshot: row.snapshot as AppraisalAttempt["snapshot"],
+    submittedAt: iso(row.submittedAt) ?? "",
+    ...(!retailProjection && typeof row.decidedByStaffId === "string"
+      ? { decidedByStaffId: row.decidedByStaffId }
+      : {}),
+    decidedAt: iso(row.decidedAt),
+    valueCents: typeof row.valueCents === "number" ? row.valueCents : undefined,
+    rangeLowCents: typeof row.rangeLowCents === "number" ? row.rangeLowCents : undefined,
+    rangeHighCents: typeof row.rangeHighCents === "number" ? row.rangeHighCents : undefined,
+    finalizedAt: iso(row.finalizedAt),
+    ...(!retailProjection && typeof row.finalizedByStaffId === "string"
+      ? { finalizedByStaffId: row.finalizedByStaffId }
+      : {}),
+    ...(!retailProjection && typeof row.finalizedAgreementId === "string"
+      ? { finalizedAgreementId: row.finalizedAgreementId }
+      : {}),
+    reopenedCount: typeof row.reopenedCount === "number" ? row.reopenedCount : 0,
+  }));
+  const mappedAttemptPhotos: AppraisalAttemptPhoto[] = attemptPhotoRows.map((row) => ({
+    attemptId: text(row, "attemptId"),
+    photoId: text(row, "photoObjectId"),
+    kind: photoKind(text(row, "kind")),
+    ...(!retailProjection
+      ? {
+          originalKey: text(row, "originalKey"),
+          checksum: text(row, "originalChecksum"),
+        }
+      : {}),
+  }));
+  const attemptsByPiece = new Map<string, AppraisalAttempt[]>();
+  for (const attempt of mappedAttempts) {
+    const bucket = attemptsByPiece.get(attempt.timepieceId);
+    if (bucket) bucket.push(attempt);
+    else attemptsByPiece.set(attempt.timepieceId, [attempt]);
+  }
   const previewsByPiece = new Map<string, Row[]>();
   for (const preview of previewRows) {
     const id = text(preview, "timepieceId");
@@ -252,6 +315,26 @@ export function mapLiveBookRows(
   const currentPreviewRows = [...previewsByPiece.values()].flat();
 
   const mappedPieces: Timepiece[] = pieceRows.map((row) => {
+    const pieceAttempts = (attemptsByPiece.get(text(row, "id")) ?? [])
+      .sort((a, b) => a.attemptNo - b.attemptNo);
+    const decisionsUsed = pieceAttempts.filter((attempt) => attempt.decisionNo !== null).length;
+    const latest = pieceAttempts.at(-1);
+    const latestDecision = [...pieceAttempts]
+      .reverse()
+      .find((attempt) => attempt.decisionNo !== null);
+    const appraisalState = latest?.status === "under_review"
+      ? "with_mac"
+      : decisionsUsed >= 3
+        ? "closed"
+        : latestDecision?.status === "accepted"
+          ? "accepted"
+          : latestDecision?.status === "refused"
+            ? "not_accepted"
+            : row.status === "reviewing"
+              ? "with_mac"
+              : row.status === "appraised"
+                ? "accepted"
+                : "not_sent";
     const previews = previewsByPiece.get(text(row, "id")) ?? [];
     const mappedPreviews = previews.flatMap((item) => {
       const source = text(item, "photoObjectId") || text(item, "previewUrl");
@@ -281,6 +364,12 @@ export function mapLiveBookRows(
       complication: text(row, "complication"),
       evaluatedAt: row.evaluatedAt instanceof Date ? row.evaluatedAt.toISOString().slice(0, 10) : optionalText(row, "evaluatedAt"),
       assetCode: optionalText(row, "assetCode"),
+      appraisalState,
+      decisionsUsed,
+      appraisalValue:
+        latestDecision?.status === "accepted" && typeof latestDecision.valueCents === "number"
+          ? latestDecision.valueCents / 100
+          : undefined,
     };
   });
 
@@ -345,6 +434,8 @@ export function mapLiveBookRows(
     agreements: mappedAgreements,
     users: customerRows.map(managedUser),
     photos: mappedPhotos,
+    appraisalAttempts: mappedAttempts,
+    appraisalAttemptPhotos: mappedAttemptPhotos,
     profiles,
     settings: discloseDeskTerms
       ? authoritativeSettings
@@ -389,6 +480,8 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
         members: [],
         ends: [],
         previews: [],
+        attempts: [],
+        attemptPhotos: [],
         settings: settingRows,
         catalog: catalogRows,
         shells: shellRows,
@@ -400,11 +493,19 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
     ]);
     const agreementIds = agreementRows.map((row) => row.id);
     const pieceIds = pieceRows.map((row) => row.id);
-    const [memberRows, endRows, previewRows] = await Promise.all([
+    const [memberRows, endRows, previewRows, attemptRows] = await Promise.all([
       agreementIds.length ? tx.select().from(liveAgreementMembers).where(inArray(liveAgreementMembers.agreementId, agreementIds)) : [],
       agreementIds.length ? tx.select().from(liveAgreementEnds).where(inArray(liveAgreementEnds.agreementId, agreementIds)) : [],
       pieceIds.length ? tx.select().from(livePreviews).where(inArray(livePreviews.timepieceId, pieceIds)) : [],
+      pieceIds.length ? tx.select().from(appraisalAttempts).where(inArray(appraisalAttempts.timepieceId, pieceIds)) : [],
     ]);
+    const attemptIds = attemptRows.map((row) => row.id);
+    const attemptPhotoRows = attemptIds.length
+      ? await tx
+          .select()
+          .from(appraisalAttemptPhotos)
+          .where(inArray(appraisalAttemptPhotos.attemptId, attemptIds))
+      : [];
     return mapLiveBookRows({
       customers: customerRows,
       timepieces: pieceRows,
@@ -412,6 +513,8 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       members: memberRows,
       ends: endRows,
       previews: previewRows,
+      attempts: attemptRows,
+      attemptPhotos: attemptPhotoRows,
       settings: settingRows,
       catalog: catalogRows,
       shells: shellRows,

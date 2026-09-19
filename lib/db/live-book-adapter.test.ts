@@ -310,4 +310,114 @@ describe("live-book adapter mapping", () => {
     assert.equal(after.settings.vaultLocation, "MAC Vault");
     assert.equal(after.shells.length, 1);
   });
+
+  it("projects appraisal attempts without exposing desk identity or object keys to retail", () => {
+    const rows = {
+      customers: [{
+        id: "customer-a",
+        email: "a@example.com",
+        name: "Collector A",
+        role: "collector",
+        status: "active",
+        preferences: {},
+      }],
+      timepieces: [{
+        id: "piece-a",
+        customerId: "customer-a",
+        brand: "Cartier",
+        model: "Crash",
+        status: "appraised",
+        financeable: true,
+        condition: "Excellent",
+        boxPapers: "Box and papers",
+        caseMetal: "Gold",
+        caseType: "Asymmetric",
+        caseDiameter: "38mm",
+        dialColor: "White",
+        buckle: "Pin",
+        band: "strap",
+        bandMaterial: "Leather",
+        complication: "Time only",
+      }],
+      agreements: [],
+      members: [],
+      ends: [],
+      previews: [],
+      attempts: [{
+        id: "attempt-a",
+        timepieceId: "piece-a",
+        customerId: "customer-a",
+        attemptNo: 1,
+        decisionNo: 1,
+        status: "accepted",
+        note: "",
+        snapshot: { fields: { brand: "Cartier", model: "Crash" }, note: "" },
+        submittedAt: new Date("2026-09-19T12:00:00Z"),
+        decidedByStaffId: "staff-secret",
+        decidedAt: new Date("2026-09-19T13:00:00Z"),
+        valueCents: 15000000,
+        rangeLowCents: 10000000,
+        rangeHighCents: 14000000,
+        reopenedCount: 0,
+      }],
+      attemptPhotos: [{
+        attemptId: "attempt-a",
+        photoObjectId: "photo-a",
+        kind: "front",
+        originalKey: "development/originals/customer-a/photo-a",
+        originalChecksum: "ab".repeat(32),
+      }],
+    };
+
+    const retail = mapLiveBookRows(rows, "customer-a");
+    assert.equal(retail.timepieces[0].appraisalState, "accepted");
+    assert.equal(retail.timepieces[0].decisionsUsed, 1);
+    assert.equal(retail.timepieces[0].appraisalValue, 150000);
+    assert.equal("decidedByStaffId" in retail.appraisalAttempts[0], false);
+    assert.equal("customerId" in retail.appraisalAttempts[0], false);
+    assert.equal("originalKey" in retail.appraisalAttemptPhotos[0], false);
+    assert.equal("checksum" in retail.appraisalAttemptPhotos[0], false);
+
+    const desk = mapLiveBookRows(rows);
+    assert.equal(desk.appraisalAttempts[0].decidedByStaffId, "staff-secret");
+    assert.equal(
+      desk.appraisalAttemptPhotos[0].originalKey,
+      "development/originals/customer-a/photo-a",
+    );
+
+    const reopenedThird = mapLiveBookRows({
+      ...rows,
+      attempts: [
+        {
+          ...rows.attempts[0],
+          id: "attempt-prior-1",
+          attemptNo: 1,
+          decisionNo: 1,
+          status: "refused",
+          valueCents: null,
+          rangeLowCents: null,
+          rangeHighCents: null,
+        },
+        {
+          ...rows.attempts[0],
+          id: "attempt-prior-2",
+          attemptNo: 2,
+          decisionNo: 2,
+          status: "refused",
+          valueCents: null,
+          rangeLowCents: null,
+          rangeHighCents: null,
+        },
+        {
+          ...rows.attempts[0],
+          attemptNo: 3,
+          decisionNo: 3,
+          status: "under_review",
+          reopenedCount: 1,
+        },
+      ],
+    }, "customer-a");
+    assert.equal(reopenedThird.timepieces[0].decisionsUsed, 3);
+    assert.equal(reopenedThird.timepieces[0].appraisalState, "with_mac");
+  });
 });

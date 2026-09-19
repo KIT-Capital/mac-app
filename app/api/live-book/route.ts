@@ -68,10 +68,15 @@ export async function POST(request: Request) {
       return json({ mode: "live", error: failure.error }, failure.status);
     }
     const input = await request.json().catch(() => null);
-    await executeLiveBookOperation(getDb(), context.actor, input, {
+    const result = await executeLiveBookOperation(getDb(), context.actor, input, {
       clientAddress: clientAddress(request.headers),
     });
-    return json({ mode: "live", acknowledged: true, viewer: context.viewer });
+    return json({
+      mode: "live",
+      acknowledged: true,
+      viewer: context.viewer,
+      ...(result && typeof result === "object" ? result : {}),
+    });
   } catch (error) {
     const failure = liveBookErrorResponse(error);
     return json({ mode: "live", error: failure.error }, failure.status);

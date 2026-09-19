@@ -176,10 +176,17 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - `POST` accepts a validated operation action, never a whole-book snapshot.
   Collector actions are limited to own profile, intake-safe piece fields, own
   pending repos, collector signature, eligible added pieces, and permitted amount
-  raises. Desk controls valuation, status, ends, marking signed, and renewal
-  (every desk role: admin, appraiser, super admin).
+  raises. Appraisal actions are `appraisal.submit` (retail owner),
+  `appraisal.return`, `appraisal.decide`, and `appraisal.reopen` (appraiser or
+  super admin). A submission freezes piece fields plus normalized stored-photo
+  evidence. At most three completed decisions are allowed; Return consumes none.
+  Only the deciding appraiser or a super admin reopens/re-decides. Admins read
+  appraisal rows but cannot write them. Other Desk roles continue to control
+  applicable status, repo ends, marking signed, and renewal.
 - Desk-data actions are `settings.update`, `catalog.upsert`, `catalog.remove`,
-  `shell.upsert`, and `shell.remove` (any desk role).
+  `shell.upsert`, and `shell.remove`. Catalog writes and appraisal fields require
+  appraiser or super admin; `requiredPhotoKinds` requires super admin; the
+  remaining settings and shell actions accept any desk role.
   Settings and shell scale terms below Scenario 60 floors are refused with
   `AGREEMENT_SCALE_INVALID`. Settings and shell mutations append an immutable
   desk audit row in the same transaction. Catalog mutations are audited as money
@@ -190,7 +197,9 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   record desk payment, cash movement, or a book end.
 - Successful mutations return a durable `{ mode: "live", acknowledged: true }`
   after commit. The client then performs a separate authoritative `GET`; mutation
-  responses do not couple commit success to a second read. Browser rollback
+  responses do not couple commit success to a second read. An accepted appraisal
+  may additionally return `rangeWarning: "below" | "above"`; the warning never
+  blocks the decision. Browser rollback
   responses switch the client back to its preserved browser state. Data-URL
   previews are never included in ordinary mutations.
 - Store actions that show success await the live mutation response; rejected or
@@ -205,7 +214,11 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 
 ## Client store
 
-`lib/store.tsx` is the live collector/desk data API: profile, timepieces, agreements, catalog, settings, photos. Agents that need to change collection state today must drive the UI or the same HTTP path.
+`lib/store.tsx` is the live collector/desk data API: profile, timepieces,
+appraisal attempts/evidence, agreements, catalog, settings, photos. Its
+`appraisal.*` methods use the same pure transition rules as browser mode and
+reconcile from the authoritative server in live mode. Agents that need to change
+collection state today must drive the UI or the same HTTP path.
 
 The default repo operations book remains browser state. After a tested staff import, the
 server-runtime owner switch moves reads and writes together to the scoped

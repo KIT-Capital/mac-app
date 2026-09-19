@@ -142,6 +142,7 @@ export async function writeDeskAudit(
   action: string,
   targetId: string,
   clientAddress: string,
+  detail: Record<string, unknown> = {},
 ) {
   if (!clientAddress.trim()) throw new Error("CLIENT_ADDRESS_REQUIRED");
   await tx.insert(deskAuditLog).values({
@@ -151,6 +152,7 @@ export async function writeDeskAudit(
     action,
     targetId,
     clientAddress,
+    detail,
   });
 }
 

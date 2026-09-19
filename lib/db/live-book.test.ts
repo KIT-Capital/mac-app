@@ -914,7 +914,9 @@ describe("live-book operation repository", { skip }, () => {
       email: linked.customer.email,
       createdOn: "2026-09-17",
     });
-    await executeLiveBookOperation(db, linked.actor, {
+    // Pieces on a live repo are retail-locked; the Desk may still maintain its
+    // operational preview (R8).
+    await executeLiveBookOperation(db, desk, {
       action: "preview.upsert",
       id: `preview-remove-${suffix}`,
       timepieceId: piece.id,

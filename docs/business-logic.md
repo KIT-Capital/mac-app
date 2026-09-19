@@ -16,10 +16,12 @@ Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation 
 
 **Shipped:** collector on the front; desk roles admin, appraiser, super admin (`lib/roles.mjs`, migrations 0020 and 0021). Master super admin `rc@mechartcap.com`, Dov Tuzman appraiser, Rosario David admin, passwords unset until first sign-in. Desk-account and appraisal fences are live: only an appraiser or super admin writes appraisal values, catalog ranges, or a bulk import carrying them, and only they may move a piece off `appraised`. The MAC-signature fence ships with the repo-request units.
 
-- Collector — vault, add piece, appraise request, repurchase application, membership, account, and the How MAC works tutorial. Adding a piece requires the five guided photographs (front, back, left and right sides of the barrel, clasp) and confirmation that the collector has the box and original documentation. Box and papers photographs are optional. Collectors see the shared book label. They do not record an end.
+- Collector — vault, add piece, appraise request, repurchase application, membership, account, and the How MAC works tutorial. Adding a piece always requires five guided photographs (front, back, left and right sides of the barrel, clasp or band) and confirmation that the collector has the box and original documentation. A super admin may also require box and/or papers photographs through Desk Configure. Collectors see the shared book label. They do not record an end.
 - Staff / admin — desk console: catalog, assets, agreements, photos, outbound mail, access, config, and the in-wall Tutorial. Staff and admin record, overwrite, or clear a repo end.
 
 **Approved, shipping unit by unit:** collector | dealer on the front of the app; admin | appraiser | super admin on the Desk; exclusive emails; whole-collection buyback only. Implement from the roles plan and `lib/roles.mjs`, not from this summary.
+
+**Appraisal persistence shipped in U3:** `appraisal.submit`, `return`, `decide`, and `reopen` persist immutable attempt snapshots, exact retained photo-object evidence, one deciding appraiser, and at most three completed decisions in both books. The current Request/Appraise UI still uses the legacy status/range path until U4 replaces those button calls; attempt-based locks begin only after a real `appraisal.submit`.
 
 ## Membership
 
