@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
-import { ENDPOINT_BY_APP_ENV } from "../lib/env/database-mapping.mjs";
+import { ENDPOINT_BY_APP_ENV, NEON_PROJECT_ID } from "../lib/env/database-mapping.mjs";
 import { sha256Hex } from "../lib/storage/object-store.mjs";
 import {
   checkObjectManifest,
@@ -15,8 +15,30 @@ import {
 const developmentUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.development}-pooler.us-east-2.aws.neon.tech/neondb`;
 const stagingUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.staging}-pooler.us-east-2.aws.neon.tech/neondb`;
 const productionUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.production}-pooler.us-east-2.aws.neon.tech/neondb`;
-const previewUrl = "postgresql://u:p@ep-preview-drill-a5abc123-pooler.us-east-2.aws.neon.tech/neondb";
+const previewEndpointId = "ep-preview-drill-a5abc123";
+const previewUrl = `postgresql://u:p@${previewEndpointId}-pooler.us-east-2.aws.neon.tech/neondb`;
+const developmentBranchId = "br-summer-truth-a52brhnv";
+const previewBranchId = "br-preview-restore-a5xyz";
 const legacyGetCapBytes = 25 * 1024 * 1024;
+
+function previewIdentity(overrides = {}) {
+  return {
+    MANIFEST_NEON_PROJECT_ID: NEON_PROJECT_ID,
+    MANIFEST_NEON_PARENT_BRANCH_ID: developmentBranchId,
+    MANIFEST_NEON_BRANCH_ID: previewBranchId,
+    MANIFEST_NEON_ENDPOINT_ID: previewEndpointId,
+    ...overrides,
+  };
+}
+
+function previewEnv(overrides = {}) {
+  return {
+    APP_ENV: "development",
+    MANIFEST_DATABASE_URL: previewUrl,
+    ...previewIdentity(),
+    ...overrides,
+  };
+}
 
 const pdfBody = new TextEncoder().encode("%PDF-1.7 agreement");
 const originalBody = new TextEncoder().encode("original-photo-bytes");
@@ -114,6 +136,7 @@ describe("object-manifest-check report", () => {
     assert.equal(report.counts.failed, 0);
     assert.equal(report.counts.agreementRows, 1);
     assert.equal(report.counts.photoRows, 1);
+    assert.equal(report.counts.photoRowsWithPreview, 1);
     assert.equal(report.counts.auditRows, 1);
     assert.deepEqual(report.errors, []);
   });
@@ -127,8 +150,56 @@ describe("object-manifest-check report", () => {
     assert.equal(report.ok, false);
     assert.equal(report.outcome, "failed");
     assert.equal(report.counts.objects, 0);
+    assert.equal(report.counts.agreementRows, 0);
+    assert.equal(report.counts.photoRows, 0);
+    assert.equal(report.counts.photoRowsWithPreview, 0);
     assert.equal(report.counts.auditRows, 7);
     assert.deepEqual(report.errors, ["MANIFEST_EMPTY"]);
+  });
+
+  it("fails an agreements-only inventory as incomplete", async () => {
+    const report = await checkObjectManifest({
+      loader: fixtureLoader({ agreements: [agreementRow()] }),
+      store: matchingStore(),
+    });
+
+    assert.equal(report.ok, false);
+    assert.equal(report.outcome, "failed");
+    assert.equal(report.counts.agreementRows, 1);
+    assert.equal(report.counts.photoRows, 0);
+    assert.equal(report.counts.photoRowsWithPreview, 0);
+    assert.equal(report.counts.objects, 1);
+    assert.deepEqual(report.errors, ["MANIFEST_INVENTORY_INCOMPLETE"]);
+  });
+
+  it("fails a photos-only inventory as incomplete", async () => {
+    const report = await checkObjectManifest({
+      loader: fixtureLoader({ photos: [photoRow()] }),
+      store: matchingStore(),
+    });
+
+    assert.equal(report.ok, false);
+    assert.equal(report.counts.agreementRows, 0);
+    assert.equal(report.counts.photoRows, 1);
+    assert.equal(report.counts.photoRowsWithPreview, 1);
+    assert.deepEqual(report.errors, ["MANIFEST_INVENTORY_INCOMPLETE"]);
+  });
+
+  it("fails a legacy original-only photo inventory as incomplete", async () => {
+    const report = await checkObjectManifest({
+      loader: fixtureLoader({
+        agreements: [agreementRow()],
+        photos: [photoRow({ preview_key: null, preview_checksum: null, preview_bytes: null })],
+      }),
+      store: matchingStore(),
+    });
+
+    assert.equal(report.ok, false);
+    assert.equal(report.counts.agreementRows, 1);
+    assert.equal(report.counts.photoRows, 1);
+    assert.equal(report.counts.photoRowsWithPreview, 0);
+    assert.equal(report.counts.objects, 2);
+    assert.deepEqual(report.errors, ["MANIFEST_INVENTORY_INCOMPLETE"]);
   });
 
   it("AE10: one mismatched stored PDF reports mismatch 1 and a failed outcome", async () => {
@@ -214,9 +285,9 @@ describe("object-manifest-check report", () => {
       store,
     });
 
-    assert.equal(report.ok, true);
     assert.equal(report.counts.mismatch, 0);
     assert.equal(report.counts.legacyHashed, 1);
+    assert.ok(report.errors.includes("MANIFEST_INVENTORY_INCOMPLETE"));
     assert.deepEqual(store.calls.get, ["development/agreements/cus_1/doc_1.pdf"]);
   });
 
@@ -229,8 +300,8 @@ describe("object-manifest-check report", () => {
       store,
     });
 
-    assert.equal(report.ok, true);
     assert.equal(report.counts.legacyHashed, 0);
+    assert.ok(report.errors.includes("MANIFEST_INVENTORY_INCOMPLETE"));
     assert.deepEqual(store.calls.get, []);
   });
 
@@ -328,7 +399,7 @@ describe("object-manifest-check report", () => {
     });
 
     assert.equal(report.counts.failed, 1);
-    assert.deepEqual(report.errors, ["OBJECT_CHECK_FAILED"]);
+    assert.ok(report.errors.includes("OBJECT_CHECK_FAILED"));
     assert.equal(JSON.stringify(report).includes("secret driver details"), false);
   });
 
@@ -395,6 +466,7 @@ describe("object-manifest-check report", () => {
 
       assert.equal(report.counts.objects, 2);
       assert.equal(report.counts.mismatch, 1);
+      assert.equal(report.counts.photoRowsWithPreview, 0);
       assert.deepEqual(store.calls.head, ["development/originals/cus_1/pho_1"]);
     });
   }
@@ -408,8 +480,10 @@ describe("object-manifest-check report", () => {
       store,
     });
 
-    assert.equal(report.ok, true);
+    assert.equal(report.ok, false);
     assert.equal(report.counts.objects, 1);
+    assert.equal(report.counts.photoRowsWithPreview, 0);
+    assert.ok(report.errors.includes("MANIFEST_INVENTORY_INCOMPLETE"));
     assert.deepEqual(store.calls.head, ["development/originals/cus_1/pho_1"]);
   });
 
@@ -457,7 +531,8 @@ describe("object-manifest-check report", () => {
       allowProductionRead: true,
     });
 
-    assert.equal(report.ok, true);
+    assert.equal(report.counts.mismatch, 0);
+    assert.ok(report.errors.includes("MANIFEST_INVENTORY_INCOMPLETE"));
     assert.deepEqual(store.calls.head, [key]);
   });
 
@@ -473,7 +548,7 @@ describe("object-manifest-check report", () => {
     assert.equal(report.ok, false);
     assert.equal(report.counts.failed, 1);
     assert.deepEqual(report.rowIds.failed, ["doc_1"]);
-    assert.deepEqual(report.errors, ["OBJECT_CHECK_FAILED"]);
+    assert.ok(report.errors.includes("OBJECT_CHECK_FAILED"));
     assert.equal(JSON.stringify(report).includes("R2_HEAD_FAILED"), false);
   });
 
@@ -493,7 +568,7 @@ describe("object-manifest-check report", () => {
     });
 
     assert.equal(report.counts.failed, 1);
-    assert.deepEqual(report.errors, ["OBJECT_CHECK_FAILED"]);
+    assert.ok(report.errors.includes("OBJECT_CHECK_FAILED"));
   });
 
   it("prints row ids but never keys, checksums, or URLs", async () => {
@@ -502,7 +577,7 @@ describe("object-manifest-check report", () => {
       "development/previews/cus_1/pho_1": { body: previewBody },
     });
     const report = await runObjectManifestCheck({
-      env: { APP_ENV: "development", MANIFEST_DATABASE_URL: previewUrl, DATABASE_URL: developmentUrl },
+      env: previewEnv({ DATABASE_URL: developmentUrl }),
       argv: [],
       createLoader: () => fixtureLoader({ agreements: [agreementRow()], photos: [photoRow()] }),
       createStore: () => store,
@@ -519,6 +594,7 @@ describe("object-manifest-check report", () => {
     assert.equal(line.includes("neon.tech"), false);
     assert.equal(line.includes("@"), false);
     assert.equal(line.includes("MANIFEST_DATABASE_URL"), false);
+    assert.equal(line.includes(previewUrl), false);
   });
 });
 
@@ -635,7 +711,7 @@ describe("object-manifest-check access guard", () => {
   it("ignores DATABASE_URL and uses MANIFEST_DATABASE_URL only", async () => {
     const store = matchingStore();
     const report = await runObjectManifestCheck({
-      env: { APP_ENV: "development", DATABASE_URL: developmentUrl, MANIFEST_DATABASE_URL: previewUrl },
+      env: previewEnv({ DATABASE_URL: developmentUrl }),
       argv: [],
       createLoader: (url) => {
         assert.equal(url, previewUrl);
@@ -673,7 +749,7 @@ describe("object-manifest-check access guard", () => {
   it("runs against a restored preview branch URL without a refusal", async () => {
     const store = matchingStore();
     const report = await runObjectManifestCheck({
-      env: { APP_ENV: "development", MANIFEST_DATABASE_URL: previewUrl },
+      env: previewEnv(),
       argv: [],
       createLoader: (url) => {
         assert.equal(url, previewUrl);
@@ -689,12 +765,19 @@ describe("object-manifest-check access guard", () => {
 
   it("reads production only with --allow-production-read", async () => {
     const key = "production/agreements/cus_1/doc_1.pdf";
-    const store = fakeStore({ [key]: { body: pdfBody } });
+    const originalKey = "production/originals/cus_1/pho_1";
+    const previewKey = "production/previews/cus_1/pho_1";
+    const store = fakeStore({
+      [key]: { body: pdfBody },
+      [originalKey]: { body: originalBody },
+      [previewKey]: { body: previewBody },
+    });
     const report = await runObjectManifestCheck({
       env: { APP_ENV: "production", MANIFEST_DATABASE_URL: productionUrl },
       argv: ["--allow-production-read"],
       createLoader: () => fixtureLoader({
         agreements: [agreementRow({ object_key: key })],
+        photos: [photoRow({ original_key: originalKey, preview_key: previewKey })],
       }),
       createStore: () => store,
     });
@@ -726,9 +809,97 @@ describe("object-manifest-check access guard", () => {
     assert.equal(JSON.stringify(report).includes(malformed), false);
   });
 
-  it("maps a loader rejection to MANIFEST_READ_FAILED without raw details", async () => {
+  async function refuseBeforeClients(env, expectedCode) {
+    let created = 0;
+    const report = await runObjectManifestCheck({
+      env,
+      argv: [],
+      createLoader: () => {
+        created += 1;
+        return fixtureLoader({});
+      },
+      createStore: () => {
+        created += 1;
+        return matchingStore();
+      },
+    });
+    assert.equal(report.outcome, "refused");
+    assert.ok(report.errors.includes(expectedCode), report.errors.join(","));
+    assert.equal(created, 0);
+    return report;
+  }
+
+  it("refuses a missing Neon project id before creating clients", async () => {
+    await refuseBeforeClients(previewEnv({ MANIFEST_NEON_PROJECT_ID: "" }), "MANIFEST_PROJECT_INVALID");
+  });
+
+  it("refuses a mismatched Neon project id before creating clients", async () => {
+    await refuseBeforeClients(
+      previewEnv({ MANIFEST_NEON_PROJECT_ID: "other-project" }),
+      "MANIFEST_PROJECT_INVALID",
+    );
+  });
+
+  it("refuses a missing parent branch id before creating clients", async () => {
+    await refuseBeforeClients(
+      previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: "" }),
+      "MANIFEST_PARENT_BRANCH_INVALID",
+    );
+  });
+
+  it("refuses a mismatched parent branch id before creating clients", async () => {
+    await refuseBeforeClients(
+      previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: "br-other-parent" }),
+      "MANIFEST_PARENT_BRANCH_INVALID",
+    );
+  });
+
+  it("refuses a missing preview branch id before creating clients", async () => {
+    await refuseBeforeClients(previewEnv({ MANIFEST_NEON_BRANCH_ID: "  " }), "MANIFEST_BRANCH_ID_REQUIRED");
+  });
+
+  it("refuses a preview branch id that matches the parent", async () => {
+    await refuseBeforeClients(
+      previewEnv({ MANIFEST_NEON_BRANCH_ID: developmentBranchId }),
+      "MANIFEST_BRANCH_INVALID",
+    );
+  });
+
+  it("refuses a missing preview endpoint id before creating clients", async () => {
+    await refuseBeforeClients(previewEnv({ MANIFEST_NEON_ENDPOINT_ID: "" }), "MANIFEST_ENDPOINT_ID_REQUIRED");
+  });
+
+  it("refuses when the recorded endpoint id does not match the URL", async () => {
+    const report = await refuseBeforeClients(
+      previewEnv({ MANIFEST_NEON_ENDPOINT_ID: ENDPOINT_BY_APP_ENV.staging }),
+      "MANIFEST_ENDPOINT_MISMATCH",
+    );
+    assert.equal(JSON.stringify(report).includes(previewUrl), false);
+    assert.equal(JSON.stringify(report).includes("postgresql://"), false);
+  });
+
+  it("still requires preview identity when --allow-production-read is used with a preview URL", async () => {
+    let created = 0;
     const report = await runObjectManifestCheck({
       env: { APP_ENV: "development", MANIFEST_DATABASE_URL: previewUrl },
+      argv: ["--allow-production-read"],
+      createLoader: () => {
+        created += 1;
+        return fixtureLoader({});
+      },
+      createStore: () => {
+        created += 1;
+        return matchingStore();
+      },
+    });
+    assert.equal(report.outcome, "refused");
+    assert.ok(report.errors.includes("MANIFEST_PROJECT_INVALID"));
+    assert.equal(created, 0);
+  });
+
+  it("maps a loader rejection to MANIFEST_READ_FAILED without raw details", async () => {
+    const report = await runObjectManifestCheck({
+      env: previewEnv(),
       argv: [],
       createLoader: () => ({
         async agreements() {
@@ -752,7 +923,7 @@ describe("object-manifest-check access guard", () => {
 
   it("maps an audit-count rejection to MANIFEST_READ_FAILED", async () => {
     const report = await runObjectManifestCheck({
-      env: { APP_ENV: "development", MANIFEST_DATABASE_URL: previewUrl },
+      env: previewEnv(),
       argv: [],
       createLoader: () => ({
         async agreements() {
@@ -776,7 +947,7 @@ describe("object-manifest-check access guard", () => {
 
   it("maps a loader timeout to MANIFEST_READ_FAILED", async () => {
     const report = await runObjectManifestCheck({
-      env: { APP_ENV: "development", MANIFEST_DATABASE_URL: previewUrl },
+      env: previewEnv(),
       argv: [],
       createLoader: () => ({
         async agreements() {
@@ -835,6 +1006,10 @@ describe("object-manifest-check CLI", () => {
         DATABASE_URL: undefined,
         DATABASE_URL_UNPOOLED: undefined,
         MANIFEST_DATABASE_URL: undefined,
+        MANIFEST_NEON_PROJECT_ID: undefined,
+        MANIFEST_NEON_PARENT_BRANCH_ID: undefined,
+        MANIFEST_NEON_BRANCH_ID: undefined,
+        MANIFEST_NEON_ENDPOINT_ID: undefined,
         R2_ACCOUNT_ID: undefined,
         R2_S3_ENDPOINT: undefined,
         R2_BUCKET: undefined,
@@ -857,7 +1032,7 @@ describe("object-manifest-check CLI", () => {
   });
 
   it("exits non-zero when the object-store client is unavailable", () => {
-    const result = runCli({ APP_ENV: "development", MANIFEST_DATABASE_URL: previewUrl });
+    const result = runCli(previewEnv());
 
     assert.notEqual(result.status, 0);
     const body = JSON.parse(result.stderr.trim().split("\n").at(-1));

@@ -10,7 +10,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
-import { appEnvForEndpoint, parseDatabaseUrl } from "../lib/env/database-mapping.mjs";
+import { appEnvForEndpoint, NEON_PROJECT_ID, parseDatabaseUrl } from "../lib/env/database-mapping.mjs";
 import { sha256Hex } from "../lib/storage/object-store.mjs";
 import { createObjectStore } from "../lib/storage/r2-object-store.mjs";
 
@@ -18,6 +18,7 @@ const STORED = "stored";
 const DEFAULT_IO_TIMEOUT_MS = 10_000;
 const MAX_LEGACY_PDF_BYTES = 25 * 1024 * 1024;
 const SHA256_HEX = /^[a-f0-9]{64}$/i;
+export const MANIFEST_DEVELOPMENT_BRANCH_ID = "br-summer-truth-a52brhnv";
 
 /**
  * @param {string[]} argv
@@ -58,14 +59,32 @@ export function evaluateManifestAccess(env, options = {}) {
   else if (parsed.parseError) errors.push("DATABASE_URL_UNPARSEABLE");
 
   const urlAppEnv = parsed.present && !parsed.parseError ? appEnvForEndpoint(parsed.endpointId) : null;
-  const touchesProduction = appEnv === "production" || urlAppEnv === "production";
+  const exactProductionEndpoint = urlAppEnv === "production";
+  const skipPreviewIdentity = options.allowProductionRead === true && exactProductionEndpoint;
+  const touchesProduction = appEnv === "production" || exactProductionEndpoint;
   if (touchesProduction && !options.allowProductionRead) {
     errors.push("PRODUCTION_READ_NOT_ALLOWED");
   } else if (urlAppEnv === "development" || urlAppEnv === "staging") {
     errors.push("RESTORE_PREVIEW_REQUIRED");
+  } else if (!skipPreviewIdentity && parsed.present && !parsed.parseError) {
+    collectPreviewIdentityErrors(env, parsed, errors);
   }
 
   return { ok: errors.length === 0, appEnv: appEnv || null, errors: [...new Set(errors)] };
+}
+
+function collectPreviewIdentityErrors(env, parsed, errors) {
+  const projectId = (env.MANIFEST_NEON_PROJECT_ID ?? "").trim();
+  const parentId = (env.MANIFEST_NEON_PARENT_BRANCH_ID ?? "").trim();
+  const branchId = (env.MANIFEST_NEON_BRANCH_ID ?? "").trim();
+  const endpointId = (env.MANIFEST_NEON_ENDPOINT_ID ?? "").trim();
+
+  if (projectId !== NEON_PROJECT_ID) errors.push("MANIFEST_PROJECT_INVALID");
+  if (parentId !== MANIFEST_DEVELOPMENT_BRANCH_ID) errors.push("MANIFEST_PARENT_BRANCH_INVALID");
+  if (!branchId) errors.push("MANIFEST_BRANCH_ID_REQUIRED");
+  else if (branchId === parentId) errors.push("MANIFEST_BRANCH_INVALID");
+  if (!endpointId) errors.push("MANIFEST_ENDPOINT_ID_REQUIRED");
+  else if (endpointId !== parsed.endpointId) errors.push("MANIFEST_ENDPOINT_MISMATCH");
 }
 
 /**
@@ -127,6 +146,10 @@ function size(value) {
 
 function validChecksum(value) {
   return typeof value === "string" && SHA256_HEX.test(value);
+}
+
+function entryHasRecordedMetadata(entry) {
+  return Boolean(entry.key && validChecksum(entry.checksum) && entry.bytes !== null);
 }
 
 function withTimeout(operation, timeoutMs) {
@@ -240,6 +263,7 @@ export async function checkObjectManifest(input) {
   const counts = {
     agreementRows: 0,
     photoRows: 0,
+    photoRowsWithPreview: 0,
     skipped: 0,
     objects: 0,
     verified: 0,
@@ -267,7 +291,13 @@ export async function checkObjectManifest(input) {
       }
       counts[group.countKey] += 1;
       const id = String(row.id ?? "");
-      for (const entry of group.entriesOf(row)) {
+      const entries = group.entriesOf(row);
+      if (group.countKey === "photoRows"
+        && entries.length === 2
+        && entries.every(entryHasRecordedMetadata)) {
+        counts.photoRowsWithPreview += 1;
+      }
+      for (const entry of entries) {
         counts.objects += 1;
         const result = await verifyEntry(store, entry, verifyOptions);
         if (result.state === "match") {
@@ -284,8 +314,14 @@ export async function checkObjectManifest(input) {
 
   counts.auditRows = await withTimeout(() => loader.auditCount(), ioTimeoutMs);
   if (counts.objects === 0) errors.add("MANIFEST_EMPTY");
+  else if (counts.agreementRows === 0 || counts.photoRows === 0 || counts.photoRowsWithPreview === 0) {
+    errors.add("MANIFEST_INVENTORY_INCOMPLETE");
+  }
 
   const ok = counts.objects > 0
+    && counts.agreementRows > 0
+    && counts.photoRows > 0
+    && counts.photoRowsWithPreview > 0
     && counts.missing === 0
     && counts.mismatch === 0
     && counts.failed === 0;
