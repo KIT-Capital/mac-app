@@ -303,8 +303,13 @@ test.describe("desk", () => {
     await page.getByLabel("Brand").fill("F.P. Journe");
     await page.getByLabel("Model").fill("Chronomètre Bleu");
     await page.getByLabel("Reference").fill("CB");
+    const eligibility = page.getByRole("checkbox", { name: /Eligible for sale-and-repurchase/i });
+    await expect(eligibility).not.toBeChecked();
+    await eligibility.check();
     await page.getByRole("button", { name: "Add Reference" }).click();
-    await expect(page.getByText("Chronomètre Bleu")).toBeVisible();
+    const row = page.getByRole("row").filter({ hasText: "Chronomètre Bleu" });
+    await expect(row).toBeVisible();
+    await expect(row.getByText("Yes", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Configure" }).click();
     await page.getByLabel("Company name").fill("Mechanical Art Capital LLC");
     await page.getByRole("button", { name: "Save Configuration" }).click();

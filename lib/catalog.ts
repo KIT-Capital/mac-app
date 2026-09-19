@@ -143,14 +143,27 @@ export function isDesk(user: { role?: string } | null) {
 
 export function catalogMatch(
   watch: { brand: string; model: string; reference?: string },
-  catalog: { brand: string; model: string; reference: string; typicalLow: number; typicalHigh: number }[],
+  catalog: {
+    brand: string;
+    model: string;
+    reference: string;
+    typicalLow: number;
+    typicalHigh: number;
+    financeable?: boolean;
+  }[],
 ) {
   const ref = (watch.reference || "").toLowerCase();
+  const brand = watch.brand.toLowerCase();
   return (
-    catalog.find((c) => ref && c.reference.toLowerCase() === ref) ||
     catalog.find(
       (c) =>
-        c.brand.toLowerCase() === watch.brand.toLowerCase() &&
+        ref &&
+        c.reference.toLowerCase() === ref &&
+        c.brand.toLowerCase() === brand,
+    ) ||
+    catalog.find(
+      (c) =>
+        c.brand.toLowerCase() === brand &&
         c.model.toLowerCase() === watch.model.toLowerCase(),
     )
   );
@@ -158,11 +171,40 @@ export function catalogMatch(
 
 export function catalogValuation(
   watch: { brand: string; model: string; reference?: string; valueLow?: number; valueHigh?: number },
-  catalog: { brand: string; model: string; reference: string; typicalLow: number; typicalHigh: number }[],
+  catalog: {
+    brand: string;
+    model: string;
+    reference: string;
+    typicalLow: number;
+    typicalHigh: number;
+    financeable?: boolean;
+  }[],
 ) {
   const match = catalogMatch(watch, catalog);
   return {
-    valueLow: watch.valueLow ?? match?.typicalLow ?? 40000,
-    valueHigh: watch.valueHigh ?? match?.typicalHigh ?? 55000,
+    valueLow: match?.typicalLow ?? watch.valueLow ?? 40000,
+    valueHigh: match?.typicalHigh ?? watch.valueHigh ?? 55000,
+    financeable:
+      match?.financeable ??
+      TIER_ONE_BRANDS.includes(watch.brand as (typeof TIER_ONE_BRANDS)[number]),
+  };
+}
+
+export function catalogAppraisalPatch(
+  watch: { brand: string; model: string; reference?: string; valueLow?: number; valueHigh?: number },
+  catalog: {
+    brand: string;
+    model: string;
+    reference: string;
+    typicalLow: number;
+    typicalHigh: number;
+    financeable?: boolean;
+  }[],
+  evaluatedAt: string,
+) {
+  return {
+    status: "appraised" as const,
+    evaluatedAt,
+    ...catalogValuation(watch, catalog),
   };
 }
