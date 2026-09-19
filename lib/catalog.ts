@@ -152,20 +152,22 @@ export function catalogMatch(
     financeable?: boolean;
   }[],
 ) {
-  const ref = (watch.reference || "").toLowerCase();
-  const brand = watch.brand.toLowerCase();
+  const ref = (watch.reference || "").trim().toLowerCase();
+  const brand = watch.brand.trim().toLowerCase();
   return (
     catalog.find(
       (c) =>
         ref &&
-        c.reference.toLowerCase() === ref &&
-        c.brand.toLowerCase() === brand,
+        c.reference.trim().toLowerCase() === ref &&
+        c.brand.trim().toLowerCase() === brand,
     ) ||
-    catalog.find(
-      (c) =>
-        c.brand.toLowerCase() === brand &&
-        c.model.toLowerCase() === watch.model.toLowerCase(),
-    )
+    (!ref
+      ? catalog.find(
+          (c) =>
+            c.brand.trim().toLowerCase() === brand &&
+            c.model.trim().toLowerCase() === watch.model.trim().toLowerCase(),
+        )
+      : undefined)
   );
 }
 
@@ -186,7 +188,10 @@ export function catalogValuation(
     valueHigh: match?.typicalHigh ?? watch.valueHigh ?? 55000,
     financeable:
       match?.financeable ??
-      TIER_ONE_BRANDS.includes(watch.brand as (typeof TIER_ONE_BRANDS)[number]),
+      TIER_ONE_BRANDS.some(
+        (tierOneBrand) =>
+          tierOneBrand.toLowerCase() === watch.brand.trim().toLowerCase(),
+      ),
   };
 }
 

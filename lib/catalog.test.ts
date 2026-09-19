@@ -57,6 +57,39 @@ describe("catalogValuation", () => {
     });
   });
 
+  it("does not fall back to another reference when the watch has one", () => {
+    const valuation = catalogValuation(
+      {
+        brand: "Audemars Piguet",
+        model: "Royal Oak Selfwinding",
+        reference: "15500ST",
+      },
+      [{
+        brand: "Audemars Piguet",
+        model: "Royal Oak Selfwinding",
+        reference: "15400ST",
+        typicalLow: 30000,
+        typicalHigh: 40000,
+        financeable: false,
+      }],
+    );
+
+    assert.deepEqual(valuation, {
+      valueLow: 40000,
+      valueHigh: 55000,
+      financeable: true,
+    });
+  });
+
+  it("matches tier-one fallback eligibility without case sensitivity", () => {
+    const valuation = catalogValuation(
+      { brand: "  ROLEX ", model: "Daytona" },
+      [],
+    );
+
+    assert.equal(valuation.financeable, true);
+  });
+
   it("builds one current appraisal snapshot for the desk update", () => {
     const patch = catalogAppraisalPatch(
       {
