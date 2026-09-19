@@ -15,7 +15,7 @@ export const COLLECTOR_TUTORIAL = {
   steps: [
     {
       title: "Sign in from your email",
-      body: "Enter the address on your collection. MAC sends a one-time link. It lasts fifteen minutes and works once. There is no collector password.",
+      body: "Enter the address on your collection and follow the sign-in instructions. In the live app, MAC sends a one-time link that lasts fifteen minutes and works once. There is no collector password.",
     },
     {
       title: "Add each timepiece",
