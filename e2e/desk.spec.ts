@@ -389,4 +389,24 @@ test.describe("desk", () => {
       patch: { vaultLocation: "Locally Edited Vault" },
     });
   });
+
+  test("desk tutorial is inside the admin wall and collectors cannot open it", async ({ page, request }) => {
+    const locked = await request.get("/admin/guide");
+    expect(locked.status()).toBe(403);
+    await expect(locked.json()).resolves.toEqual({ error: "Desk session required." });
+
+    await signInHale(page);
+    await expect(page.getByRole("link", { name: "Tutorial" })).toHaveCount(0);
+    const blocked = await page.goto("/admin/guide");
+    expect(blocked?.status()).toBe(403);
+    await expect(page.getByText("Desk session required.")).toBeVisible();
+    await expect(page.getByText("How the desk works")).toHaveCount(0);
+
+    await signInDesk(page);
+    await page.getByRole("link", { name: "Tutorial" }).click();
+    await expect(page.getByText(/How the desk works/i)).toBeVisible();
+    await expect(page.getByText(/Staff only/i)).toBeVisible();
+    await expect(page.getByText(/Collectors never get a desk link/i)).toBeVisible();
+    await expect(page.getByText(/\bloan\b/i)).toHaveCount(0);
+  });
 });

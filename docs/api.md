@@ -192,6 +192,10 @@ an agent-native exception. Isolation is enforced in the repository and tested by
 a server file proxy. Stage 6 ledger posting is deferred and is not this product’s
 books.
 
+In-app tutorials (`/guide` for collectors, `/admin/guide` for staff) are static
+screens. They do not mutate the book. There is no tRPC or MCP procedure for them;
+that remains an explicit parity exception until a shared authorized path exists.
+
 ## Errors
 
 Handlers return JSON `{ error: string }` with 401 / 403 / 429 / 4xx as appropriate. The contract PDF handler also includes `code` and `errors`. Desk-required mail and `/admin` pages return 403 without a staff session. Failed desk login remains 401. Do not add a second undocumented mail or session path.
