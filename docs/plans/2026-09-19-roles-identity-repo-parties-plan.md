@@ -134,7 +134,7 @@ Today collectors use an email link and have no password. Desk roles are only `st
 One PR each. Do not combine auth with signing in one PR.
 
 1. **U-roles** — Role enum, master flag, permission helpers (`lib/roles.mjs`), tests. Migration 0020 seeds the three desk people with no password. Desk menu item for desk sessions only (already in the drawer). The login-page “MAC desk staff” reveal stays until U-passwords gives everyone a password box, otherwise desk people could not sign in.
-2. **U-passwords** — One password box for everyone; remove the “MAC desk staff” reveal; retail password on signup/sign-in; self-service email reset for all roles; first-login set-password link for rows with no password (the three seeded people); lock/disable retail accounts for desk roles.
+2. **U-passwords** — **Amended 2026-09-19 (owner):** retail users sign in with a **one-time code** sent to their email or phone — no password, no Google/Facebook/Amazon; the same code path is the recovery path, so there is no separate “forgot password” for retail. Desk roles keep a password **plus** the one-time code, because they move money; first-login set-password link for the three seeded rows stays; remove the “MAC desk staff” reveal; lock/disable retail accounts for desk roles. The email code ships in this unit; the SMS code arrives with U-sms on the same person row.
 3. **U-party** — Onboarding collector/dealer; profile edit; snapshot `partyKind` on create and renew; exclusive live piece flag on retail UI.
 4. **U-appraise-acl** — Server refuses catalog/piece value writes unless actor is appraiser or super admin; unsigned repos only for per-repo freeze; admin can read.
 5. **U-mac-sign** — Checklist + MAC signs last + only appraiser/super admin; admin cannot complete MAC sign; retail still cannot edit a signed repo.
@@ -154,6 +154,6 @@ One PR each. Do not combine auth with signing in one PR.
 
 ## Owner confirmation
 
-**Approved 2026-09-19.** Password, roles, dealer tag, MAC-last sign, whole-collection buyback, Twilio (Norfolk AI now, MAC later), and WhatsApp as a retail channel are decided. Do not paste Twilio tokens into chat; they go into Doppler when U-sms / U-whatsapp start.
+**Approved 2026-09-19.** Roles, dealer tag, MAC-last sign, whole-collection buyback, Twilio (Norfolk AI now, MAC later), and WhatsApp as a retail channel are decided. Login amended the same day: retail = one-time code by email or phone; desk = password plus code. Do not paste Twilio tokens into chat; they go into Doppler when U-sms / U-whatsapp start.
 
 Default: WhatsApp is service and notices, not a login method. Say if you instead want one-time login codes on WhatsApp as well.
