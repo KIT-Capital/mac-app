@@ -548,7 +548,7 @@ After U13, U3 ships before U4 because U4 reuses U3's `access_rate_limits` table 
 
 **Files:**
 - Modify: `lib/storage/object-store.mjs`, `lib/storage/r2-object-store.mjs`, `lib/db/photos.ts` (remove `saveOriginal`), `lib/db/schema.ts` (`photo_objects` columns, partial unique index, `live_previews.photo_object_id`), `lib/live-book-errors.mjs`, `docs/api.md`, `docs/hosting.md` (CORS values), `docs/config-and-env-map.md`
-- Create: `lib/storage/photo-object-key.mjs`, `drizzle/0011_photo_objects_direct.sql`, `app/api/photos/route.ts`, `tools/harness/photo-pending-sweep.mjs`
+- Create: `lib/storage/photo-object-key.mjs`, `drizzle/0011_photo_objects_direct.sql`, `app/api/photos/route.ts`, `scripts/photo-pending-sweep.mjs`
 - Test: `lib/storage/object-store.test.mjs`, `lib/storage/r2-object-store.test.mjs`, `lib/storage/photo-object-key.test.mjs` on `test:unit`; `lib/db/photos.test.ts` on `test:db`
 
 **Approach:**

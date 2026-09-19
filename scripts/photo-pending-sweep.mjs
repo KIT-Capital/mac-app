@@ -1,6 +1,6 @@
-import { createDb } from "../../lib/db/client.ts";
-import { sweepPendingPhotos } from "../../lib/db/photos.ts";
-import { createObjectStore } from "../../lib/storage/r2-object-store.mjs";
+import { createDb } from "../lib/db/client.ts";
+import { sweepPendingPhotos } from "../lib/db/photos.ts";
+import { createObjectStore } from "../lib/storage/r2-object-store.mjs";
 
 try {
   const result = await sweepPendingPhotos(createDb(), createObjectStore());
