@@ -16,7 +16,7 @@ const BLANK: CatalogEntry = {
   caseDiameter: "40mm",
   typicalLow: 40000,
   typicalHigh: 55000,
-  financeable: true,
+  financeable: false,
   notes: "",
 };
 
@@ -65,6 +65,16 @@ export default function AdminCatalogPage() {
         <Field label="Typical high">
           <input type="number" value={draft.typicalHigh} onChange={(e) => setDraft({ ...draft, typicalHigh: Number(e.target.value) })} className="w-full bg-transparent py-1 text-[16px] outline-none" />
         </Field>
+        <Field label="Application eligibility">
+          <label className="flex min-h-8 items-center gap-3 text-sm text-white/75">
+            <input
+              type="checkbox"
+              checked={draft.financeable}
+              onChange={(e) => setDraft({ ...draft, financeable: e.target.checked })}
+            />
+            Eligible for sale-and-repurchase applications
+          </label>
+        </Field>
         <Field label="Notes">
           <input value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} className="w-full bg-transparent py-1 text-[16px] outline-none" />
         </Field>
@@ -74,12 +84,13 @@ export default function AdminCatalogPage() {
       </form>
       {error ? <p className="mb-4 text-sm text-red-300">{error}</p> : null}
       <AdminTable
-        headers={["Brand", "Model", "Reference", "Range", ""]}
+        headers={["Brand", "Model", "Reference", "Range", "Eligible", ""]}
         rows={catalog.map((c) => [
           c.brand,
           c.model,
           c.reference,
           `${money(c.typicalLow)} – ${money(c.typicalHigh)}`,
+          c.financeable ? "Yes" : "No",
           <div key={c.id} className="flex gap-3 text-[#FCB040]">
             <button type="button" onClick={() => setDraft(c)}>Edit</button>
             <button type="button" onClick={() => void onRemove(c.id)}>Remove</button>

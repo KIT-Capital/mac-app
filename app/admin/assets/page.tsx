@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
-import { catalogValuation, moneyRange } from "@/lib/catalog";
+import { catalogAppraisalPatch, moneyRange } from "@/lib/catalog";
 import { useStore } from "@/lib/store";
 
 export default function AdminAssetsPage() {
@@ -36,13 +36,12 @@ export default function AdminAssetsPage() {
             <button
               type="button"
               onClick={() => {
-                const range = catalogValuation(w, catalog);
-                void save(updateTimepiece(w.id, {
-                  status: "appraised",
-                  evaluatedAt: new Date().toISOString().slice(0, 10),
-                  valueLow: range.valueLow,
-                  valueHigh: range.valueHigh,
-                }));
+                const patch = catalogAppraisalPatch(
+                  w,
+                  catalog,
+                  new Date().toISOString().slice(0, 10),
+                );
+                void save(updateTimepiece(w.id, patch));
               }}
             >
               Appraise
