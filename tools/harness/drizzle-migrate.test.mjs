@@ -9,6 +9,7 @@ const migrate = fileURLToPath(new URL("./drizzle-migrate.mjs", import.meta.url))
 const developmentUnpooled = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.development}.us-east-2.aws.neon.tech/neondb`;
 const productionUnpooled = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.production}.us-east-2.aws.neon.tech/neondb`;
 const stagingUnpooled = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.staging}.us-east-2.aws.neon.tech/neondb`;
+const ciUnpooled = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.ci}.us-east-2.aws.neon.tech/neondb`;
 
 function runMigrate(env, args = []) {
   return spawnSync(process.execPath, [migrate, ...args], {
@@ -31,6 +32,17 @@ describe("drizzle-migrate CLI", () => {
     assert.notEqual(result.status, 0);
     const body = stderrBody(result);
     assert.ok(body.errors.includes("PRODUCTION_MIGRATION_NOT_ALLOWED"));
+    assert.ok(body.errors.includes("DEVELOPMENT_MIGRATION_ONLY"));
+  });
+
+  it("exits before connecting when APP_ENV is ci without --target ci", () => {
+    const result = runMigrate({
+      APP_ENV: "ci",
+      NEON_BRANCH: "ci",
+      DATABASE_URL_UNPOOLED: ciUnpooled,
+    });
+    assert.notEqual(result.status, 0);
+    const body = stderrBody(result);
     assert.ok(body.errors.includes("DEVELOPMENT_MIGRATION_ONLY"));
   });
 
@@ -84,6 +96,8 @@ describe("drizzle-migrate CLI", () => {
     const scripts = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).scripts;
     assert.equal(scripts["db:migrate:production"].includes("--confirm-production"), false);
     assert.ok(scripts["db:migrate:production"].includes("--target production"));
+    assert.equal(scripts["db:migrate:ci"].includes("doppler"), false);
+    assert.ok(scripts["db:migrate:ci"].includes("--target ci"));
   });
 
   it("refuses an unknown target", () => {

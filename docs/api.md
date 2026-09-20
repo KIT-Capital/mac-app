@@ -238,7 +238,7 @@ The live operations book, agreement documents, and direct photo uploads have
 authorized HTTP handlers for the human app. A tRPC or MCP adapter for those
 capabilities and the remaining repository-only operations remains an explicit
 agent-native exception. Isolation is enforced in the repository and tested by
-`npm run test:db`. Do not dual-write or auto-migrate the browser store. Do not
+`npm run test:db` locally and GitHub Actions `test:db:run` on Neon `ci`. Do not dual-write or auto-migrate the browser store. Do not
 add a server file proxy. Stage 6 ledger posting is deferred and is not this
 product’s books.
 

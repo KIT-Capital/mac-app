@@ -110,7 +110,7 @@ tools/harness/    read-only structural check + neon-ping
 ## Learned Workspace Facts
 
 - This checkout’s product remote is `github` → `https://github.com/KIT-Capital/mac-app.git`; Cursor `origin` is a second remote.
-- The Neon project for this app is MAC App (`withered-lake-05570428`). Map Doppler `dev` / Railway Development / local to Neon development; Doppler `stg` / Railway staging to Neon staging; Doppler `prd` / Railway production to Neon production.
+- The Neon project for this app is MAC App (`withered-lake-05570428`). Map Doppler `dev` / Railway Development / local to Neon development; Doppler `stg` / Railway staging to Neon staging; Doppler `prd` / Railway production to Neon production. GitHub Actions `test:db` uses dedicated Neon branch `ci` (`br-polished-star-a5lo62bb`, endpoint `ep-tiny-poetry-a59fn11f`) via repo secrets `CI_DATABASE_URL` / `CI_DATABASE_URL_UNPOOLED` only — never development, staging, or production URLs.
 - The Cloudflare R2 bucket for this app is named `mac-app`.
 - Doppler workplace **KIT Capital** / project `mac-app` is the secret store (`dev`, `stg`, `prd`). The leftover Norfolk AI project `mechanical-art-capital` was deleted; do not recreate it. Do not delete the Norfolk AI workplace (it still holds Product OS and other projects).
 - Public hostname is `mechart.app` on the Norfolk AI Cloudflare zone. Railway production attached the custom domain and, after Cloudflare login, wrote the apex CNAME and `_railway-verify` TXT. `www.mechart.app` is a proxied CNAME to the apex and 301s to `https://mechart.app`. Do not add MX/SPF on this zone; mail stays on `@mechartcap.com`. When adding Railway custom domains, expect Railway to apply Cloudflare DNS after authorization instead of assuming copy-paste.

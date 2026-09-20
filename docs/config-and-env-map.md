@@ -1,6 +1,6 @@
 # Config and env map
 
-**Tier: REFERENCE** · Last verified: 2026-09-19
+**Tier: REFERENCE** · Last verified: 2026-09-20
 
 Key **names** only. Values belong in Doppler or Railway variables. See `.env.example`. Never print values.
 
@@ -26,6 +26,7 @@ Key **names** only. Values belong in Doppler or Railway variables. See `.env.exa
 | Neon project | MAC App / `withered-lake-05570428` | `aws-us-east-2` · Postgres 18 · database `neondb` |
 | Neon `development` | `br-summer-truth-a52brhnv` | Schema-only · endpoint `ep-red-union-a5fze04l` |
 | Neon `staging` | `br-sweet-poetry-a5j7m69j` | Schema-only · endpoint `ep-calm-heart-a5ttpc4d` |
+| Neon `ci` | `br-polished-star-a5lo62bb` | GitHub Actions `test:db` only · parent `development` · endpoint `ep-tiny-poetry-a59fn11f` |
 | Neon `production` | `br-wispy-mode-a5z57bho` | Default, protected · endpoint `ep-wild-fire-a5a5m53v` |
 | Local `.neon` | branch `development` | Gitignored pin |
 
@@ -42,6 +43,7 @@ Live `SELECT current_database()` through each stored URL returned `neondb`. `neo
 | Railway Development | `development` | `development` | `ep-red-union-a5fze04l` | `neondb` |
 | Railway staging | `staging` | `staging` | `ep-calm-heart-a5ttpc4d` | `neondb` |
 | Railway production | `production` | `production` | `ep-wild-fire-a5a5m53v` | `neondb` |
+| GitHub Actions `database` | `ci` | `ci` | `ep-tiny-poetry-a59fn11f` | `neondb` |
 
 Railway staging now matches Doppler `stg`. `DATABASE_URL_UNPOOLED` was not copied onto the app service.
 
@@ -53,10 +55,10 @@ The Next.js runtime still does not open a database connection. The live checks u
 |---|---|---|
 | App / startup | pooled + unpooled if they match | `start-mac-app.mjs` and `instrumentation.ts`. Unpooled on the app service is a follow-up |
 | Guard / ping | pooled + unpooled if they match | `npm run db:guard` · `npm run db:ping` |
-| Migrate | `DATABASE_URL_UNPOOLED` only | `npm run db:migrate` · development default · `db:migrate:staging` · `db:migrate:production -- --confirm-production` |
-| Manifest check (restore drill) | `MANIFEST_DATABASE_URL` plus process-only preview identity names, read-only | `npm run db:manifest-check` · owner-exported `MANIFEST_NEON_PROJECT_ID`, `MANIFEST_NEON_PARENT_BRANCH_ID`, `MANIFEST_NEON_BRANCH_ID`, `MANIFEST_NEON_ENDPOINT_ID` must bind the URL endpoint · never stored in Doppler/Railway/repo/logs · `DATABASE_URL` is ignored · known development/staging endpoints are refused · production requires `--allow-production-read` · `docs/runbooks/restore-drill.md` |
+| Migrate | `DATABASE_URL_UNPOOLED` only | `npm run db:migrate` · development default · `db:migrate:staging` · `db:migrate:ci` (GitHub Actions env, no Doppler) · `db:migrate:production -- --confirm-production` |
+| Manifest check (restore drill) | `MANIFEST_DATABASE_URL` plus process-only preview identity names, read-only | `npm run db:manifest-check` · owner-exported `MANIFEST_NEON_PROJECT_ID`, `MANIFEST_NEON_PARENT_BRANCH_ID`, `MANIFEST_NEON_BRANCH_ID`, `MANIFEST_NEON_ENDPOINT_ID` must bind the URL endpoint · never stored in Doppler/Railway/repo/logs · `DATABASE_URL` is ignored · known development/staging/ci endpoints are refused · production requires `--allow-production-read` · `docs/runbooks/restore-drill.md` |
 
-`DATABASE_URL_UNPOOLED` is in Doppler only. It is not on the Railway `mac-app` service in Development, staging, or production.
+`DATABASE_URL_UNPOOLED` is in Doppler for migrate-only use and in GitHub Actions as `CI_DATABASE_URL_UNPOOLED` for the `ci` branch. It is not on the Railway `mac-app` service in Development, staging, or production.
 
 ## Delivery method
 
@@ -75,7 +77,7 @@ Sentry code is installed but project creation remains an owner gate. Once approv
 
 | Name | Where used | Status | Notes |
 |---|---|---|---|
-| `APP_ENV` | Mapping guard | Doppler + Railway production/Development | `development` · `staging` · `preview` · `production`. Required when any database URL is set |
+| `APP_ENV` | Mapping guard | Doppler + Railway + GitHub Actions `database` | `development` · `staging` · `preview` · `ci` · `production`. Required when any database URL is set. `ci` is GitHub Actions only |
 | `NEXT_PUBLIC_SITE_URL` | Public links | Implemented | Production/Development `https://mechart.app` · staging Railway host |
 | `DESK_SESSION_SECRET` | Development desk cookie alias | Development only | Single-key compatibility alias; ignored in staging and production |
 | `DESK_SESSION_KEYS` | Desk key set | Required outside development | Ordered `kid:secret,kid2:secret2`; each secret is at least 32 characters. Sign with the first, verify all. Malformed or missing is `DESK_SESSION_KEYS_INVALID` |
@@ -103,7 +105,7 @@ Sentry code is installed but project creation remains an owner gate. Once approv
 | `MANIFEST_NEON_BRANCH_ID` | Restore-drill preview identity | Process-only | Preview branch id from the owner-approved create; must differ from the parent. Not a Doppler or Railway secret. |
 | `MANIFEST_NEON_ENDPOINT_ID` | Restore-drill preview identity | Process-only | Preview endpoint id from the owner-approved create; must equal the endpoint parsed from `MANIFEST_DATABASE_URL`. Not a Doppler or Railway secret. |
 | `DATABASE_URL_UNPOOLED` | Neon direct URL | Verified | Same endpoint as pooled; migrate process only (later) |
-| `NEON_BRANCH` | Branch label | Verified | Must match `APP_ENV` for development/production |
+| `NEON_BRANCH` | Branch label | Verified | Must match `APP_ENV` for development/staging/ci/production |
 | `R2_ACCOUNT_ID` | R2 S3 account | Verified | Norfolk AI Cloudflare account; Doppler + Railway |
 | `R2_BUCKET` | R2 bucket name | Verified | `mac-app`; private (no r2.dev); Doppler + Railway. Owner applies a Cloudflare bucket lock on `{app_env}/agreements/` so stored PDFs cannot be overwritten or deleted in-app. Photo objects use `{app_env}/originals/{customer_id}/{photo_id}` and `{app_env}/previews/{customer_id}/{photo_id}`. Code does not apply bucket policy or CORS. |
 | `R2_S3_ENDPOINT` | R2 S3 API host | Verified | `https://<account>.r2.cloudflarestorage.com`; adapter can also derive this from `R2_ACCOUNT_ID` |
@@ -126,6 +128,6 @@ Development is not governed: flag off is browser mode; flag on with a missing pr
 
 `GET /api/health` is the Railway health check (`railway.json`). It is `force-dynamic`, `Cache-Control: no-store`, and returns `{ ok, appEnv, checks: { database, liveBook } }` with codes only: `database` is `ok`, `NOT_CONFIGURED` (no `DATABASE_URL`), a mapping code, or `DATABASE_UNREACHABLE` (any driver error or a 3-second timeout); `liveBook` is `ok`, `browser`, or the first missing prerequisite by name. Status is `200` when `ok`, else `503`. No URL, hostname, secret, or driver message appears in the body.
 
-Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` by default. Staging and production apply only through `db:migrate:staging` and `db:migrate:production -- --confirm-production` over `DATABASE_URL_UNPOOLED`. The confirmation flag is never baked into the script. `npm run db:schema-check` fails CI on snapshot drift. `npm run test:db` runs Stage 2–5 and 7 isolation against that branch. `npm run r2:ping` puts, HEADs, and deletes a `dev-probes/` object; it runs only when `APP_ENV` is `development` and prints no secrets. `npm run db:manifest-check` is read-only: it binds process-only `MANIFEST_DATABASE_URL` to owner-exported Neon project, parent branch, preview branch, and preview endpoint ids before any client is created, then selects `stored` `agreement_documents` and `photo_objects` rows plus the `desk_audit_log` count and serially HEADs each recorded R2 key with checksum mode. Database and object operations have a 10-second bound. Output contains counts and row ids only — never a key, checksum, URL, or driver message. Empty inventories fail with `MANIFEST_EMPTY`; nonempty inventories missing agreements, photos, or a complete original-and-preview photo row fail with `MANIFEST_INVENTORY_INCOMPLETE`; exact live development/staging endpoints fail with `RESTORE_PREVIEW_REQUIRED`. By default only `development/` object keys are eligible. The restore drill in `docs/runbooks/restore-drill.md` prompts for `MANIFEST_DATABASE_URL` so the credential never enters command history; Doppler `dev` supplies R2 credentials, and `DATABASE_URL` is ignored. The preview-branch URL is not copied into the repo, Doppler, Railway, the record, or a log. GitHub `quality` runs `lint`, `test:unit`, `db:schema-check`, and `build` with no database URL. `test:db` and Playwright stay local. Stage 6 ledger posting is blocked.
+Build (`next build`) does not select a database. Playwright starts Doppler `dev` through `tools/harness/start-e2e.mjs`, which strips `RESEND_API_KEY` so inquiries stay in the preview outbox. `npm run db:migrate` applies Drizzle to Neon `development` by default. Staging and production apply only through `db:migrate:staging` and `db:migrate:production -- --confirm-production` over `DATABASE_URL_UNPOOLED`. The confirmation flag is never baked into the script. `npm run db:schema-check` fails CI on snapshot drift. `npm run test:db` runs Stage 2–5 and 7 isolation against Doppler `dev` / Neon `development`. GitHub `quality` job `database` migrates and runs `test:db:run` against Neon `ci` using repo secrets `CI_DATABASE_URL` and `CI_DATABASE_URL_UNPOOLED` — never development, staging, or production URLs. `MAC_LIVE_BOOK` stays off for `ci`. `npm run r2:ping` puts, HEADs, and deletes a `dev-probes/` object; it runs only when `APP_ENV` is `development` and prints no secrets. `npm run db:manifest-check` is read-only: it binds process-only `MANIFEST_DATABASE_URL` to owner-exported Neon project, parent branch, preview branch, and preview endpoint ids before any client is created, then selects `stored` `agreement_documents` and `photo_objects` rows plus the `desk_audit_log` count and serially HEADs each recorded R2 key with checksum mode. Database and object operations have a 10-second bound. Output contains counts and row ids only — never a key, checksum, URL, or driver message. Empty inventories fail with `MANIFEST_EMPTY`; nonempty inventories missing agreements, photos, or a complete original-and-preview photo row fail with `MANIFEST_INVENTORY_INCOMPLETE`; exact live development/staging/ci endpoints fail with `RESTORE_PREVIEW_REQUIRED`. By default only `development/` object keys are eligible. The restore drill in `docs/runbooks/restore-drill.md` prompts for `MANIFEST_DATABASE_URL` so the credential never enters command history; Doppler `dev` supplies R2 credentials, and `DATABASE_URL` is ignored. The preview-branch URL is not copied into the repo, Doppler, Railway, the record, or a log. GitHub `quality` job `quality` runs `lint`, `test:unit`, `db:schema-check`, and `build` with no database URL. Playwright stays local. Stage 6 ledger posting is blocked.
 
 Do not move mail or demo logins to `@mechart.app`.

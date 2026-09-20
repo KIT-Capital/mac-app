@@ -1,7 +1,9 @@
 name: quality
 
-# Product gates from AGENTS.md. No database URL and no Doppler secrets.
-# kit-guard stays a separate workflow. Playwright and test:db stay local.
+# Product gates from AGENTS.md.
+# quality job: no database URL and no Doppler secrets.
+# database job: dedicated Neon ci branch via GitHub secrets only.
+# Playwright stays local.
 
 on:
   pull_request:
@@ -26,3 +28,23 @@ jobs:
       - run: npm run test:unit
       - run: npm run db:schema-check
       - run: npm run build
+
+  database:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: ci
+      NEON_BRANCH: ci
+      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+      DATABASE_URL_UNPOOLED: ${{ secrets.CI_DATABASE_URL_UNPOOLED }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.13.0"
+          cache: npm
+
+      - run: npm ci
+      - run: node tools/harness/assert-ci-database.mjs
+      - run: npm run db:migrate:ci
+      - run: npm run test:db:run
