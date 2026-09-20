@@ -243,7 +243,7 @@ type TransitionOutcome =
   | { ok: true; agreement: Agreement; mintsStage?: string; event?: RequestTransitionEvent };
 
 function withRequestEvent(agreement: Agreement, event?: RequestTransitionEvent): Agreement {
-  if (!event || event.internal) return agreement;
+  if (!event) return agreement;
   return {
     ...agreement,
     events: [
@@ -255,6 +255,7 @@ function withRequestEvent(agreement: Agreement, event?: RequestTransitionEvent):
         version: event.version,
         note: event.note,
         createdAt: event.createdAt,
+        ...(event.internal ? { internal: true } : {}),
       },
     ],
   };
@@ -846,6 +847,9 @@ function transitionRequest(
       : result.agreement,
     result.event,
   );
+  if (action === "recordDelivery") {
+    next = { ...next, deliveredOn: deskToday(now) };
+  }
   if (action === "signCollector") {
     next = {
       ...next,
@@ -1550,7 +1554,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!row) return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
         if (row.status !== "closed") return Promise.resolve({ ok: false, error: "AGREEMENT_STATE_CONFLICT" });
         if (!row.deliveredOn) return Promise.resolve({ ok: false, error: "RETURN_NOT_APPLICABLE" });
-        return updateStore((prev) => prev, {
+        const createdAt = new Date().toISOString();
+        return updateStore((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((item) => (
+            item.id === id
+              ? {
+                  ...item,
+                  events: [
+                    ...(item.events ?? []),
+                    { action: "recordReturn", createdAt, note: note ?? "" },
+                  ],
+                }
+              : item
+          )),
+        }), {
           operation: {
             action: "request.recordReturn",
             id,

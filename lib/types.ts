@@ -231,6 +231,7 @@ export type RequestEvent = {
   amount?: number;
   version?: number;
   note?: string;
+  internal?: boolean;
 };
 
 export type AgreementSignature = {

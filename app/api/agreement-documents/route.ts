@@ -80,6 +80,7 @@ export async function GET(request: Request) {
           toStatus: row.toStatus,
           createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
           note: row.note,
+          internal: Boolean(row.internal),
         }));
       } catch (error) {
         if (!(error instanceof Error) || error.message !== "AGREEMENT_NOT_FOUND") throw error;

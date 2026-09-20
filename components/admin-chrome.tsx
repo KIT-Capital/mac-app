@@ -60,7 +60,11 @@ export function AdminChrome({
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2" aria-label="Desk">
           {LINKS.map((link) => {
-            const active = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
+            const active = link.href === "/admin"
+            ? pathname === "/admin"
+            : link.href === "/admin/agreements"
+              ? pathname.startsWith("/admin/agreements") || pathname.startsWith("/admin/requests")
+              : pathname.startsWith(link.href);
             const Icon = link.icon;
             return (
               <Link
