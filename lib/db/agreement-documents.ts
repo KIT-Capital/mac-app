@@ -563,6 +563,38 @@ export async function listAgreementDocuments(
   return rendered.changed ? query() : rows;
 }
 
+/**
+ * The current version's stage row, rendered now when it is still building or
+ * failed (KTD11). Sign and MAC execute call this before they bind a signature.
+ */
+export async function recoverCurrentStageDocument(
+  db: Database,
+  liveAgreementId: string,
+  version: number,
+  stage: DocumentStage,
+  store: DocumentStore | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  const rows = await db
+    .select()
+    .from(agreementDocuments)
+    .where(
+      and(
+        eq(agreementDocuments.liveAgreementId, liveAgreementId),
+        eq(agreementDocuments.version, version),
+        eq(agreementDocuments.stage, stage),
+      ),
+    )
+    .orderBy(desc(agreementDocuments.createdAt));
+  const stored = rows.find((row) => row.status === "stored");
+  if (stored) return stored;
+  const latest = rows[0];
+  if (!latest || !store) throw new Error("DOCUMENT_NOT_READY");
+  const recovered = await readyStageDocument(db, latest, store, env);
+  if (recovered.status !== "stored") throw new Error("DOCUMENT_NOT_READY");
+  return recovered;
+}
+
 /** A stage row a reader asked for, rendered now if it still owes its object. */
 async function readyStageDocument(
   db: Database,

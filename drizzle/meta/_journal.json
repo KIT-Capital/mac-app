@@ -204,6 +204,13 @@
       "when": 1789889730891,
       "tag": "0028_signed_document_freeze",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789924812522,
+      "tag": "0029_inspection_values",
+      "breakpoints": true
     }
   ]
 }

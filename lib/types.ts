@@ -111,6 +111,7 @@ export type AppraisalAttempt = {
   finalizedAt?: string;
   finalizedByStaffId?: string;
   finalizedAgreementId?: string;
+  inspectedValueCents?: number;
   reopenedCount: number;
 };
 
@@ -218,6 +219,17 @@ export type Agreement = {
   paymentReference?: string;
   /** Per-piece caps frozen at Apply so a later appraisal never reprices it. */
   pieceCaps?: Record<string, number>;
+  signatures?: AgreementSignature[];
+};
+
+export type AgreementSignature = {
+  id: string;
+  version: number;
+  party: "collector" | "mac";
+  typedName: string;
+  snapshotHash: string;
+  book: "live" | "browser";
+  signedAt: string;
 };
 
 export type UserPreferences = {

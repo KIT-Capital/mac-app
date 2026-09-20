@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { INSPECTION_CONDITION } from "../contract/repo-agreement-snapshot.mjs";
-import { deskToday } from "../contract/repo-book.mjs";
+import { bookLabel, completedAppraisalDecisions, deskToday } from "../contract/repo-book.mjs";
 import { agreementDocumentStore, memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
 import { createDb, type Database } from "./client";
 import { clearAccessRateLimit } from "./collector-sessions";
@@ -21,6 +21,7 @@ import { hashStaffPassword } from "../staff-password.mjs";
 import {
   agreementDocuments,
   agreementEvents,
+  agreementSignatures,
   agreementShells,
   appraisalAttempts,
   catalogReferences,
@@ -804,7 +805,9 @@ describe("live-book operation repository", { skip }, () => {
         createdOn: "2026-01-01",
       });
     }
-    await executeLiveBookOperation(db, desk, { action: "agreement.markSigned", id: signedId });
+    await db.update(liveAgreements)
+      .set({ signedOn: "2026-01-02" })
+      .where(eq(liveAgreements.id, signedId));
     await executeLiveBookOperation(db, desk, {
       action: "agreement.recordEnd",
       id: endedId,
@@ -813,7 +816,7 @@ describe("live-book operation repository", { skip }, () => {
     for (const id of [signedId, endedId]) {
       await assert.rejects(
         () => executeLiveBookOperation(db, desk, { action: "agreement.markSigned", id }),
-        { message: "AGREEMENT_IMMUTABLE" },
+        { message: "LIVE_BOOK_ACTION_INVALID" },
       );
       await assert.rejects(
         () => executeLiveBookOperation(db, desk, {
@@ -849,6 +852,7 @@ describe("repo requests", { skip }, () => {
   let releaseTransaction: (() => void) | undefined;
   let transactionPromise: Promise<unknown> | undefined;
   let appraiserId = "";
+  let inspector: ReturnType<typeof deskActor>;
   let admin: ReturnType<typeof deskActor>;
   let adminEmail = "";
   let adminStaffId = "";
@@ -856,8 +860,16 @@ describe("repo requests", { skip }, () => {
   const deskOptions = {
     env: { APP_ENV: "development", MAC_LIVE_BOOK: "1" } as NodeJS.ProcessEnv,
     clientAddress: "127.0.0.1",
+    documentStore: store,
   };
   const retailOptions = { documentStore: store };
+  const CHECKLIST = {
+    identityVerified: true,
+    serialsMatch: true,
+    conditionMatches: true,
+    termAgreed: true,
+    inCustody: true,
+  } as const;
   const DAY = 86_400_000;
 
   before(async () => {
@@ -885,6 +897,7 @@ describe("repo requests", { skip }, () => {
       mustRotate: false,
     });
     appraiserId = appraiser.id;
+    inspector = deskActor("appraiser", appraiser.email, appraiser.id);
     const adminRow = await createStaffAccount(db, {
       name: "Request Admin",
       email: `request-admin.${suffix}@mac.test`,
@@ -978,6 +991,114 @@ describe("repo requests", { skip }, () => {
 
   async function documentsOf(id: string) {
     return db.select().from(agreementDocuments).where(eq(agreementDocuments.liveAgreementId, id));
+  }
+
+  async function signaturesOf(id: string) {
+    return db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, id));
+  }
+
+  async function attemptsOf(timepieceId: string) {
+    return db.select().from(appraisalAttempts).where(eq(appraisalAttempts.timepieceId, timepieceId));
+  }
+
+  async function flush(result: { afterCommit?: Array<() => Promise<unknown>> }) {
+    for (const job of result.afterCommit ?? []) await job();
+  }
+
+  async function stageHash(id: string, stage: string, version: number) {
+    const docs = await documentsOf(id);
+    const row = docs.find((doc) => doc.stage === stage && doc.version === version);
+    assert.ok(row, `missing ${stage} v${version}`);
+    return row.snapshotHash;
+  }
+
+  async function confirmRequest(id: string) {
+    const row = await agreementRow(id);
+    return executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn",
+      id,
+      decision: "confirm",
+      expectedStatus: row.status,
+      expectedVersion: row.version ?? 1,
+    }, deskOptions);
+  }
+
+  async function signRequest(
+    owner: Awaited<ReturnType<typeof collector>>,
+    id: string,
+    extra: {
+      snapshotHash?: string;
+      typedName?: string;
+      delivery?: string;
+      options?: { documentStore?: ReturnType<typeof agreementDocumentStore> };
+    } = {},
+  ) {
+    const row = await agreementRow(id);
+    const result = await executeLiveBookOperation(db, owner.actor, {
+      action: "request.signCollector",
+      id,
+      typedName: extra.typedName ?? owner.customer.name,
+      snapshotHash: extra.snapshotHash ?? await stageHash(id, "proposal", row.version ?? 1),
+      delivery: extra.delivery ?? "Desk arranges intake",
+      expectedStatus: row.status,
+      expectedVersion: row.version ?? 1,
+    }, extra.options ?? retailOptions) as RequestSubmitResult;
+    await flush(result);
+    return result;
+  }
+
+  async function deliverRequest(id: string) {
+    const row = await agreementRow(id);
+    return executeLiveBookOperation(db, admin, {
+      action: "request.recordDelivery",
+      id,
+      expectedStatus: row.status,
+      expectedVersion: row.version ?? 1,
+    }, deskOptions);
+  }
+
+  async function inspectPieces(
+    id: string,
+    pieces: Array<{ timepieceId: string; decision: "confirm" | "refuse" | "drop"; inspectedValueCents?: number }>,
+    outcome: "proceed" | "decline" = "proceed",
+    actor = inspector,
+  ) {
+    const row = await agreementRow(id);
+    const result = await executeLiveBookOperation(db, actor, {
+      action: "request.inspect",
+      id,
+      outcome,
+      pieces,
+      expectedStatus: row.status,
+      expectedVersion: row.version ?? 1,
+    }, deskOptions) as RequestSubmitResult;
+    await flush(result);
+    return result;
+  }
+
+  async function executeRequest(
+    id: string,
+    extra: {
+      snapshotHash?: string;
+      paymentReference?: string;
+      checklist?: Record<string, true>;
+      expectedStatus?: string;
+      expectedVersion?: number;
+    } = {},
+  ) {
+    const row = await agreementRow(id);
+    const result = await executeLiveBookOperation(db, inspector, {
+      action: "request.executeMac",
+      id,
+      typedName: "Dov Tuzman",
+      snapshotHash: extra.snapshotHash ?? await stageHash(id, "collector_signed", row.version ?? 1),
+      paymentReference: extra.paymentReference ?? "ABC-1",
+      checklist: extra.checklist ?? CHECKLIST,
+      expectedStatus: extra.expectedStatus ?? row.status,
+      expectedVersion: extra.expectedVersion ?? row.version ?? 1,
+    }, deskOptions) as RequestSubmitResult;
+    await flush(result);
+    return result;
   }
 
   it("submits three current pieces at the cap and mints a building proposal", async () => {
@@ -1516,7 +1637,7 @@ describe("repo requests", { skip }, () => {
     );
     await assert.rejects(
       () => executeLiveBookOperation(db, admin, { action: "agreement.markSigned", id }, deskOptions),
-      { message: "AGREEMENT_IMMUTABLE" },
+      { message: "LIVE_BOOK_ACTION_INVALID" },
     );
     assert.equal((await agreementRow(id)).status, "submitted");
     await executeLiveBookOperation(db, admin, {
@@ -1538,6 +1659,321 @@ describe("repo requests", { skip }, () => {
       { message: "AGREEMENT_IMMUTABLE" },
     );
     assert.equal((await agreementRow(id)).status, "returned");
+  });
+
+  it("recovers a failed proposal on collector sign and refuses a stale hash", async () => {
+    const owner = await collector("request-sign-recover");
+    const piece = await acceptedPiece(owner);
+    const id = `request-sign-recover-${suffix}`;
+    const stranger = await collector("request-sign-stranger");
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await db.update(agreementDocuments)
+      .set({ status: "failed" })
+      .where(and(eq(agreementDocuments.liveAgreementId, id), eq(agreementDocuments.stage, "proposal")));
+
+    await assert.rejects(
+      () => signRequest(owner, id, { options: {} }),
+      { message: "DOCUMENT_NOT_READY" },
+    );
+    await assert.rejects(
+      () => signRequest(owner, id, { snapshotHash: "b".repeat(64) }),
+      { message: "DOCUMENT_STALE" },
+    );
+    assert.equal((await agreementRow(id)).status, "returned");
+
+    await signRequest(owner, id);
+    const row = await agreementRow(id);
+    assert.equal(row.status, "collector_signed");
+    assert.equal(row.delivery, "Desk arranges intake");
+    const signatures = await signaturesOf(id);
+    assert.equal(signatures.length, 1);
+    assert.equal(signatures[0].party, "collector");
+    assert.equal(signatures[0].book, "live");
+    assert.equal(signatures[0].version, 1);
+    const proposal = (await documentsOf(id)).find((doc) => doc.stage === "proposal" && doc.status === "stored");
+    assert.ok(proposal);
+    assert.equal(signatures[0].documentId, proposal.id);
+    assert.equal(signatures[0].snapshotHash, proposal.snapshotHash);
+    assert.ok((await documentsOf(id)).some((doc) => doc.stage === "collector_signed"));
+
+    await assert.rejects(
+      () => signRequest(owner, id),
+      { message: "AGREEMENT_STATE_CONFLICT" },
+    );
+    const other = await collector("request-sign-other-row");
+    const otherPiece = await acceptedPiece(other);
+    const otherId = `request-sign-other-${suffix}`;
+    await flush(await submit(other, otherId, [otherPiece.id], 30_000));
+    await confirmRequest(otherId);
+    const otherHash = await stageHash(otherId, "proposal", 1);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, {
+        action: "request.signCollector",
+        id: otherId,
+        typedName: owner.customer.name,
+        snapshotHash: otherHash,
+        expectedStatus: "returned",
+        expectedVersion: 1,
+      }, retailOptions),
+      { message: "AGREEMENT_NOT_FOUND" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, stranger.actor, {
+        action: "request.signCollector",
+        id,
+        typedName: stranger.customer.name,
+        snapshotHash: proposal.snapshotHash,
+        expectedStatus: "returned",
+        expectedVersion: 0,
+      }, retailOptions),
+      { message: "AGREEMENT_NOT_FOUND" },
+    );
+  });
+
+  it("returns a signed request when inspection lowers the cap, then executes the accepted amount", async () => {
+    const owner = await collector("request-inspect-lower");
+    const piece = await acceptedPiece(owner);
+    const id = `request-inspect-lower-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    const beforeDecisions = completedAppraisalDecisions(await attemptsOf(piece.id), piece.id);
+
+    await assert.rejects(
+      () => inspectPieces(id, [{ timepieceId: piece.id, decision: "confirm" }]),
+      { message: "INSPECTED_VALUE_REQUIRED" },
+    );
+    await inspectPieces(id, [{
+      timepieceId: piece.id, decision: "confirm", inspectedValueCents: 4_500_000,
+    }]);
+    const lowered = await agreementRow(id);
+    assert.equal(lowered.status, "returned");
+    assert.equal(lowered.version, 2);
+    assert.equal(lowered.amountCents, 2_700_000);
+    const [finalized] = await attemptsOf(piece.id);
+    assert.equal(finalized.inspectedValueCents, 4_500_000);
+    assert.ok(finalized.finalizedAt);
+    assert.equal(completedAppraisalDecisions(await attemptsOf(piece.id), piece.id), beforeDecisions);
+
+    await assert.rejects(
+      () => executeRequest(id, { snapshotHash: "a".repeat(64) }),
+      { message: "SIGNATURE_STALE" },
+    );
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    const executed = await executeRequest(id);
+    assert.equal(executed.agreement.status, "executed");
+    assert.equal(executed.agreement.amount, 27_000);
+    const row = await agreementRow(id);
+    assert.equal(row.status, "executed");
+    assert.equal(row.amountCents, 2_700_000);
+    assert.ok(row.executedOn);
+    assert.equal(row.paymentReference, "ABC-1");
+    assert.ok((await membersOf(id)).every((member) => member.status === "live"));
+    assert.ok((await signaturesOf(id)).some((signature) => signature.party === "mac" && signature.version === 2));
+    assert.equal(bookLabel({
+      executedOn: row.executedOn,
+      createdAt: row.createdOn,
+      termMonths: row.termMonths,
+    }), "open");
+  });
+
+  it("stays inspecting when the signed amount still fits the inspected maximum", async () => {
+    const owner = await collector("request-inspect-stay");
+    const piece = await acceptedPiece(owner);
+    const id = `request-inspect-stay-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    await inspectPieces(id, [{
+      timepieceId: piece.id, decision: "confirm", inspectedValueCents: 5_833_300,
+    }]);
+    const row = await agreementRow(id);
+    assert.equal(row.status, "inspecting");
+    assert.equal(row.version, 1);
+    assert.equal(row.amountCents, 3_000_000);
+    const executed = await executeRequest(id);
+    assert.equal(executed.agreement.status, "executed");
+    assert.equal(executed.agreement.amount, 30_000);
+    assert.ok((await membersOf(id)).every((member) => member.status === "live"));
+  });
+
+  it("lets only an appraiser inspect, and a refuse keeps the decision slot", async () => {
+    const owner = await collector("request-inspect-refuse");
+    const piece = await acceptedPiece(owner);
+    const id = `request-inspect-refuse-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    await assert.rejects(
+      () => inspectPieces(id, [{
+        timepieceId: piece.id, decision: "confirm", inspectedValueCents: 5_833_300,
+      }], "proceed", admin),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const passwordHash = await hashStaffPassword("request password 123");
+    const other = await createStaffAccount(db, {
+      name: "Other Appraiser",
+      email: `request-other-appraiser.${suffix}@mac.test`,
+      role: "appraiser",
+      passwordHash,
+      mustRotate: false,
+    });
+    const otherActor = deskActor("appraiser", other.email, other.id);
+    const before = await attemptsOf(piece.id);
+    await inspectPieces(id, [{ timepieceId: piece.id, decision: "refuse" }], "proceed", otherActor);
+    const after = await attemptsOf(piece.id);
+    assert.equal(after[0].status, "refused");
+    assert.equal(after[0].decisionNo, before[0].decisionNo);
+    assert.equal(after[0].decidedByStaffId, appraiserId);
+    assert.equal(completedAppraisalDecisions(after, piece.id), completedAppraisalDecisions(before, piece.id));
+    const events = await eventsOf(id);
+    assert.equal(events.at(-1)?.action, "declineAtInspection");
+    assert.equal(events.at(-1)?.actorId, other.id);
+    const row = await agreementRow(id);
+    assert.equal(row.status, "closed");
+    assert.equal(row.closeReason, "declined_by_desk");
+  });
+
+  it("drops a piece, returns a new proposal, and executes only after the collector signs it", async () => {
+    const owner = await collector("request-inspect-drop");
+    const kept = await acceptedPiece(owner);
+    const dropped = await acceptedPiece(owner);
+    const id = `request-inspect-drop-${suffix}`;
+    await flush(await submit(owner, id, [kept.id, dropped.id], 60_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    await inspectPieces(id, [
+      { timepieceId: kept.id, decision: "confirm", inspectedValueCents: 5_833_300 },
+      { timepieceId: dropped.id, decision: "drop" },
+    ]);
+    const returned = await agreementRow(id);
+    assert.equal(returned.status, "returned");
+    assert.equal(returned.version, 2);
+    assert.equal(returned.amountCents, 3_500_000);
+    const members = await membersOf(id);
+    assert.equal(members.find((member) => member.timepieceId === dropped.id)?.status, "released");
+    assert.equal(members.find((member) => member.timepieceId === kept.id)?.status, "reserved");
+    const [droppedAttempt] = await attemptsOf(dropped.id);
+    assert.equal(droppedAttempt.status, "accepted");
+    assert.equal(droppedAttempt.finalizedAt, null);
+    await assert.rejects(
+      () => executeRequest(id, { snapshotHash: "a".repeat(64) }),
+      { message: "SIGNATURE_STALE" },
+    );
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    const executed = await executeRequest(id);
+    assert.equal(executed.agreement.status, "executed");
+    assert.deepEqual(executed.agreement.watchIds, [kept.id]);
+  });
+
+  it("refuses MAC execute until inspection, payment, and the checklist are complete", async () => {
+    const owner = await collector("request-execute-gates");
+    const piece = await acceptedPiece(owner);
+    const id = `request-execute-gates-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    await assert.rejects(() => executeRequest(id), { message: "INSPECTION_INCOMPLETE" });
+    await inspectPieces(id, [{
+      timepieceId: piece.id, decision: "confirm", inspectedValueCents: 5_833_300,
+    }]);
+    const signedHash = await stageHash(id, "collector_signed", 1);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, inspector, {
+        action: "request.executeMac",
+        id,
+        typedName: "Dov Tuzman",
+        snapshotHash: signedHash,
+        paymentReference: "",
+        checklist: CHECKLIST,
+        expectedStatus: "inspecting",
+        expectedVersion: 1,
+      }, deskOptions),
+      { message: "PAYMENT_REFERENCE_REQUIRED" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, inspector, {
+        action: "request.executeMac",
+        id,
+        typedName: "Dov Tuzman",
+        snapshotHash: signedHash,
+        paymentReference: "ABC-1",
+        checklist: { ...CHECKLIST, inCustody: false },
+        expectedStatus: "inspecting",
+        expectedVersion: 1,
+      }, deskOptions),
+      { message: "CHECKLIST_INCOMPLETE" },
+    );
+    const executed = await executeRequest(id);
+    assert.equal(executed.agreement.status, "executed");
+  });
+
+  it("keeps the collector signature when the owner withdraws after signing", async () => {
+    const owner = await collector("request-withdraw-signed");
+    const piece = await acceptedPiece(owner);
+    const id = `request-withdraw-signed-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await executeLiveBookOperation(db, owner.actor, {
+      action: "request.withdraw",
+      id,
+      expectedStatus: "collector_signed",
+      expectedVersion: 1,
+    });
+    const row = await agreementRow(id);
+    assert.equal(row.status, "closed");
+    assert.equal(row.closeReason, "withdrawn");
+    assert.ok((await membersOf(id)).every((member) => member.status === "released"));
+    assert.equal((await signaturesOf(id)).length, 1);
+  });
+
+  it("records a return only after a delivered request has closed", async () => {
+    const owner = await collector("request-return");
+    const piece = await acceptedPiece(owner);
+    const id = `request-return-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    await inspectPieces(id, [{ timepieceId: piece.id, decision: "refuse" }]);
+    const closed = await agreementRow(id);
+    const recorded = await executeLiveBookOperation(db, admin, {
+      action: "request.recordReturn",
+      id,
+      note: "Pieces handed back.",
+      expectedStatus: closed.status,
+      expectedVersion: closed.version ?? 1,
+    }, deskOptions) as RequestTransitionResult;
+    assert.equal(recorded.agreement.status, "closed");
+    assert.ok((await eventsOf(id)).some((event) => event.action === "recordReturn"));
+
+    const neverDelivered = `request-return-never-${suffix}`;
+    await flush(await submit(owner, neverDelivered, [(await acceptedPiece(owner)).id], 30_000));
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn",
+      id: neverDelivered,
+      decision: "decline",
+      expectedStatus: "submitted",
+      expectedVersion: 1,
+    }, deskOptions);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "request.recordReturn",
+        id: neverDelivered,
+        expectedStatus: "closed",
+        expectedVersion: 1,
+      }, deskOptions),
+      { message: "RETURN_NOT_APPLICABLE" },
+    );
   });
 });
 
