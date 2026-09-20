@@ -408,10 +408,21 @@ export function mapLiveBookRows(
     const agreementCode = optionalText(row, "agreementCode");
     if (signedAt) agreement.signedAt = signedAt;
     if (agreementCode) agreement.agreementCode = agreementCode;
-    // Live rows still carry the legacy shape until U5's migration lands the
-    // request columns. Map them on the way out through the one mapping the
-    // migration will bake in, so a book label reads the same in both books.
-    // `updated_at` feeds last_action_at exactly as the backfill will (KTD21).
+    const executedOn = optionalText(row, "executedOn");
+    const deliveredOn = optionalText(row, "deliveredOn");
+    const closeReason = optionalText(row, "closeReason");
+    if (executedOn) agreement.executedOn = executedOn;
+    if (deliveredOn) agreement.deliveredOn = deliveredOn;
+    if (closeReason) agreement.closeReason = closeReason as Agreement["closeReason"];
+    agreement.version = typeof row.version === "number" ? row.version : 1;
+    // Only what the row actually carries: inventing a default here would be
+    // handed straight back to the mapping below as if the row had stated it.
+    const lastActionAt = iso(row.lastActionAt) ?? iso(row.updatedAt);
+    if (lastActionAt) agreement.lastActionAt = lastActionAt;
+    if (row.customerSuccess === true) agreement.customerSuccess = true;
+    // The backfill converts every legacy row, so this only catches one written
+    // by a path U6 has yet to retire. `updated_at` feeds last_action_at exactly
+    // as the backfill does (KTD21).
     const mapped = legacyAgreementToRequest({
       ...agreement,
       updatedAt: iso(row.updatedAt) ?? undefined,

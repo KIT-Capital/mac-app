@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -204,6 +205,8 @@ export const deskSettings = pgTable(
     earlyUntilMonth: integer("early_until_month").notNull(),
     typicalTerm: integer("typical_term").notNull(),
     membershipMonthlyCents: integer("membership_monthly_cents").notNull(),
+    /** Floor for a repo request. Below it the desk declines instead of pricing. */
+    minSaleAmountCents: integer("min_sale_amount_cents").notNull().default(100000),
     vaultLocation: text("vault_location").notNull(),
     requiredPhotoKinds: text("required_photo_kinds")
       .array()
@@ -218,6 +221,10 @@ export const deskSettings = pgTable(
       sql`${table.requiredPhotoKinds} @> '{"front","back","left","right","clasp"}'::text[]`,
     ),
     check("desk_settings_singleton_check", sql`${table.id} = 'default'`),
+    check(
+      "desk_settings_min_sale_check",
+      sql`${table.minSaleAmountCents} > 0 and ${table.minSaleAmountCents} <= 2147483647`,
+    ),
     check("desk_settings_max_ltv_check", sql`${table.maxLtvBps} > 0 and ${table.maxLtvBps} <= 6000`),
     check("desk_settings_money_check", sql`
       ${table.startingRateBps} >= 1850
@@ -557,11 +564,128 @@ export const liveAgreements = pgTable(
     agreementCode: text("agreement_code"),
     createdOn: text("created_on").notNull(),
     signedOn: text("signed_on"),
+    /** The day the repo went on the book. The term clock starts here (KTD7). */
+    executedOn: text("executed_on"),
+    deliveredOn: text("delivered_on"),
+    /** Bumped whenever the amount or the pieces change (KTD6). */
+    version: integer("version").notNull().default(1),
+    lastActionAt: timestamp("last_action_at", { withTimezone: true }).notNull().defaultNow(),
+    closeReason: text("close_reason"),
+    /** Desk-only handling flag; never serialized to a retail reader (KTD22). */
+    customerSuccess: boolean("customer_success").notNull().default(false),
+    paymentReference: text("payment_reference"),
+    /** Per-piece caps frozen at Apply so a later appraisal never reprices it. */
+    pieceCaps: jsonb("piece_caps"),
     scale: jsonb("scale"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("live_agreements_customer_id_idx").on(table.customerId)],
+  (table) => [
+    index("live_agreements_customer_id_idx").on(table.customerId),
+    index("live_agreements_status_idx").on(table.status),
+    check(
+      "live_agreements_status_check",
+      sql`${table.status} in (
+        'submitted', 'returned', 'collector_signed', 'inspecting', 'executed', 'closed',
+        'draft', 'pending_signature', 'signed'
+      )`,
+    ),
+    // A repo is on the book exactly when it carries the day it went there.
+    // Anything that moves a row across this line must set both in one
+    // statement, which is why the backfill never lands a date on its own.
+    check(
+      "live_agreements_executed_shape_check",
+      sql`(${table.status} = 'executed') = (${table.executedOn} is not null)`,
+    ),
+    check(
+      "live_agreements_closed_shape_check",
+      sql`(${table.status} = 'closed') = (${table.closeReason} is not null)`,
+    ),
+    check(
+      "live_agreements_close_reason_check",
+      sql`${table.closeReason} is null or ${table.closeReason} in (
+        'declined_by_desk', 'declined_by_collector', 'withdrawn', 'expired'
+      )`,
+    ),
+    check("live_agreements_version_check", sql`${table.version} >= 1`),
+  ],
+);
+
+/**
+ * The request thread: one row per state change, in the order it happened.
+ * Append-only — a corrected record is a new event, never an edited one.
+ */
+export const agreementEvents = pgTable(
+  "agreement_events",
+  {
+    id: text("id").primaryKey(),
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => liveAgreements.id),
+    actorKind: text("actor_kind").notNull(),
+    actorId: text("actor_id"),
+    action: text("action").notNull(),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    amountCents: integer("amount_cents"),
+    version: integer("version").notNull(),
+    note: text("note").notNull().default(""),
+    /** Desk-only events never reach the retail thread (KTD22). */
+    internal: boolean("internal").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("agreement_events_agreement_id_idx").on(table.agreementId),
+    index("agreement_events_created_at_idx").on(table.createdAt),
+    check(
+      "agreement_events_actor_kind_check",
+      sql`${table.actorKind} in ('retail', 'desk', 'system')`,
+    ),
+    check("agreement_events_note_check", sql`length(${table.note}) <= 1000`),
+    check("agreement_events_version_check", sql`${table.version} >= 1`),
+  ],
+);
+
+/**
+ * Signature evidence. A signature binds to the exact document the signer was
+ * shown, through `document_id` plus that row's snapshot hash (KTD10), so it can
+ * never be read as approval of a version the signer never saw.
+ */
+export const agreementSignatures = pgTable(
+  "agreement_signatures",
+  {
+    id: text("id").primaryKey(),
+    agreementId: text("agreement_id")
+      .notNull()
+      .references(() => liveAgreements.id),
+    version: integer("version").notNull(),
+    party: text("party").notNull(),
+    signerId: text("signer_id"),
+    typedName: text("typed_name").notNull(),
+    documentId: text("document_id").notNull(),
+    snapshotHash: text("snapshot_hash").notNull(),
+    clientAddress: text("client_address"),
+    /** Browser signatures are demo data and are labeled as such (KTD24). */
+    book: text("book").notNull().default("live"),
+    signedAt: timestamp("signed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("agreement_signatures_agreement_id_idx").on(table.agreementId),
+    uniqueIndex("agreement_signatures_agreement_version_party_uidx").on(
+      table.agreementId,
+      table.version,
+      table.party,
+    ),
+    // The document must belong to this agreement, not merely exist.
+    foreignKey({
+      columns: [table.documentId, table.agreementId],
+      foreignColumns: [agreementDocuments.id, agreementDocuments.liveAgreementId],
+      name: "agreement_signatures_document_fk",
+    }),
+    check("agreement_signatures_party_check", sql`${table.party} in ('collector', 'mac')`),
+    check("agreement_signatures_book_check", sql`${table.book} in ('live', 'browser')`),
+    check("agreement_signatures_version_check", sql`${table.version} >= 1`),
+  ],
 );
 
 /** Membership of a timepiece on a live-book repo. Released rows stay for history. */
@@ -584,9 +708,15 @@ export const liveAgreementMembers = pgTable(
       table.agreementId,
       table.timepieceId,
     ),
-    uniqueIndex("live_agreement_members_live_timepiece_uidx")
+    // A piece sits on at most one request or repo at a time: reserving it for a
+    // request holds it just as firmly as executing one does (R19, KTD6).
+    uniqueIndex("live_agreement_members_held_timepiece_uidx")
       .on(table.timepieceId)
-      .where(sql`${table.status} = 'live'`),
+      .where(sql`${table.status} in ('reserved', 'live')`),
+    check(
+      "live_agreement_members_status_check",
+      sql`${table.status} in ('reserved', 'live', 'released')`,
+    ),
   ],
 );
 
@@ -811,15 +941,33 @@ export const agreementDocuments = pgTable(
     checksum: text("checksum"),
     bytes: integer("bytes"),
     failureCode: text("failure_code"),
+    /** Which step of the request this PDF records (KTD11). */
+    stage: text("stage").notNull().default("legacy"),
     createdByKind: text("created_by_kind").notNull(),
     createdById: text("created_by_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     storedAt: timestamp("stored_at", { withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("agreement_documents_live_version_uidx").on(table.liveAgreementId, table.version),
     index("agreement_documents_customer_id_idx").on(table.customerId),
     index("agreement_documents_live_agreement_id_idx").on(table.liveAgreementId),
+    // The Stage 4 contract path numbers one document per version and retries on
+    // this name when two renders race, so it keeps its rule over its own rows.
+    uniqueIndex("agreement_documents_live_version_uidx")
+      .on(table.liveAgreementId, table.version)
+      .where(sql`${table.stage} = 'legacy'`),
+    // One usable PDF per version per stage. A failed render is excluded so a
+    // fresh attempt can reuse the same key.
+    uniqueIndex("agreement_documents_stage_uidx")
+      .on(table.liveAgreementId, table.version, table.stage)
+      .where(sql`${table.stage} <> 'legacy' and ${table.status} <> 'failed'`),
+    // Lets a signature's composite foreign key prove the document is this
+    // agreement's own (KTD10).
+    uniqueIndex("agreement_documents_id_agreement_uidx").on(table.id, table.liveAgreementId),
+    check(
+      "agreement_documents_stage_check",
+      sql`${table.stage} in ('proposal', 'collector_signed', 'executed', 'legacy')`,
+    ),
   ],
 );
 
