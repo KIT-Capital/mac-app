@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
+import { HELD_PIECE_CONSTRAINTS } from "../live-book-errors.mjs";
 import { assertIsolation, canReadAgreement, canWriteCustomer, canWritePhoto } from "./isolation.mjs";
 import type { Database } from "./client";
 import { dollarsToCents } from "./money.mjs";
@@ -49,7 +50,7 @@ function uniqueConstraint(error: unknown): string | null {
 
 function mapUniqueError(error: unknown): never {
   const constraint = uniqueConstraint(error);
-  if (constraint === "live_agreement_members_live_timepiece_uidx") {
+  if (HELD_PIECE_CONSTRAINTS.has(constraint ?? "")) {
     throw new Error("LIVE_WATCH_CONFLICT");
   }
   if (constraint === "live_agreements_pkey") {

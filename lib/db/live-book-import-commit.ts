@@ -221,7 +221,9 @@ export async function commitLiveBookImport(
             id: `${agreement.id}:${timepieceId}`,
             agreementId: agreement.id,
             timepieceId,
-            status: agreement.memberStatus === "released" ? "released" : "live",
+            // The planner already decided whether the row holds its pieces and
+            // how firmly; flattening reserved into live would hide a request.
+            status: agreement.memberStatus,
           })),
         );
       }
