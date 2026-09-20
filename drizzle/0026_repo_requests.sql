@@ -81,10 +81,13 @@ WHERE "status" in ('pending_signature', 'signed');--> statement-breakpoint
 
 -- A signed row stays signed even if it never recorded the day, and every
 -- immutability check now reads that date, so give it the one it went on for.
-UPDATE "live_agreements" SET "signed_on" = "executed_on"
-WHERE "status" = 'signed'
-  AND "executed_on" is not null
-  AND substring(coalesce("signed_on", '') from '^\d{4}-\d{2}-\d{2}') is null;--> statement-breakpoint
+-- A readable date is stored as the day itself, because that is what the
+-- mapping hands the other two readers and the three must not disagree.
+UPDATE "live_agreements" SET "signed_on" = coalesce(
+  substring("signed_on" from '^\d{4}-\d{2}-\d{2}'),
+  "executed_on"
+)
+WHERE "status" = 'signed' AND "executed_on" is not null;--> statement-breakpoint
 
 -- Record the conversion in the thread before the statuses move, while the row
 -- still knows what it was. Desk-only: no retail reader owns this sentence.
@@ -114,6 +117,62 @@ WHERE "status" in ('pending_signature', 'signed') AND "executed_on" is not null;
 UPDATE "live_agreements"
 SET "status" = 'closed', "close_reason" = 'withdrawn', "executed_on" = null, "version" = 1
 WHERE "status" in ('draft', 'pending_signature', 'signed');--> statement-breakpoint
+
+-- Rows that were already on the new shape before the columns existed to hold
+-- it. The browser book has said `executed` since the rules layer, and the Desk
+-- import copied that status verbatim into a table with no `executed_on`, so
+-- such a row claims the book with no day to show for it. None of the statements
+-- above touch it — they all filter on the three legacy statuses — and the
+-- checks below would refuse it and stop the migration. Repair it the same way
+-- `legacyAgreementToRequest()` does.
+INSERT INTO "agreement_events" (
+  "id", "agreement_id", "actor_kind", "action", "from_status", "to_status",
+  "amount_cents", "version", "note", "internal"
+)
+SELECT
+  'repaired:' || "id",
+  "id",
+  'system',
+  'legacy_backfill',
+  "status",
+  CASE
+    WHEN "status" = 'executed' AND coalesce(
+      substring(coalesce("signed_on", '') from '^\d{4}-\d{2}-\d{2}'),
+      substring("created_on" from '^\d{4}-\d{2}-\d{2}')
+    ) is not null THEN 'executed'
+    ELSE 'closed'
+  END,
+  "amount_cents",
+  "version",
+  '',
+  true
+FROM "live_agreements"
+WHERE ("status" = 'executed' AND "executed_on" is null)
+   OR ("status" = 'closed' AND ("close_reason" is null OR "close_reason" not in (
+        'declined_by_desk', 'declined_by_collector', 'withdrawn', 'expired')))
+   OR "status" not in (
+        'submitted', 'returned', 'collector_signed', 'inspecting', 'executed', 'closed');--> statement-breakpoint
+
+UPDATE "live_agreements" SET "executed_on" = coalesce(
+  substring(coalesce("signed_on", '') from '^\d{4}-\d{2}-\d{2}'),
+  substring("created_on" from '^\d{4}-\d{2}-\d{2}')
+)
+WHERE "status" = 'executed' AND "executed_on" is null;--> statement-breakpoint
+
+-- On the book with no readable day to start the term from, so not on it.
+UPDATE "live_agreements" SET "status" = 'closed', "close_reason" = 'withdrawn'
+WHERE "status" = 'executed' AND "executed_on" is null;--> statement-breakpoint
+
+UPDATE "live_agreements" SET "close_reason" = 'withdrawn'
+WHERE "status" = 'closed'
+  AND ("close_reason" is null OR "close_reason" not in (
+    'declined_by_desk', 'declined_by_collector', 'withdrawn', 'expired'));--> statement-breakpoint
+
+-- A status nobody recognises cannot hold a piece, so it holds none.
+UPDATE "live_agreements"
+SET "status" = 'closed', "close_reason" = 'withdrawn', "executed_on" = null
+WHERE "status" not in (
+  'submitted', 'returned', 'collector_signed', 'inspecting', 'executed', 'closed');--> statement-breakpoint
 
 -- A closed request holds nothing. Executed rows keep the membership they have:
 -- a piece released to a renewal successor must not be pulled back onto its

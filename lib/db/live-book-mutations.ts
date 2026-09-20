@@ -137,6 +137,13 @@ async function ownedAgreement(db: Database, actor: Actor, id: string) {
   } as Agreement & { customerId: string };
 }
 
+/**
+ * A piece reserved for a request is spoken for just as firmly as one on the
+ * book, and the held-piece index says so. These checks answer first, so that a
+ * caller reads a named conflict instead of a unique violation.
+ */
+const HELD_MEMBER_STATUSES = ["reserved", "live"];
+
 function requireMutableAgreement(agreement: Agreement) {
   // A recorded signature freezes the terms, exactly as the browser book does.
   if (agreement.signedAt || agreement.bookEnd) {
@@ -857,7 +864,7 @@ async function executeLiveBookOperationCore(
     if (agreement.amount > cap) throw new Error("OVER_LTV");
     const conflicts = await db.select().from(liveAgreementMembers).where(and(
       inArray(liveAgreementMembers.timepieceId, agreement.watchIds),
-      eq(liveAgreementMembers.status, "live"),
+      inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
     ));
     if (conflicts.length) throw new Error("LIVE_WATCH_CONFLICT");
     const amountCents = dollarsToCents(agreement.amount);
@@ -947,7 +954,7 @@ async function executeLiveBookOperationCore(
     if (isLiveBookLabel(bookLabel(checked.agreement))) {
       const conflicts = await db.select().from(liveAgreementMembers).where(and(
         inArray(liveAgreementMembers.timepieceId, agreement.watchIds),
-        eq(liveAgreementMembers.status, "live"),
+        inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
         ne(liveAgreementMembers.agreementId, agreement.id),
       ));
       if (conflicts.length) throw new Error("LIVE_WATCH_CONFLICT");
@@ -976,7 +983,7 @@ async function executeLiveBookOperationCore(
     const agreement = await ownedAgreement(db, actor, String(operation.id));
     const conflicts = await db.select().from(liveAgreementMembers).where(and(
       inArray(liveAgreementMembers.timepieceId, agreement.watchIds),
-      eq(liveAgreementMembers.status, "live"),
+      inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
       ne(liveAgreementMembers.agreementId, agreement.id),
     ));
     if (conflicts.length) throw new Error("LIVE_WATCH_CONFLICT");
@@ -1054,7 +1061,7 @@ async function executeLiveBookOperationCore(
     }
     const conflicts = await db.select().from(liveAgreementMembers).where(and(
       inArray(liveAgreementMembers.timepieceId, watchIds),
-      eq(liveAgreementMembers.status, "live"),
+      inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
     ));
     if (conflicts.length) throw new Error("LIVE_WATCH_CONFLICT");
     await db.insert(liveAgreementMembers).values(watchIds.map((timepieceId) => ({
