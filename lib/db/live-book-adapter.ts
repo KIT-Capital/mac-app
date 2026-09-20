@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
@@ -38,6 +38,7 @@ import {
   liveAgreementMembers,
   liveAgreements,
   livePreviews,
+  agreementEvents,
   timepieces,
 } from "./schema";
 
@@ -54,6 +55,7 @@ export type LiveBookRows = {
   settings?: Row[];
   catalog?: Row[];
   shells?: Row[];
+  returnedAgreementIds?: string[];
 };
 export type LiveBookState = Pick<
   AppState,
@@ -449,6 +451,12 @@ export function mapLiveBookRows(
       date: text(end, "endedOn"),
       amount: centsToDollars(typeof end.amountCents === "number" ? end.amountCents : 0) ?? 0,
     };
+    if ((rows.returnedAgreementIds ?? []).includes(agreement.id)) {
+      agreement.events = [
+        ...(agreement.events ?? []),
+        { action: "recordReturn", createdAt: agreement.lastActionAt ?? agreement.createdAt },
+      ];
+    }
     return agreement;
   });
   const pieceById = new Map(mappedPieces.map((row) => [row.id, row]));
@@ -537,11 +545,17 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
     ]);
     const agreementIds = agreementRows.map((row) => row.id);
     const pieceIds = pieceRows.map((row) => row.id);
-    const [memberRows, endRows, previewRows, attemptRows] = await Promise.all([
+    const [memberRows, endRows, previewRows, attemptRows, returnRows] = await Promise.all([
       agreementIds.length ? tx.select().from(liveAgreementMembers).where(inArray(liveAgreementMembers.agreementId, agreementIds)) : [],
       agreementIds.length ? tx.select().from(liveAgreementEnds).where(inArray(liveAgreementEnds.agreementId, agreementIds)) : [],
       pieceIds.length ? tx.select().from(livePreviews).where(inArray(livePreviews.timepieceId, pieceIds)) : [],
       pieceIds.length ? tx.select().from(appraisalAttempts).where(inArray(appraisalAttempts.timepieceId, pieceIds)) : [],
+      agreementIds.length
+        ? tx.select({ agreementId: agreementEvents.agreementId }).from(agreementEvents).where(and(
+          inArray(agreementEvents.agreementId, agreementIds),
+          eq(agreementEvents.action, "recordReturn"),
+        ))
+        : [],
     ]);
     const attemptIds = attemptRows.map((row) => row.id);
     const attemptPhotoRows = attemptIds.length
@@ -562,6 +576,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       settings: settingRows,
       catalog: catalogRows,
       shells: shellRows,
+      returnedAgreementIds: [...new Set(returnRows.map((row) => row.agreementId))],
     }, actor.role === "collector" ? actor.customerId : undefined,
     actor.role !== "collector" || applicationRows.length > 0 || agreementRows.length > 0);
   });

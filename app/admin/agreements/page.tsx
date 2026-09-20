@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
@@ -7,7 +8,11 @@ import { Field, NativeSelect, PillButton } from "@/components/field";
 import { isDesk, money } from "@/lib/catalog";
 import { bookLabel, deskToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
-import { isRequestRow, retailRequestWord } from "@/lib/contract/request-transitions.mjs";
+import {
+  DESK_REQUEST_TABS,
+  deskRequestTab,
+  hasRecordReturn,
+} from "@/lib/contract/request-transitions.mjs";
 import { persistableState } from "@/lib/session-persist.mjs";
 import { useStore } from "@/lib/store";
 import type { Agreement, AgreementEnd, AgreementShell, AppState, BookEndKind } from "@/lib/types";
@@ -170,6 +175,8 @@ export default function AdminAgreementsPage() {
     removeAgreement,
     signAgreement,
     deskReturnRequest,
+    recordDeliveryRequest,
+    recordReturnRequest,
     updateAgreement,
     recordAgreementEnd,
     renewAgreement,
@@ -181,6 +188,7 @@ export default function AdminAgreementsPage() {
   const [endDraft, setEndDraft] = useState({ kind: "bought_back" as BookEndKind, date: "", amount: "" });
   const [endError, setEndError] = useState("");
   const [requestError, setRequestError] = useState<{ id: string; text: string } | null>(null);
+  const [tab, setTab] = useState<(typeof DESK_REQUEST_TABS)[number]["id"]>("queue");
   const [shellError, setShellError] = useState("");
   const [documentNote, setDocumentNote] = useState<{ id: string; text: string } | null>(null);
   const [sendHistory, setSendHistory] = useState<{ id: string; rows: { actorKind: string; recipientKind: string; result: string }[] } | null>(null);
@@ -317,6 +325,32 @@ export default function AdminAgreementsPage() {
     }
   }
 
+  async function onRecordDelivery(agreement: Agreement) {
+    setRequestError(null);
+    const result = await recordDeliveryRequest(agreement.id);
+    if (!result.ok) {
+      setRequestError({
+        id: agreement.id,
+        text: result.error === "AGREEMENT_STATE_CONFLICT"
+          ? "This request moved on. Refresh the desk."
+          : "Delivery could not be recorded.",
+      });
+    }
+  }
+
+  async function onRecordReturn(agreement: Agreement) {
+    setRequestError(null);
+    const result = await recordReturnRequest(agreement.id);
+    if (!result.ok) {
+      setRequestError({
+        id: agreement.id,
+        text: result.error === "RETURN_NOT_APPLICABLE"
+          ? "Record return only after a closed delivery."
+          : "Return could not be recorded.",
+      });
+    }
+  }
+
   async function onRenew(agreement: Agreement) {
     const closeDate = endDraft.date || deskToday();
     const result = await renewAgreement(agreement.id, closeDate);
@@ -328,6 +362,8 @@ export default function AdminAgreementsPage() {
     setSelectedId(result.successor.id);
     setEndDraft(endDraftFrom(result.successor));
   }
+
+  const tabRows = agreements.filter((row) => deskRequestTab(row) === tab);
 
   return (
     <AdminChrome title="Agreement databases">
@@ -392,129 +428,175 @@ export default function AdminAgreementsPage() {
         ])}
       />
 
-      <h2 className="mt-8 mb-3 text-[11px] tracking-[0.16em] text-white/40 uppercase">Live agreements</h2>
-      <AdminTable
-        headers={["Code", "Owner", "Amount", "Signature", "Book", ""]}
-        selectedRow={agreements.findIndex((a) => a.id === selectedId)}
-        onRowSelect={(index) => {
-          const agreement = agreements[index];
-          if (agreement) selectLiveRow(agreement);
-        }}
-        rows={agreements.map((a) => [
-          a.agreementCode || a.id,
-          a.ownerName,
-          money(a.amount),
-          a.signedAt ? "signed" : a.status.replace("_", " "),
-          bookLabel(a) ?? "—",
-          <div key={a.id} className="flex flex-wrap items-center gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
-            {isRequestRow(a) ? (
-              a.status === "submitted" ? (
-                <>
-                  <button type="button" onClick={() => void onDeskReturn(a, "confirm")}>Confirm</button>
-                  <button type="button" onClick={() => void onDeskReturn(a, "decline")}>Decline</button>
-                </>
-              ) : (
-                <span className="text-white/60">{retailRequestWord(a)}</span>
-              )
-            ) : !a.signedAt ? (
-              <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
-            ) : null}
-            {!a.signedAt && !a.bookEnd && !isRequestRow(a) ? (
-              <button type="button" onClick={() => void removeAgreement(a.id)}>Remove</button>
-            ) : null}
-            {requestError?.id === a.id ? (
-              <span className="text-[12px] text-red-400">{requestError.text}</span>
-            ) : null}
-          </div>,
-        ])}
-        expandedRows={agreements.map((a) => {
-          if (a.id !== selectedId) return null;
-          const scale = settingsToTerms(a.scale ?? settings, a.termMonths);
-          const scalePrice = repurchaseDollars(a.amount, a.termMonths, scale);
-          return (
-            <form
-              key={`${a.id}-end`}
-              onClick={(event) => event.stopPropagation()}
-              onSubmit={(event) => onRecordEnd(event, a)}
-              className="grid gap-4 md:grid-cols-3"
-            >
-              <Field label="End">
-                <NativeSelect
-                  aria-label="End"
-                  value={endDraft.kind}
-                  onChange={(e) => setEndDraft({ ...endDraft, kind: e.target.value as BookEndKind })}
-                >
-                  {END_KIND_OPTIONS.map((option) => (
-                    <option key={option.value} className="bg-black" value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field label="End date">
-                <input
-                  type="date"
-                  value={endDraft.date}
-                  onChange={(e) => setEndDraft({ ...endDraft, date: e.target.value })}
-                  className="w-full bg-transparent py-1 text-[16px] outline-none"
-                />
-              </Field>
-              <Field label="Amount">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={endDraft.amount}
-                  onChange={(e) => setEndDraft({ ...endDraft, amount: e.target.value })}
-                  className="w-full bg-transparent py-1 text-[16px] outline-none"
-                />
-              </Field>
-              <p className="md:col-span-3 text-[12px] text-white/50">
-                This month&apos;s repurchase on the scale is {scalePrice == null ? "—" : money(scalePrice)}. Staff type the dollars.
-              </p>
-              {endError ? <p className="md:col-span-3 text-sm text-red-400">{endError}</p> : null}
-              {a.bookEnd ? (
-                <p className="md:col-span-3 text-[12px] text-white/60">
-                  Recorded {bookLabel(a)} on {a.bookEnd.date} for {money(a.bookEnd.amount)}.
-                </p>
+      <h2 className="mt-8 mb-3 text-[11px] tracking-[0.16em] text-white/40 uppercase">Repo requests</h2>
+      <div role="tablist" aria-label="Repo requests" className="mb-3 flex flex-wrap gap-1">
+        {DESK_REQUEST_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            className={
+              tab === item.id
+                ? "rounded-md bg-[#FCB040] px-3 py-2 text-[11px] font-semibold tracking-[0.08em] text-[#0A0D14] uppercase"
+                : "rounded-md px-3 py-2 text-[11px] font-semibold tracking-[0.08em] text-white/65 uppercase hover:bg-white/5"
+            }
+            onClick={() => {
+              setTab(item.id);
+              setSelectedId(null);
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {tab === "book" ? (
+        <AdminTable
+          headers={["Code", "Owner", "Amount", "Signature", "Book", ""]}
+          selectedRow={tabRows.findIndex((a) => a.id === selectedId)}
+          onRowSelect={(index) => {
+            const agreement = tabRows[index];
+            if (agreement) selectLiveRow(agreement);
+          }}
+          rows={tabRows.map((a) => [
+            a.agreementCode || a.id,
+            a.ownerName,
+            money(a.amount),
+            a.signedAt ? "signed" : a.status.replace("_", " "),
+            bookLabel(a) ?? "—",
+            <div key={a.id} className="flex flex-wrap items-center gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
+              {!a.signedAt ? (
+                <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
               ) : null}
-              <div className="md:col-span-3 flex flex-wrap gap-3">
-                <PillButton type="submit" variant="gold" className="md:w-auto px-6">
-                  {a.bookEnd ? "Overwrite end" : "Record end"}
-                </PillButton>
-                {isDesk(user) && (!a.bookEnd || a.bookEnd.kind === "in_liquidation") ? (
-                  <PillButton
-                    type="button"
-                    variant="navy"
-                    className="md:w-auto px-6"
-                    onClick={() => onRenew(a)}
+              {!a.signedAt && !a.bookEnd ? (
+                <button type="button" onClick={() => void removeAgreement(a.id)}>Remove</button>
+              ) : null}
+            </div>,
+          ])}
+          expandedRows={tabRows.map((a) => {
+            if (a.id !== selectedId) return null;
+            const scale = settingsToTerms(a.scale ?? settings, a.termMonths);
+            const scalePrice = repurchaseDollars(a.amount, a.termMonths, scale);
+            return (
+              <form
+                key={`${a.id}-end`}
+                onClick={(event) => event.stopPropagation()}
+                onSubmit={(event) => onRecordEnd(event, a)}
+                className="grid gap-4 md:grid-cols-3"
+              >
+                <Field label="End">
+                  <NativeSelect
+                    aria-label="End"
+                    value={endDraft.kind}
+                    onChange={(e) => setEndDraft({ ...endDraft, kind: e.target.value as BookEndKind })}
                   >
-                    Renew
-                  </PillButton>
-                ) : null}
+                    {END_KIND_OPTIONS.map((option) => (
+                      <option key={option.value} className="bg-black" value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <Field label="End date">
+                  <input
+                    type="date"
+                    value={endDraft.date}
+                    onChange={(e) => setEndDraft({ ...endDraft, date: e.target.value })}
+                    className="w-full bg-transparent py-1 text-[16px] outline-none"
+                  />
+                </Field>
+                <Field label="Amount">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={endDraft.amount}
+                    onChange={(e) => setEndDraft({ ...endDraft, amount: e.target.value })}
+                    className="w-full bg-transparent py-1 text-[16px] outline-none"
+                  />
+                </Field>
+                <p className="md:col-span-3 text-[12px] text-white/50">
+                  This month&apos;s repurchase on the scale is {scalePrice == null ? "—" : money(scalePrice)}. Staff type the dollars.
+                </p>
+                {endError ? <p className="md:col-span-3 text-sm text-red-400">{endError}</p> : null}
                 {a.bookEnd ? (
-                  <button
-                    type="button"
-                    className="text-[12px] font-bold tracking-[0.18em] text-[#FCB040] uppercase"
-                    onClick={async () => {
-                      if (!await clearAgreementEnd(a.id)) {
-                        setEndError(END_ERRORS.LIVE_WATCH_CONFLICT);
-                        return;
-                      }
-                      setEndError("");
-                      setEndDraft(endDraftFrom({ ...a, bookEnd: undefined }));
-                    }}
-                  >
-                    Clear end
-                  </button>
+                  <p className="md:col-span-3 text-[12px] text-white/60">
+                    Recorded {bookLabel(a)} on {a.bookEnd.date} for {money(a.bookEnd.amount)}.
+                  </p>
+                ) : null}
+                <div className="md:col-span-3 flex flex-wrap gap-3">
+                  <PillButton type="submit" variant="gold" className="md:w-auto px-6">
+                    {a.bookEnd ? "Overwrite end" : "Record end"}
+                  </PillButton>
+                  {isDesk(user) && (!a.bookEnd || a.bookEnd.kind === "in_liquidation") ? (
+                    <PillButton
+                      type="button"
+                      variant="navy"
+                      className="md:w-auto px-6"
+                      onClick={() => onRenew(a)}
+                    >
+                      Renew
+                    </PillButton>
+                  ) : null}
+                  {a.bookEnd ? (
+                    <button
+                      type="button"
+                      className="text-[12px] font-bold tracking-[0.18em] text-[#FCB040] uppercase"
+                      onClick={async () => {
+                        if (!await clearAgreementEnd(a.id)) {
+                          setEndError(END_ERRORS.LIVE_WATCH_CONFLICT);
+                          return;
+                        }
+                        setEndError("");
+                        setEndDraft(endDraftFrom({ ...a, bookEnd: undefined }));
+                      }}
+                    >
+                      Clear end
+                    </button>
+                  ) : null}
+                </div>
+              </form>
+            );
+          })}
+        />
+      ) : (
+        <AdminTable
+          headers={tab === "queue" ? ["Code", "Owner", "CS", ""] : ["Code", "Owner", ""]}
+          rows={tabRows.map((a) => {
+            const open = (
+              <Link key={`${a.id}-open`} href={`/admin/requests/${a.id}`} className="text-[#FCB040]">
+                Open
+              </Link>
+            );
+            const actions = (
+              <div key={a.id} className="flex flex-wrap items-center gap-3 text-[#FCB040]">
+                {tab === "queue" ? (
+                  <>
+                    <button type="button" onClick={() => void onDeskReturn(a, "confirm")}>Confirm</button>
+                    <button type="button" onClick={() => void onDeskReturn(a, "decline")}>Decline</button>
+                  </>
+                ) : null}
+                {tab === "awaiting-intake" ? (
+                  <button type="button" onClick={() => void onRecordDelivery(a)}>Record delivery</button>
+                ) : null}
+                {tab === "closed" && a.deliveredOn && !hasRecordReturn(a) ? (
+                  <button type="button" onClick={() => void onRecordReturn(a)}>Record return</button>
+                ) : null}
+                {open}
+                {requestError?.id === a.id ? (
+                  <span className="text-[12px] text-red-400">{requestError.text}</span>
                 ) : null}
               </div>
-            </form>
-          );
-        })}
-      />
+            );
+            if (tab === "queue") {
+              return [a.agreementCode || a.id, a.ownerName, a.customerSuccess ? "CS" : "—", actions];
+            }
+            return [a.agreementCode || a.id, a.ownerName, actions];
+          })}
+        />
+      )}
 
-      {selected ? (
+      {selected && tab === "book" ? (
         <section className="mt-6 space-y-2 border border-white/25 bg-[#222] p-4">
           <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
             Document — {selected.agreementCode || selected.id}
@@ -533,7 +615,7 @@ export default function AdminAgreementsPage() {
           ) : null}
         </section>
       ) : null}
-      {selected && !selected.signedAt && !selected.bookEnd ? (
+      {selected && tab === "book" && !selected.signedAt && !selected.bookEnd ? (
         <section className="mt-6 space-y-4 border border-white/25 bg-[#222] p-4">
           <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
             Contract terms — {selected.agreementCode || selected.id}

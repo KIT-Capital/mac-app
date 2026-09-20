@@ -132,6 +132,32 @@ describe("live-book adapter mapping", () => {
     assert.equal(desk.agreements[0].customerSuccess, true);
   });
 
+  it("projects a recordReturn onto live agreements so Closed can hide the action", () => {
+    const rows = {
+      customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
+      timepieces: [{ id: "piece-a", customerId: "cust-a" }],
+      agreements: [{
+        id: "req-a",
+        customerId: "cust-a",
+        amountCents: 6000000,
+        termMonths: 12,
+        delivery: "Insured courier",
+        ownerName: "A",
+        email: "a@example.com",
+        status: "closed",
+        createdOn: "2026-09-20",
+        closeReason: "declined_by_desk",
+        deliveredOn: "2026-09-20",
+      }],
+      members: [{ agreementId: "req-a", timepieceId: "piece-a", status: "released" }],
+      ends: [],
+      previews: [],
+      returnedAgreementIds: ["req-a"],
+    };
+    const state = mapLiveBookRows(rows);
+    assert.equal(state.agreements[0].events?.some((event) => event.action === "recordReturn"), true);
+  });
+
   it("closes an unrecognised status rather than letting it hold a piece", () => {
     const state = mapLiveBookRows({
       customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],

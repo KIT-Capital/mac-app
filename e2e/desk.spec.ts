@@ -10,8 +10,10 @@ import {
   completeTimepieceIntakePhotos,
   openCollectorAgreements,
   openDeskAgreements,
+  openDeskBook,
   openDeskReview,
   sendForAppraisal,
+  signHaleCollectorRequest,
   signIn,
   signInAppraiser,
   signInDesk,
@@ -85,6 +87,7 @@ test.describe("desk", () => {
     await signIn(page, "desk@mechartcap.com", DESK_PASSWORD);
     await expect(page).toHaveURL(/\/admin/);
     await page.goto("/admin/agreements");
+    await page.getByRole("tab", { name: "Book" }).click();
     await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).click();
     await expect(page.getByRole("button", { name: "Renew", exact: true })).toBeVisible();
   });
@@ -118,7 +121,7 @@ test.describe("desk", () => {
 
   test("desk repo detail does not claim a stored document in browser mode", async ({ page }) => {
     await signInDesk(page);
-    await openDeskAgreements(page);
+    await openDeskBook(page);
     await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).first().click();
     await expect(page.getByText(/No stored document in browser mode/i)).toBeVisible();
     await expect(page.getByText(/\bofficial\b/i)).toHaveCount(0);
@@ -339,7 +342,7 @@ test.describe("desk", () => {
 
   test("Hale live row is past due and Mark signed does not change the book", async ({ page }) => {
     await signInDesk(page);
-    await openDeskAgreements(page);
+    await openDeskBook(page);
     const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
     await expect(haleRow.getByText("past due")).toBeVisible();
     await expect(haleRow.getByRole("button", { name: "Mark signed" })).toBeVisible();
@@ -368,7 +371,8 @@ test.describe("desk", () => {
     // A request is not on the book, so it has no book label and no Mark signed.
     await expect(request.getByRole("button", { name: "Mark signed" })).toHaveCount(0);
     await request.getByRole("button", { name: "Confirm" }).click();
-    const confirmed = page.getByRole("row").filter({ hasText: "Your turn" });
+    await page.getByRole("tab", { name: "Awaiting collector" }).click();
+    const confirmed = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
     await expect(confirmed).toHaveCount(1);
     await expect(confirmed.getByRole("button", { name: "Confirm" })).toHaveCount(0);
     await expect(page.getByText(/loan|paid off|vesting/i)).toHaveCount(0);
@@ -398,7 +402,7 @@ test.describe("desk", () => {
 
   test("desk records bought back and the collector chip matches", async ({ page }) => {
     await signInDesk(page);
-    await openDeskAgreements(page);
+    await openDeskBook(page);
     const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
     await haleRow.click();
     await page.getByLabel("End date").fill("2022-03-14");
@@ -416,7 +420,7 @@ test.describe("desk", () => {
 
   test("desk rejects an empty end and can overwrite then clear Hale", async ({ page }) => {
     await signInDesk(page);
-    await openDeskAgreements(page);
+    await openDeskBook(page);
     const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
     await haleRow.click();
     await page.getByLabel("Amount", { exact: true }).fill("");
@@ -445,7 +449,7 @@ test.describe("desk", () => {
 
   test("admin renews Hale at the scheduled price and the collector sees both books", async ({ page }) => {
     await signInDesk(page);
-    await openDeskAgreements(page);
+    await openDeskBook(page);
     const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
     await haleRow.click();
     await page.getByRole("button", { name: "Renew" }).click();
@@ -597,5 +601,111 @@ test.describe("desk", () => {
     await expect(page.getByText(/Staff only/i)).toBeVisible();
     await expect(page.getByText(/Collectors never get a desk link/i)).toBeVisible();
     await expect(page.getByText(/\bloan\b/i)).toHaveCount(0);
+  });
+
+  test("desk queue has no amount field and gates inspection to an appraiser", async ({ page }) => {
+    await appraiseNewHalePiece(page);
+    await signInHale(page);
+    await page.goto("/repurchase");
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByText("With MAC", { exact: true }).first()).toBeVisible();
+    await signOutFromMenu(page);
+
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    await expect(page.getByRole("columnheader", { name: "Amount" })).toHaveCount(0);
+    const queued = page.getByRole("row").filter({ has: page.getByRole("button", { name: "Confirm" }) });
+    await queued.getByRole("link", { name: "Open" }).click();
+    await page.getByRole("textbox", { name: "Note", exact: true }).fill("This is not a loan.");
+    await expect(page.getByText(/word MAC does not use/i)).toBeVisible();
+    await page.getByLabel("Outcome note").fill("Phone call complete.");
+    await page.getByRole("button", { name: "Flag customer success" }).click();
+    await expect(page.getByText("Flagged for customer success.")).toBeVisible();
+    await page.getByRole("link", { name: "Back to queue" }).click();
+    await expect(page.getByRole("tab", { name: "Queue" })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByText("CS", { exact: true })).toBeVisible();
+    await page.getByRole("row").filter({ has: page.getByRole("button", { name: "Confirm" }) }).getByRole("button", { name: "Confirm" }).click();
+
+    await page.getByRole("button", { name: "Log out" }).click();
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await page.getByRole("link").filter({ hasText: "Your turn" }).click();
+    await signHaleCollectorRequest(page);
+    await signOutFromMenu(page);
+
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    await page.getByRole("tab", { name: "Awaiting intake" }).click();
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByRole("button", { name: "Record delivery" }).click();
+    await page.getByRole("tab", { name: "Inspection" }).click();
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByRole("link", { name: "Open" }).click();
+    await expect(page.getByText("Appraiser or super admin required").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Record inspection" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Sign for MAC" })).toBeDisabled();
+  });
+
+  test("appraiser inspection can drop a piece and checklist gates MAC sign", async ({ page }) => {
+    test.setTimeout(240_000);
+    await appraiseNewHalePiece(page, "UR-100V");
+    await appraiseNewHalePiece(page, "UR-105");
+    await appraiseNewHalePiece(page, "UR-111");
+    await signInHale(page);
+    await page.goto("/repurchase");
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByText("With MAC", { exact: true }).first()).toBeVisible();
+    await signOutFromMenu(page);
+
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    await page.getByRole("row").filter({ has: page.getByRole("button", { name: "Confirm" }) }).getByRole("button", { name: "Confirm" }).click();
+    await page.getByRole("button", { name: "Log out" }).click();
+
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await page.getByRole("link").filter({ hasText: "Your turn" }).click();
+    await signHaleCollectorRequest(page);
+    await signOutFromMenu(page);
+
+    await signInAppraiser(page);
+    await openDeskAgreements(page);
+    await page.getByRole("tab", { name: "Awaiting intake" }).click();
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByRole("link", { name: "Open" }).click();
+    await page.getByRole("button", { name: "Record delivery" }).click();
+    await page.getByText("Urwerk UR-111", { exact: true }).locator("..").getByRole("radio", { name: "Drop" }).check();
+    await page.getByText("Urwerk UR-100V", { exact: true }).locator("..").getByLabel("Inspected value").fill("120000");
+    await page.getByText("Urwerk UR-100V", { exact: true }).locator("..").getByRole("checkbox", { name: "Serial match" }).check();
+    await page.getByText("Urwerk UR-100V", { exact: true }).locator("..").getByRole("checkbox", { name: "Condition match" }).check();
+    await page.getByText("Urwerk UR-105", { exact: true }).locator("..").getByLabel("Inspected value").fill("120000");
+    await page.getByText("Urwerk UR-105", { exact: true }).locator("..").getByRole("checkbox", { name: "Serial match" }).check();
+    await page.getByText("Urwerk UR-105", { exact: true }).locator("..").getByRole("checkbox", { name: "Condition match" }).check();
+    await expect(page.getByText(/return to the collector at \$144,000/i)).toBeVisible();
+    await page.getByRole("button", { name: "Record inspection" }).click();
+    await expect(page.getByText(/Version 2/i)).toBeVisible();
+    await page.getByRole("button", { name: "Log out" }).click();
+
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await page.getByRole("link").filter({ hasText: "Your turn" }).click();
+    await expect(page.getByText(/MAC inspected the pieces/i).first()).toBeVisible();
+    await signHaleCollectorRequest(page, "Accept the inspected amount and sign");
+    await signOutFromMenu(page);
+
+    await signInAppraiser(page);
+    await openDeskAgreements(page);
+    await page.getByRole("tab", { name: "Awaiting intake" }).click();
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByRole("link", { name: "Open" }).click();
+    await page.getByRole("button", { name: "Record delivery" }).click();
+    await expect(page.getByRole("button", { name: "Sign for MAC" })).toBeDisabled();
+    await page.getByRole("checkbox", { name: "Identity verified" }).check();
+    await page.getByRole("checkbox", { name: "Serials match" }).check();
+    await page.getByRole("checkbox", { name: "Condition matches" }).check();
+    await page.getByRole("checkbox", { name: "Term agreed" }).check();
+    await page.getByRole("checkbox", { name: "In MAC custody" }).check();
+    await page.getByLabel("Payment reference").fill("ABC-WIRE-1");
+    await page.getByLabel("Typed name").fill("Dov Tuzman");
+    await page.getByRole("button", { name: "Sign for MAC" }).click();
+    await page.getByRole("link", { name: "Back to queue" }).click();
+    await page.getByRole("tab", { name: "Book" }).click();
+    await expect(page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByText("open", { exact: true })).toBeVisible();
   });
 });

@@ -95,7 +95,20 @@ export async function openCollectorAgreements(page: Page) {
 
 export async function openDeskAgreements(page: Page) {
   await page.getByRole("link", { name: "Repo Agreements" }).click();
-  await expect(page.getByText("Live agreements")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Queue" })).toBeVisible();
+}
+
+export async function openDeskBook(page: Page) {
+  await openDeskAgreements(page);
+  await page.getByRole("tab", { name: "Book" }).click();
+}
+
+export async function signHaleCollectorRequest(page: Page, opener = "Sign") {
+  await page.getByRole("button", { name: opener, exact: true }).click();
+  await page.getByLabel("Typed name").fill("Jonathan Hale");
+  await page.getByText("I have read this agreement and I am signing it").click();
+  await page.getByRole("button", { name: opener, exact: true }).click();
+  await expect(page.getByText("Awaiting inspection.")).toBeVisible();
 }
 
 export async function signOutFromMenu(page: Page) {
