@@ -112,20 +112,24 @@ async function ownedAgreement(db: Database, actor: Actor, id: string) {
     db.select().from(liveAgreementMembers).where(eq(liveAgreementMembers.agreementId, id)),
     db.select().from(liveAgreementEnds).where(eq(liveAgreementEnds.agreementId, id)),
   ]);
-  // The stored row still carries the legacy status, and the legacy guards below
-  // read it directly, so only the derived execution date is added here — that is
-  // all the book label needs until U5's migration persists these columns.
+  // A row written before the request columns existed still carries a legacy
+  // status, and the mapping dates those. Every other row states its own date.
   const mapped = legacyAgreementToRequest({
     status: agreement.status,
     createdAt: agreement.createdOn,
     signedAt: agreement.signedOn ?? undefined,
+    executedOn: agreement.executedOn ?? undefined,
   });
   return {
     ...agreement,
     amount: agreement.amountCents / 100,
     createdAt: agreement.createdOn,
-    signedAt: agreement.signedOn ?? undefined,
-    executedOn: mapped.executedOn,
+    // A legacy row that recorded no signing day is still signed, and the terms
+    // freeze on this date, so take the one the mapping gives it.
+    signedAt: agreement.signedOn ?? mapped.signedAt ?? undefined,
+    executedOn: agreement.executedOn ?? mapped.executedOn,
+    closeReason: agreement.closeReason ?? undefined,
+    lastActionAt: agreement.lastActionAt.toISOString(),
     watchIds: members.map((row) => row.timepieceId),
     bookEnd: ends[0]
       ? { kind: ends[0].kind, date: ends[0].endedOn, amount: ends[0].amountCents / 100 }
@@ -134,7 +138,8 @@ async function ownedAgreement(db: Database, actor: Actor, id: string) {
 }
 
 function requireMutableAgreement(agreement: Agreement) {
-  if (agreement.status === "signed" || agreement.bookEnd) {
+  // A recorded signature freezes the terms, exactly as the browser book does.
+  if (agreement.signedAt || agreement.bookEnd) {
     throw new Error("AGREEMENT_IMMUTABLE");
   }
 }
@@ -866,7 +871,10 @@ async function executeLiveBookOperationCore(
         delivery: agreement.delivery,
         ownerName: owner.name,
         email: owner.email,
-        status: "pending_signature",
+        // KTD21: a repo the desk creates today is already on the book, so it
+        // records its own execution date rather than leaning on a read-time map.
+        status: "executed",
+        executedOn: agreement.createdAt,
         agreementCode: agreement.agreementCode,
         createdOn: agreement.createdAt,
         scale,
@@ -886,9 +894,11 @@ async function executeLiveBookOperationCore(
     if (action === "agreement.markSigned") requireDesk(actor);
     if (action === "agreement.signCollector" && actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
     requireMutableAgreement(agreement);
+    // Signing records who signed and when. It does not move the repo off the
+    // book, so the status the row already carries stands.
     await db.update(liveAgreements).set({
-      status: "signed",
       signedOn: new Date().toISOString().slice(0, 10),
+      lastActionAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(liveAgreements.id, agreement.id));
     return;
@@ -1011,10 +1021,10 @@ async function executeLiveBookOperationCore(
         delivery: planned.successor.delivery,
         ownerName: planned.successor.ownerName,
         email: agreement.email,
-        // Stays the legacy shape until U5's migration adds `executed_on`; the
-        // adapter maps it through `legacyAgreementToRequest` on the way out, so
-        // the successor still reads as executed from its close date (KTD21).
-        status: "pending_signature",
+        // A renewal succeeds a repo that was already on the book, so the
+        // successor goes on it too, dated from the day the old one closed.
+        status: "executed",
+        executedOn: String(operation.closeDate),
         agreementCode: String(operation.agreementCode),
         createdOn: String(operation.closeDate),
         scale,
