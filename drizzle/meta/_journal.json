@@ -190,6 +190,13 @@
       "when": 1789884045331,
       "tag": "0026_repo_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1789888676570,
+      "tag": "0027_request_evidence_hardening",
+      "breakpoints": true
     }
   ]
 }

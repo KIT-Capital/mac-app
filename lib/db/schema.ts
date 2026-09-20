@@ -608,6 +608,19 @@ export const liveAgreements = pgTable(
       )`,
     ),
     check("live_agreements_version_check", sql`${table.version} >= 1`),
+    // The term clock is computed from this day, so it has to be one. The
+    // backfill closes any row it cannot date; writes are held to the same bar.
+    // Written as a character class, not `\d`: a backslash does not survive the
+    // template literal into the generated SQL, and the regex would then match
+    // the letter d and reject every real date.
+    check(
+      "live_agreements_executed_on_check",
+      sql`${table.executedOn} is null or ${table.executedOn} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
+    ),
+    check(
+      "live_agreements_delivered_on_check",
+      sql`${table.deliveredOn} is null or ${table.deliveredOn} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
+    ),
   ],
 );
 

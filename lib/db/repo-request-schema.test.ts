@@ -26,6 +26,18 @@ function triggerSql(): string {
   return block;
 }
 
+/** 0027's hardening, verbatim, between its two sentinels. */
+function hardeningSql(): string {
+  const file = readFileSync(
+    join(process.cwd(), "drizzle", "0027_request_evidence_hardening.sql"),
+    "utf8",
+  );
+  const start = file.indexOf("-- BEGIN EVIDENCE HARDENING");
+  const end = file.indexOf("-- END EVIDENCE HARDENING");
+  assert.ok(start >= 0 && end > start, "migration 0027 must keep its hardening sentinels");
+  return file.slice(start, end).replaceAll("--> statement-breakpoint", "");
+}
+
 /** The driver wraps the database's refusal, so read the whole chain. */
 async function fails(run: Promise<unknown>, expected: RegExp): Promise<void> {
   await assert.rejects(run, (error: Error) => {
@@ -44,7 +56,9 @@ describe("repo request database rules", { skip }, () => {
       create schema "${schema}";
       create table "${schema}"."agreement_documents" (
         "id" text primary key, "live_agreement_id" text not null, "version" integer not null,
-        "status" text not null, "snapshot_hash" text not null
+        "status" text not null, "snapshot_hash" text not null,
+        "snapshot" jsonb not null default '{}'::jsonb, "stage" text not null default 'proposal',
+        "object_key" text, "checksum" text
       );
       create unique index on "${schema}"."agreement_documents" ("id", "live_agreement_id");
       create table "${schema}"."agreement_events" (
@@ -65,7 +79,9 @@ describe("repo request database rules", { skip }, () => {
       );
       create unique index "sig_version_party_uidx"
         on "${schema}"."agreement_signatures" ("agreement_id", "version", "party");
-      insert into "${schema}"."agreement_documents" values
+      insert into "${schema}"."agreement_documents"
+        ("id","live_agreement_id","version","status","snapshot_hash")
+      values
         ('doc-v1', 'repo-1', 1, 'stored', 'hash-v1'),
         ('doc-v2', 'repo-1', 2, 'stored', 'hash-v2'),
         ('doc-building', 'repo-1', 3, 'building', 'hash-v3'),
@@ -79,6 +95,7 @@ describe("repo request database rules", { skip }, () => {
       begin;
       set local search_path to "${schema}";
       ${triggerSql()}
+      ${hardeningSql()}
       commit;
     `));
     // In production these resolve their tables through the default path. Here
@@ -86,6 +103,7 @@ describe("repo request database rules", { skip }, () => {
     await rootDb.execute(sql.raw(`
       alter function "${schema}"."validate_agreement_signature_document"() set search_path = "${schema}";
       alter function "${schema}"."prevent_agreement_record_mutation"() set search_path = "${schema}";
+      alter function "${schema}"."prevent_signed_document_mutation"() set search_path = "${schema}";
     `));
   });
 
@@ -146,6 +164,50 @@ describe("repo request database rules", { skip }, () => {
     );
     await fails(
       rootDb.execute(sql.raw(`delete from "${schema}"."agreement_signatures" where "id" = 'sig-good'`)),
+      /AGREEMENT_RECORD_IMMUTABLE/,
+    );
+  });
+
+  it("refuses to rewrite a document once someone has signed it", async () => {
+    // sig-good, recorded above, names doc-v1 and hash-v1.
+    await fails(
+      rootDb.execute(sql.raw(`
+        update "${schema}"."agreement_documents"
+        set "snapshot_hash" = 'hash-rewritten' where "id" = 'doc-v1'
+      `)),
+      /DOCUMENT_SIGNED_IMMUTABLE/,
+    );
+    await fails(
+      rootDb.execute(sql.raw(`
+        update "${schema}"."agreement_documents" set "version" = 9 where "id" = 'doc-v1'
+      `)),
+      /DOCUMENT_SIGNED_IMMUTABLE/,
+    );
+  });
+
+  it("still lets a render finish on a document nobody has signed", async () => {
+    await rootDb.execute(sql.raw(`
+      update "${schema}"."agreement_documents"
+      set "status" = 'stored', "object_key" = 'k', "checksum" = 'c' where "id" = 'doc-building'
+    `));
+    // And a signed one may still record where its bytes landed.
+    await rootDb.execute(sql.raw(`
+      update "${schema}"."agreement_documents"
+      set "object_key" = 'moved', "checksum" = 'c2' where "id" = 'doc-v1'
+    `));
+    await rootDb.execute(sql.raw(`
+      update "${schema}"."agreement_documents"
+      set "snapshot_hash" = 'hash-v2b' where "id" = 'doc-v2'
+    `));
+  });
+
+  it("refuses to empty the thread with a truncate", async () => {
+    await fails(
+      rootDb.execute(sql.raw(`truncate "${schema}"."agreement_events"`)),
+      /AGREEMENT_RECORD_IMMUTABLE/,
+    );
+    await fails(
+      rootDb.execute(sql.raw(`truncate "${schema}"."agreement_signatures"`)),
       /AGREEMENT_RECORD_IMMUTABLE/,
     );
   });
@@ -220,6 +282,22 @@ describe("repo request row shapes", { skip }, () => {
     await fails(
       insertAgreement("u5-shape-bad-reason", `,"status","close_reason"`, `,'closed','because'`),
       /live_agreements_close_reason_check/,
+    );
+  });
+
+  it("refuses a book date that is not a date", async () => {
+    // The term clock is computed from this value, so free text cannot reach it.
+    await fails(
+      insertAgreement("u5-shape-bad-date", `,"status","executed_on"`, `,'executed','sometime in 2019'`),
+      /live_agreements_executed_on_check/,
+    );
+    await fails(
+      insertAgreement("u5-shape-empty-date", `,"status","executed_on"`, `,'executed',''`),
+      /live_agreements_executed_on_check/,
+    );
+    await fails(
+      insertAgreement("u5-shape-bad-delivery", `,"status","delivered_on"`, `,'submitted','soon'`),
+      /live_agreements_delivered_on_check/,
     );
   });
 

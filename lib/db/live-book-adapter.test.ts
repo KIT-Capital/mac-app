@@ -106,7 +106,7 @@ describe("live-book adapter mapping", () => {
     assert.equal(state.agreements[0].executedOn, undefined);
   });
 
-  it("does not turn an unrecognised status into an active repo", () => {
+  it("closes an unrecognised status rather than letting it hold a piece", () => {
     const state = mapLiveBookRows({
       customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
       timepieces: [{ id: "piece-a", customerId: "cust-a" }],
@@ -125,7 +125,10 @@ describe("live-book adapter mapping", () => {
       ends: [],
       previews: [],
     });
-    assert.equal(state.agreements[0].status, "not-a-real-status");
+    // The database will not store a status outside the vocabulary, so the
+    // mapping settles on the one meaning that holds nothing.
+    assert.equal(state.agreements[0].status, "closed");
+    assert.equal(state.agreements[0].closeReason, "withdrawn");
     assert.equal(state.agreements[0].executedOn, undefined);
   });
 

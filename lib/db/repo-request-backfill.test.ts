@@ -37,7 +37,15 @@ const FIXTURES = [
   { id: "bf-draft", status: "draft", createdOn: "2024-04-04", signedOn: null },
   { id: "bf-unreadable", status: "pending_signature", createdOn: "sometime in 2019", signedOn: null },
   { id: "bf-timestamp", status: "signed", createdOn: "2024-07-08T12:30:00.000Z", signedOn: null },
+  { id: "bf-signed-timestamp", status: "signed", createdOn: "2024-08-01", signedOn: "2024-09-09T08:15:00.000Z" },
   { id: "bf-already-new", status: "submitted", createdOn: "2026-09-01", signedOn: null },
+  // Written after the browser book moved to the request model but before this
+  // migration gave the table anywhere to record the day (KTD21).
+  { id: "bf-executed-undated", status: "executed", createdOn: "2025-05-05", signedOn: null },
+  { id: "bf-executed-by-signing", status: "executed", createdOn: "bad", signedOn: "2025-06-06" },
+  { id: "bf-executed-undatable", status: "executed", createdOn: "no idea", signedOn: null },
+  { id: "bf-closed-no-reason", status: "closed", createdOn: "2025-07-07", signedOn: null },
+  { id: "bf-nonsense", status: "not-a-real-status", createdOn: "2025-08-08", signedOn: null },
 ];
 
 const updatedAt = "2026-02-02T10:00:00.000Z";
@@ -123,16 +131,50 @@ describe("KTD21 legacy backfill", { skip }, () => {
     });
   }
 
-  it("carries a signing date onto a signed row that never recorded one", async () => {
+  it("stores every signing date as a plain day, whatever shape it arrived in", async () => {
     const { rows } = await rootDb.execute(sql.raw(`
       select "id", "signed_on" from "${schema}"."live_agreements"
-      where "id" in ('bf-signed', 'bf-signed-undated', 'bf-timestamp') order by "id"
+      where "id" in ('bf-signed', 'bf-signed-undated', 'bf-timestamp', 'bf-signed-timestamp')
+      order by "id"
     `));
     assert.deepEqual(rows.map((row) => (row as Record<string, unknown>).signed_on), [
       "2022-05-02",
+      "2024-09-09",
       "2023-02-03",
       "2024-07-08",
     ]);
+  });
+
+  it("repairs a row that claimed the book before the column existed", async () => {
+    const { rows } = await rootDb.execute(sql.raw(`
+      select "id", "status", "executed_on", "close_reason"
+      from "${schema}"."live_agreements"
+      where "id" like 'bf-executed-%' or "id" in ('bf-closed-no-reason', 'bf-nonsense')
+      order by "id"
+    `));
+    const byId = new Map(
+      rows.map((row) => {
+        const record = row as Record<string, unknown>;
+        return [record.id, record];
+      }),
+    );
+    // Dated from what the row does know, so a live repo stays on the book.
+    assert.deepEqual(byId.get("bf-executed-undated"), {
+      id: "bf-executed-undated", status: "executed", executed_on: "2025-05-05", close_reason: null,
+    });
+    assert.deepEqual(byId.get("bf-executed-by-signing"), {
+      id: "bf-executed-by-signing", status: "executed", executed_on: "2025-06-06", close_reason: null,
+    });
+    // Nothing readable to start a term from, so it cannot claim the book.
+    assert.deepEqual(byId.get("bf-executed-undatable"), {
+      id: "bf-executed-undatable", status: "closed", executed_on: null, close_reason: "withdrawn",
+    });
+    assert.deepEqual(byId.get("bf-closed-no-reason"), {
+      id: "bf-closed-no-reason", status: "closed", executed_on: null, close_reason: "withdrawn",
+    });
+    assert.deepEqual(byId.get("bf-nonsense"), {
+      id: "bf-nonsense", status: "closed", executed_on: null, close_reason: "withdrawn",
+    });
   });
 
   it("releases the pieces a closed row was holding and leaves the rest", async () => {
@@ -147,8 +189,12 @@ describe("KTD21 legacy backfill", { skip }, () => {
     );
     assert.equal(byAgreement.get("bf-draft"), "released");
     assert.equal(byAgreement.get("bf-unreadable"), "released");
+    assert.equal(byAgreement.get("bf-executed-undatable"), "released");
+    assert.equal(byAgreement.get("bf-closed-no-reason"), "released");
+    assert.equal(byAgreement.get("bf-nonsense"), "released");
     assert.equal(byAgreement.get("bf-pending"), "live");
     assert.equal(byAgreement.get("bf-signed"), "live");
+    assert.equal(byAgreement.get("bf-executed-undated"), "live");
   });
 
   it("records one desk-only event per converted row and none for a new-model row", async () => {
