@@ -15,7 +15,7 @@ import {
   WITH_MAC_PHRASE,
   shotPhrase,
 } from "@/lib/appraisal-words";
-import { appraisalView, heldWatchIds, missingEvidenceKinds } from "@/lib/contract/repo-book.mjs";
+import { appraisalView, deskToday, heldWatchIds, isAppraisalCurrent, missingEvidenceKinds } from "@/lib/contract/repo-book.mjs";
 import { nextId } from "@/lib/ids";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
@@ -69,6 +69,8 @@ export default function WatchDetailPage() {
   const view = appraisalView(appraisalAttempts, watch.id, watch);
   const underReview = view.word === "with_mac";
   const closed = view.word === "closed";
+  const expired = view.word === "accepted"
+    && !isAppraisalCurrent(appraisalAttempts, watch.id, deskToday(), watch);
   const held = onLiveRepo;
   const hasAttempt = appraisalAttempts.some((attempt) => attempt.timepieceId === watch.id);
 
@@ -140,7 +142,7 @@ export default function WatchDetailPage() {
               {view.word === "accepted" ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
               {view.word === "not_accepted" ? <XCircle className="h-3 w-3" /> : null}
               {view.word === "with_mac" ? <Clock className="h-3 w-3" /> : null}
-              {APPRAISAL_WORDS[view.word]}
+              {expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[view.word]}
             </span>
           </div>
         </div>
@@ -168,7 +170,7 @@ export default function WatchDetailPage() {
               data-testid="appraisal-state"
               className="mt-1 text-[22px] font-bold text-mac-fg"
             >
-              {APPRAISAL_WORDS[view.word]}
+              {expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[view.word]}
             </p>
             {view.decisionsUsed > 0 ? (
               <p className="mt-1 text-[12px] text-mac-faint">
@@ -308,7 +310,7 @@ export default function WatchDetailPage() {
           ) : null}
           {actionError ? <p className="text-sm text-red-400">{actionError}</p> : null}
 
-          {view.word === "accepted" && watch.financeable && !onLiveRepo ? (
+          {view.word === "accepted" && watch.financeable && !onLiveRepo && !expired ? (
             <button
               type="button"
               onClick={() => router.push(`/repurchase/new?watch=${watch.id}`)}

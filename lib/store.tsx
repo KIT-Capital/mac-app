@@ -228,10 +228,37 @@ type RequestTransitionAction =
   | "executeMac"
   | "declineAtInspection"
   | "amend";
+type RequestTransitionEvent = {
+  action: string;
+  toStatus: string;
+  amount?: number;
+  version: number;
+  note?: string;
+  createdAt: string;
+  internal?: boolean;
+};
 /** `applyTransition` is typed through JSDoc; this is its answer read from TypeScript. */
 type TransitionOutcome =
   | { ok: false; error: string }
-  | { ok: true; agreement: Agreement; mintsStage?: string };
+  | { ok: true; agreement: Agreement; mintsStage?: string; event?: RequestTransitionEvent };
+
+function withRequestEvent(agreement: Agreement, event?: RequestTransitionEvent): Agreement {
+  if (!event || event.internal) return agreement;
+  return {
+    ...agreement,
+    events: [
+      ...(agreement.events ?? []),
+      {
+        action: event.action,
+        toStatus: event.toStatus,
+        amount: event.amount,
+        version: event.version,
+        note: event.note,
+        createdAt: event.createdAt,
+      },
+    ],
+  };
+}
 let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
 let loadStarted = false;
 let optimisticGeneration = 0;
@@ -813,10 +840,12 @@ function transitionRequest(
     },
   ) as TransitionOutcome;
   if (!result.ok) return Promise.resolve({ ok: false, error: result.error });
-  let next: Agreement =
+  let next: Agreement = withRequestEvent(
     action === "flagCustomerSuccess"
       ? { ...result.agreement, customerSuccess: Boolean(input.flag) }
-      : result.agreement;
+      : result.agreement,
+    result.event,
+  );
   if (action === "signCollector") {
     next = {
       ...next,
@@ -1367,6 +1396,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           lastActionAt: new Date().toISOString(),
           pieceCaps,
           scale: agreementScaleFromDesk(current.settings, openShell, input.termMonths),
+          events: [{
+            action: "submit",
+            toStatus: "submitted",
+            amount: input.amount,
+            version: 1,
+            note,
+            createdAt: new Date().toISOString(),
+          }],
         };
         const now = new Date();
         const acknowledgement = await updateStore((prev) => {
@@ -1456,7 +1493,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return updateStore((prev) => ({
           ...prev,
           agreements: transition && transition.ok
-            ? prev.agreements.map((item) => (item.id === id ? transition.agreement : item))
+            ? prev.agreements.map((item) => (
+              item.id === id ? withRequestEvent(transition.agreement, transition.event) : item
+            ))
             : prev.agreements,
           appraisalAttempts: input.outcome === "decline"
             ? prev.appraisalAttempts
