@@ -3,16 +3,20 @@
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
+import { FINAL_PHRASE, PROVISIONAL_PHRASE } from "@/lib/appraisal-words";
 import { COMPANY, money } from "@/lib/catalog";
+import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { MacLogoMark } from "@/components/mac-logo";
 import { WatchPhoto } from "@/components/watch-photo";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function AppraisalPage() {
-  const { user } = useStore();
+  const { user, appraisalAttempts } = useStore();
   const { timepieces } = useOwnedAssets();
-  const appraised = timepieces.filter((w) => w.status === "appraised");
+  const appraised = timepieces
+    .map((w) => ({ watch: w, view: appraisalView(appraisalAttempts, w.id, w) }))
+    .filter((row) => row.view.word === "accepted");
 
   return (
     <main className="flex flex-1 flex-col bg-white text-[#10141D]">
@@ -33,21 +37,22 @@ export default function AppraisalPage() {
 
         {appraised.length === 0 ? (
           <p className="mt-16 text-center text-sm text-black/50">
-            No appraised timepieces yet. Request an appraisal from the collection.
+            No accepted timepieces yet. Send a piece for appraisal from the collection.
           </p>
         ) : (
           <ol className="mt-8 space-y-8">
-            {appraised.map((w, i) => (
+            {appraised.map(({ watch: w, view }, i) => (
               <li key={w.id} className="border-t border-black/10 pt-5">
                 <div className="flex justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium">
-                      {i + 1}. {w.brand}
+                      {i + 1}. {w.brand} {w.model}
                     </p>
                     <p className="text-lg">
-                      {w.valueLow && w.valueHigh
-                        ? `${money(w.valueLow)} – ${money(w.valueHigh)}`
-                        : "Pending"}
+                      {typeof view.value === "number" ? money(view.value) : "Pending"}
+                    </p>
+                    <p className="text-[12px] text-black/60">
+                      {view.latestDecision?.finalizedAt ? FINAL_PHRASE : PROVISIONAL_PHRASE}
                     </p>
                     <p className="text-[12px] text-black/50">
                       Evaluated {w.evaluatedAt || "—"}

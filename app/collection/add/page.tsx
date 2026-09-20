@@ -433,11 +433,9 @@ function AddFormEditor() {
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
+    // Intake only records the piece. A submission is created on the detail
+    // screen by `appraisal.submit`, which freezes the evidence (KTD1).
     await submit(existing?.status ?? "not_evaluated");
-  }
-
-  async function onAppraise() {
-    await submit("reviewing", true);
   }
 
   return (
@@ -732,14 +730,6 @@ function AddFormEditor() {
             }`}
           >
             Save
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={onAppraise}
-            className="mac-tap flex h-12 items-center justify-center bg-[#0E2A44] text-[12px] font-semibold tracking-[0.18em] text-white uppercase"
-          >
-            Appraise
           </button>
         </div>
       </form>

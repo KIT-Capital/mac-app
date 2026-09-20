@@ -195,22 +195,3 @@ export function catalogValuation(
       ),
   };
 }
-
-export function catalogAppraisalPatch(
-  watch: { brand: string; model: string; reference?: string; valueLow?: number; valueHigh?: number },
-  catalog: {
-    brand: string;
-    model: string;
-    reference: string;
-    typicalLow: number;
-    typicalHigh: number;
-    financeable?: boolean;
-  }[],
-  evaluatedAt: string,
-) {
-  return {
-    status: "appraised" as const,
-    evaluatedAt,
-    ...catalogValuation(watch, catalog),
-  };
-}

@@ -1,71 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
-import { catalogAppraisalPatch, moneyRange } from "@/lib/catalog";
-import { canEditAppraisal } from "@/lib/roles.mjs";
+import { APPRAISAL_WORDS } from "@/lib/appraisal-words";
+import { moneyRange } from "@/lib/catalog";
+import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { useStore } from "@/lib/store";
 
-const APPRAISER_REQUIRED = "Appraiser or super admin required";
+function daysSince(iso: string) {
+  const submitted = Date.parse(iso);
+  if (!Number.isFinite(submitted)) return 0;
+  return Math.max(0, Math.floor((Date.now() - submitted) / 86_400_000));
+}
+
+function age(days: number) {
+  if (days === 0) return "today";
+  return days === 1 ? "1 day" : `${days} days`;
+}
 
 export default function AdminAssetsPage() {
-  const { timepieces, catalog, updateTimepiece, removeTimepiece, user } = useStore();
-  const canAppraise = canEditAppraisal(user);
-  const [error, setError] = useState("");
+  const { timepieces, appraisalAttempts } = useStore();
+  const pieceById = new Map(timepieces.map((piece) => [piece.id, piece]));
 
-  async function save(operation: Promise<{ ok: boolean; error?: string }>) {
-    const result = await operation;
-    if (result.ok) {
-      setError("");
-      return;
-    }
-    setError(
-      result.error === "ROLE_FORBIDDEN"
-        ? `${APPRAISER_REQUIRED} to appraise.`
-        : result.error || "The asset change could not be saved.",
-    );
-  }
+  const queue = appraisalAttempts
+    .filter((attempt) => attempt.status === "under_review")
+    .map((attempt) => ({ attempt, piece: pieceById.get(attempt.timepieceId) }))
+    .filter((row) => row.piece)
+    .sort((a, b) => a.attempt.submittedAt.localeCompare(b.attempt.submittedAt));
+
+  const latestAttemptFor = (timepieceId: string) =>
+    [...appraisalAttempts]
+      .filter((attempt) => attempt.timepieceId === timepieceId)
+      .sort((a, b) => a.attemptNo - b.attemptNo)
+      .at(-1);
 
   return (
     <AdminChrome title="Asset database">
       <p className="mb-4 max-w-2xl text-sm text-white/55">
-        Collector pieces. Match a catalog reference first; if missing, create the asset from the
-        photographs and specifications.
+        Collector pieces and the submissions waiting on an appraiser. A value is only written by
+        deciding a submission.
       </p>
-      {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
+
+      <h2 className="mb-2 text-[11px] font-bold tracking-[0.16em] text-white/70 uppercase">
+        Appraisal queue
+      </h2>
+      {queue.length === 0 ? (
+        <p className="mb-6 rounded-2xl border border-white/10 bg-[#161B24] p-4 text-sm text-white/50">
+          No submissions are waiting.
+        </p>
+      ) : (
+        <div className="mb-6">
+          <AdminTable
+            headers={["Piece", "Owner", "Waiting", "Attempt", ""]}
+            rows={queue.map(({ attempt, piece }) => [
+              `${piece?.brand} ${piece?.model}`,
+              piece?.ownerEmail || "—",
+              age(daysSince(attempt.submittedAt)),
+              `#${attempt.attemptNo}`,
+              <Link
+                key={attempt.id}
+                href={`/admin/appraisals/${attempt.id}`}
+                className="text-[#FCB040]"
+              >
+                Review
+              </Link>,
+            ])}
+          />
+        </div>
+      )}
+
+      <h2 className="mb-2 text-[11px] font-bold tracking-[0.16em] text-white/70 uppercase">
+        Client assets
+      </h2>
       <AdminTable
-        headers={["Code", "Piece", "Owner", "Status", "Value", ""]}
-        rows={timepieces.map((w) => [
-          w.assetCode || w.id,
-          `${w.brand} ${w.model}`,
-          w.ownerEmail || "—",
-          w.status.replace("_", " "),
-          moneyRange(w.valueLow, w.valueHigh),
-          <div key={w.id} className="flex flex-wrap gap-3 text-[#FCB040]">
-            <button type="button" onClick={() => void save(updateTimepiece(w.id, { status: "reviewing" }))}>
-              Review
-            </button>
-            <button
-              type="button"
-              disabled={!canAppraise}
-              title={canAppraise ? undefined : APPRAISER_REQUIRED}
-              className="disabled:cursor-not-allowed disabled:opacity-40"
-              onClick={() => {
-                const patch = catalogAppraisalPatch(
-                  w,
-                  catalog,
-                  new Date().toISOString().slice(0, 10),
-                );
-                void save(updateTimepiece(w.id, patch));
-              }}
-            >
-              Appraise
-            </button>
-            <button type="button" onClick={() => void save(removeTimepiece(w.id))}>
-              Remove
-            </button>
-          </div>,
-        ])}
+        headers={["Code", "Piece", "Owner", "Appraisal", "Range", ""]}
+        rows={timepieces.map((w) => {
+          const view = appraisalView(appraisalAttempts, w.id, w);
+          const latest = latestAttemptFor(w.id);
+          return [
+            w.assetCode || w.id,
+            `${w.brand} ${w.model}`,
+            w.ownerEmail || "—",
+            `${APPRAISAL_WORDS[view.word]}${view.decisionsUsed ? ` · ${view.decisionsUsed}/3` : ""}`,
+            moneyRange(w.valueLow, w.valueHigh),
+            latest ? (
+              <Link key={w.id} href={`/admin/appraisals/${latest.id}`} className="text-[#FCB040]">
+                Review
+              </Link>
+            ) : (
+              <span key={w.id} className="text-white/35">
+                No submission
+              </span>
+            ),
+          ];
+        })}
       />
     </AdminChrome>
   );

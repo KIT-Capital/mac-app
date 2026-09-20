@@ -1,4 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
+import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
 import { ownerKey } from "@/lib/owners";
 import { mergePreferences } from "@/lib/preferences";
@@ -315,26 +316,11 @@ export function mapLiveBookRows(
   const currentPreviewRows = [...previewsByPiece.values()].flat();
 
   const mappedPieces: Timepiece[] = pieceRows.map((row) => {
-    const pieceAttempts = (attemptsByPiece.get(text(row, "id")) ?? [])
-      .sort((a, b) => a.attemptNo - b.attemptNo);
-    const decisionsUsed = pieceAttempts.filter((attempt) => attempt.decisionNo !== null).length;
-    const latest = pieceAttempts.at(-1);
-    const latestDecision = [...pieceAttempts]
-      .reverse()
-      .find((attempt) => attempt.decisionNo !== null);
-    const appraisalState = latest?.status === "under_review"
-      ? "with_mac"
-      : decisionsUsed >= 3
-        ? "closed"
-        : latestDecision?.status === "accepted"
-          ? "accepted"
-          : latestDecision?.status === "refused"
-            ? "not_accepted"
-            : row.status === "reviewing"
-              ? "with_mac"
-              : row.status === "appraised"
-                ? "accepted"
-                : "not_sent";
+    const view = appraisalView(
+      attemptsByPiece.get(text(row, "id")) ?? [],
+      text(row, "id"),
+      { status: text(row, "status") },
+    );
     const previews = previewsByPiece.get(text(row, "id")) ?? [];
     const mappedPreviews = previews.flatMap((item) => {
       const source = text(item, "photoObjectId") || text(item, "previewUrl");
@@ -364,12 +350,9 @@ export function mapLiveBookRows(
       complication: text(row, "complication"),
       evaluatedAt: row.evaluatedAt instanceof Date ? row.evaluatedAt.toISOString().slice(0, 10) : optionalText(row, "evaluatedAt"),
       assetCode: optionalText(row, "assetCode"),
-      appraisalState,
-      decisionsUsed,
-      appraisalValue:
-        latestDecision?.status === "accepted" && typeof latestDecision.valueCents === "number"
-          ? latestDecision.valueCents / 100
-          : undefined,
+      appraisalState: view.word,
+      decisionsUsed: view.decisionsUsed,
+      appraisalValue: view.value,
     };
   });
 
