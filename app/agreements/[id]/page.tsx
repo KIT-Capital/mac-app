@@ -11,7 +11,7 @@ import { WatchPhoto } from "@/components/watch-photo";
 import { COMPANY, hasApplication, money } from "@/lib/catalog";
 import { bookLabel, isRequestExpired } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
-import { PENDING_COUNSEL_LABEL, buildAgreementSnapshot } from "@/lib/contract/repo-agreement-snapshot.mjs";
+import { buildAgreementSnapshot, counselLabelForStage, documentStageForAgreementStatus } from "@/lib/contract/repo-agreement-snapshot.mjs";
 import {
   isRequestRow,
   nextAllowedActions,
@@ -28,6 +28,7 @@ type ListedDocument = {
   id: string;
   version: number;
   status: string;
+  stage?: string;
   checksum?: string | null;
   templateVersion?: string;
   snapshotHash?: string;
@@ -130,6 +131,7 @@ export default function AgreementDetailPage() {
         delivery: agreement.delivery,
         agreementCode: agreement.agreementCode || agreement.id,
         scale: agreement.scale,
+        stage: documentStageForAgreementStatus(agreement.status),
         timepieces: watches.map((watch) => ({
           name: `${watch.brand} ${watch.model}`,
           brand: watch.brand,
@@ -516,7 +518,9 @@ export default function AgreementDetailPage() {
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
             Repurchase agreement
           </h2>
-          <p className="text-center text-[12px] font-semibold text-[#0E2A44]">{PENDING_COUNSEL_LABEL}</p>
+          <p className="text-center text-[12px] font-semibold text-[#0E2A44]">
+            {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
+          </p>
           {snapshot.ok && snapshot.value ? (
             <>
               {snapshot.value.facts.map((line) => (
@@ -634,15 +638,18 @@ export default function AgreementDetailPage() {
             <p className="font-semibold text-emerald-800">Signed {agreement.signedAt}</p>
           ) : null}
         </article>
-        {bookMode === "live" && documents.some((row) => row.status === "stored") ? (
+        {bookMode === "live" && documents.length ? (
           <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
             <h3 className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Stored document</h3>
-            <p className="mt-1 text-[12px] text-mac-muted">{PENDING_COUNSEL_LABEL}</p>
+            <p className="mt-1 text-[12px] text-mac-muted">
+              {counselLabelForStage(documents.find((row) => row.status === "stored")?.stage
+                ?? documents[0]?.stage)}
+            </p>
             <ul className="mt-3 space-y-2">
               {documents.map((row) => (
                 <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-mac-muted">
                   <span>
-                    Version {row.version} · {row.status}
+                    Version {row.version} · {row.stage ?? "document"} · {row.status === "building" ? "PDF preparing" : row.status}
                     {row.checksum ? ` · ${row.checksum.slice(0, 8)}` : ""}
                   </span>
                   {row.status === "stored" ? (
@@ -727,7 +734,7 @@ export default function AgreementDetailPage() {
               </PillButton>
             </div>
             <p className="text-center text-[11px] text-mac-faint">
-              Temporary preview — not stored. {PENDING_COUNSEL_LABEL}
+              Temporary preview — not stored. {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
             </p>
           </div>
         ) : null}

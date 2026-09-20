@@ -134,6 +134,7 @@ type Store = AppState & {
       note?: string;
     },
   ) => Promise<OperationAck>;
+  resendExecutedRequest: (id: string, note?: string) => Promise<OperationAck>;
   recordReturnRequest: (id: string, note?: string) => Promise<OperationAck>;
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
   removeAgreement: (id: string) => Promise<OperationAck>;
@@ -1548,6 +1549,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             checklist: input.checklist,
           },
         }),
+      resendExecutedRequest: (id, note) => {
+        const current = getStoreSnapshot();
+        const row = current.agreements.find((item) => item.id === id);
+        if (!row) return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
+        if (row.status !== "executed") return Promise.resolve({ ok: false, error: "AGREEMENT_STATE_CONFLICT" });
+        return updateStore((prev) => ({ ...prev }), {
+          operation: {
+            action: "request.resendExecuted",
+            id,
+            note: String(note ?? ""),
+            expectedStatus: row.status,
+            expectedVersion: row.version ?? 1,
+          },
+          deferLive: true,
+          applyOnAck: false,
+        });
+      },
       recordReturnRequest: (id, note) => {
         const current = getStoreSnapshot();
         const row = current.agreements.find((item) => item.id === id);

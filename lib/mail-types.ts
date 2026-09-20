@@ -4,9 +4,15 @@ export const MAIL_KINDS = [
   "invite",
   "appraisal",
   "repurchase",
-  "financing",
   "membership",
   "test",
+  "request_submitted",
+  "request_confirmed",
+  "request_declined",
+  "request_withdrawn",
+  "request_signed",
+  "request_inspected",
+  "request_expired",
 ] as const;
 
 export type RequestMailKind = (typeof MAIL_KINDS)[number];

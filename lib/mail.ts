@@ -10,6 +10,10 @@ import {
   type RequestMailKind,
 } from "@/lib/mail-types";
 import { routeInternalRecipients } from "@/lib/internal-mail.mjs";
+import {
+  composeCollectorDeclineNotice,
+  composeRequestNotices,
+} from "@/lib/request-notice-mail.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 import { allowMailRequest as allowKeyedMailRequest } from "@/lib/mail-rate.mjs";
 
@@ -238,10 +242,9 @@ function composeMail(request: MailRequest): ComposedMail[] {
         }),
       ];
     case "repurchase":
-    case "financing":
       return [
         letter({
-          kind: request.kind === "financing" ? "financing" : "repurchase",
+          kind: "repurchase",
           to: [desk, request.email],
           replyTo: request.email,
           subject: `Sale-and-repurchase application: ${request.watch || "timepiece"}`,
@@ -257,6 +260,40 @@ function composeMail(request: MailRequest): ComposedMail[] {
           ],
         }),
       ];
+    case "request_submitted":
+    case "request_confirmed":
+    case "request_withdrawn":
+    case "request_signed":
+    case "request_inspected":
+    case "request_expired":
+      return composeRequestNotices(request.kind, {
+        name: request.name,
+        email: request.email,
+        watch: request.watch,
+        amount: request.amount,
+        delivery: request.delivery,
+        termMonths: request.termMonths,
+        deskEmail: desk,
+      }).map((notice) => noticeToLetter(request.kind, notice));
+    case "request_declined":
+      return (
+        request.message === "collector"
+          ? composeCollectorDeclineNotice({
+            name: request.name,
+            email: request.email,
+            watch: request.watch,
+            deskEmail: desk,
+          })
+          : composeRequestNotices("request_declined", {
+            name: request.name,
+            email: request.email,
+            watch: request.watch,
+            amount: request.amount,
+            delivery: request.delivery,
+            termMonths: request.termMonths,
+            deskEmail: desk,
+          })
+      ).map((notice) => noticeToLetter(request.kind, notice));
     case "membership":
       return [
         letter({
@@ -286,6 +323,30 @@ function composeMail(request: MailRequest): ComposedMail[] {
         }),
       ];
   }
+}
+
+function noticeToLetter(kind: MailKind, notice: {
+  to: string[];
+  replyTo?: string;
+  subject: string;
+  heading: string;
+  intro: string;
+  rows?: string[][];
+  body?: string;
+}) {
+  const rows = (notice.rows ?? [])
+    .filter((row) => row.length >= 2)
+    .map((row) => [String(row[0]), String(row[1])] as [string, string]);
+  return letter({
+    kind,
+    to: notice.to,
+    replyTo: notice.replyTo,
+    subject: notice.subject,
+    heading: notice.heading,
+    intro: notice.intro,
+    rows,
+    body: notice.body,
+  });
 }
 
 function letter({

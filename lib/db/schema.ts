@@ -1018,5 +1018,14 @@ export const agreementDocumentSends = pgTable(
     failureCode: text("failure_code"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("agreement_document_sends_document_id_idx").on(table.documentId)],
+  (table) => [
+    index("agreement_document_sends_document_id_idx").on(table.documentId),
+    uniqueIndex("agreement_document_sends_system_uidx")
+      .on(table.documentId, table.recipientKind)
+      .where(sql`${table.actorKind} = 'system'`),
+    check(
+      "agreement_document_sends_actor_kind_check",
+      sql`${table.actorKind} in ('retail', 'desk', 'system', 'collector')`,
+    ),
+  ],
 );

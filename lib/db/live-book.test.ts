@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { INSPECTION_CONDITION } from "../contract/repo-agreement-snapshot.mjs";
+import { ATTESTATION_LABEL, INSPECTION_CONDITION } from "../contract/repo-agreement-snapshot.mjs";
 import { bookLabel, completedAppraisalDecisions, deskToday } from "../contract/repo-book.mjs";
 import { agreementDocumentStore, memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
 import { createDb, type Database } from "./client";
 import { clearAccessRateLimit } from "./collector-sessions";
+import { sendExecutedDocumentEmails } from "./agreement-documents";
 import { readLiveBookState } from "./live-book-adapter";
 import {
   executeLiveBookOperation,
@@ -19,6 +20,7 @@ import { listAgreementEvents } from "./request-events";
 import { createStaffAccount } from "./staff-accounts";
 import { hashStaffPassword } from "../staff-password.mjs";
 import {
+  agreementDocumentSends,
   agreementDocuments,
   agreementEvents,
   agreementSignatures,
@@ -862,7 +864,7 @@ describe("repo requests", { skip }, () => {
     clientAddress: "127.0.0.1",
     documentStore: store,
   };
-  const retailOptions = { documentStore: store };
+  const retailOptions = { documentStore: store, env: { APP_ENV: "development" } as NodeJS.ProcessEnv };
   const CHECKLIST = {
     identityVerified: true,
     serialsMatch: true,
@@ -1567,6 +1569,54 @@ describe("repo requests", { skip }, () => {
     assert.deepEqual((await eventsOf(holderId)).map((event) => event.action), ["submit", "deskReturn", "expire"]);
   });
 
+  it("does not send an expiry letter until the new submit commits", async () => {
+    const owner = await collector("request-expired-mail");
+    const piece = await acceptedPiece(owner);
+    const holderId = `request-expired-mail-${suffix}`;
+    await submit(owner, holderId, [piece.id], 60_000);
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id: holderId, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    await db.update(liveAgreements)
+      .set({ lastActionAt: new Date(Date.now() - 15 * DAY) })
+      .where(eq(liveAgreements.id, holderId));
+    const kinds: string[] = [];
+    const mailOptions = {
+      ...retailOptions,
+      env: { ...retailOptions.env, RESEND_API_KEY: "re_test" },
+      sendEmail: async (message: { tags: { name: string; value: string }[] }) => {
+        kinds.push(message.tags.find((tag) => tag.name === "kind")?.value ?? "");
+        return { data: { id: "re_test" }, error: null };
+      },
+    };
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, {
+        action: "request.submit",
+        id: `request-expired-mail-abort-${suffix}`,
+        watchIds: [piece.id],
+        termMonths: 12,
+        amount: 60_001,
+        delivery: "Insured courier",
+      }, mailOptions),
+      { message: "AMOUNT_ABOVE_CAP" },
+    );
+    assert.deepEqual(kinds, []);
+    const stillOpen = await agreementRow(holderId);
+    assert.equal(stillOpen.status, "returned");
+    const next = await executeLiveBookOperation(db, owner.actor, {
+      action: "request.submit",
+      id: `request-expired-mail-next-${suffix}`,
+      watchIds: [piece.id],
+      termMonths: 12,
+      amount: 60_000,
+      delivery: "Insured courier",
+    }, mailOptions) as RequestSubmitResult;
+    assert.deepEqual(kinds, []);
+    await flush(next);
+    assert.ok(kinds.includes("request_expired"));
+    assert.ok(kinds.includes("request_submitted"));
+  });
+
   it("flags customer success as a desk-only event the owner never reads", async () => {
     const owner = await collector("request-success");
     const piece = await acceptedPiece(owner);
@@ -1914,6 +1964,70 @@ describe("repo requests", { skip }, () => {
     );
     const executed = await executeRequest(id);
     assert.equal(executed.agreement.status, "executed");
+  });
+
+  it("emails the executed PDF once per recipient and records a checksum failure without claiming a send", async () => {
+    const owner = await collector("request-executed-mail");
+    const piece = await acceptedPiece(owner);
+    const id = `request-executed-mail-${suffix}`;
+    await flush(await submit(owner, id, [piece.id], 30_000));
+    await confirmRequest(id);
+    await signRequest(owner, id);
+    await deliverRequest(id);
+    await inspectPieces(id, [{
+      timepieceId: piece.id, decision: "confirm", inspectedValueCents: 5_833_300,
+    }]);
+    const executed = await executeRequest(id);
+    assert.equal(executed.agreement.status, "executed");
+    const docs = await documentsOf(id);
+    const executedDoc = docs.find((row) => row.stage === "executed" && row.status === "stored");
+    assert.ok(executedDoc);
+    const snapshot = executedDoc.snapshot as { text: string; label: string };
+    assert.equal(snapshot.label, ATTESTATION_LABEL);
+    assert.match(snapshot.text, /Collector: /);
+    assert.match(snapshot.text, /MAC: /);
+    const sends = await db.select().from(agreementDocumentSends).where(eq(agreementDocumentSends.documentId, executedDoc.id));
+    assert.equal(sends.filter((row) => row.actorKind === "system").length, 2);
+    assert.ok(sends.every((row) => row.result === "accepted"));
+    const resent = await executeLiveBookOperation(db, inspector, {
+      action: "request.resendExecuted",
+      id,
+      expectedStatus: "executed",
+      expectedVersion: executed.agreement.version,
+    }, deskOptions) as RequestSubmitResult;
+    await assert.rejects(() => flush(resent), { message: "DOCUMENT_ALREADY_SENT" });
+    assert.equal(
+      (await db.select().from(agreementDocumentSends).where(eq(agreementDocumentSends.documentId, executedDoc.id))).length,
+      2,
+    );
+
+    const deskSend = sends.find((row) => row.recipientKind === "desk");
+    assert.ok(deskSend);
+    await db.update(agreementDocumentSends)
+      .set({ result: "failed", failureCode: "DOCUMENT_SEND_FAILED" })
+      .where(eq(agreementDocumentSends.id, deskSend.id));
+    const retryDesk = await executeLiveBookOperation(db, inspector, {
+      action: "request.resendExecuted",
+      id,
+      expectedStatus: "executed",
+      expectedVersion: executed.agreement.version,
+    }, deskOptions) as RequestSubmitResult;
+    await flush(retryDesk);
+    const retried = await db.select().from(agreementDocumentSends).where(eq(agreementDocumentSends.documentId, executedDoc.id));
+    assert.equal(retried.length, 2);
+    assert.ok(retried.every((row) => row.result === "accepted"));
+    const alreadySent = await executeLiveBookOperation(db, inspector, {
+      action: "request.resendExecuted",
+      id,
+      expectedStatus: "executed",
+      expectedVersion: executed.agreement.version,
+    }, deskOptions) as RequestSubmitResult;
+    await assert.rejects(() => flush(alreadySent), { message: "DOCUMENT_ALREADY_SENT" });
+
+    await db.update(agreementDocuments).set({ checksum: "ff".repeat(32) }).where(eq(agreementDocuments.id, executedDoc.id));
+    await db.delete(agreementDocumentSends).where(eq(agreementDocumentSends.documentId, executedDoc.id));
+    const failed = await sendExecutedDocumentEmails(db, executedDoc.id, store, { env: deskOptions.env });
+    assert.ok(failed.every((row) => row && row.result === "failed" && row.failureCode === "DOCUMENT_CHECKSUM_MISMATCH"));
   });
 
   it("keeps the collector signature when the owner withdraws after signing", async () => {

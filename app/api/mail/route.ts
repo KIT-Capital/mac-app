@@ -9,6 +9,15 @@ import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { requestActor } from "@/lib/server/request-actor";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
+const REQUEST_NOTICE_KINDS = new Set([
+  "request_submitted",
+  "request_confirmed",
+  "request_declined",
+  "request_withdrawn",
+  "request_signed",
+  "request_inspected",
+  "request_expired",
+]);
 const DESK_ONLY = new Set(["invite", "test"]);
 
 function clientIp(headerList: Headers) {
@@ -75,6 +84,12 @@ export async function POST(request: Request) {
     if (DESK_ONLY.has(payload.kind)) {
       const desk = await deskSession();
       if ("error" in desk) return deskFailure(desk.error);
+    }
+    if (REQUEST_NOTICE_KINDS.has(payload.kind)) {
+      const resolved = await requestActor();
+      if ("error" in resolved) {
+        return Response.json({ error: "Sign in to send that notice." }, { status: 403 });
+      }
     }
 
     const result = await dispatchMail(payload);

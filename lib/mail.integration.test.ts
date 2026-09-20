@@ -117,4 +117,31 @@ describe("mail delivery boundaries", () => {
       false,
     );
   });
+
+  it("refuses the retired financing alias and still sends request notices", async () => {
+    const { parseMailRequest } = await import("./mail");
+    assert.throws(
+      () => parseMailRequest({ kind: "financing", name: "Ada", email: "ada@example.com" }),
+      /Unknown mail kind/,
+    );
+    const result = await dispatchMail(
+      {
+        kind: "request_submitted",
+        name: "Ada Locke",
+        email: "ada@example.com",
+        watch: "MAC-1",
+        amount: "60000",
+        delivery: "Insured courier",
+        termMonths: 12,
+      },
+      { env: { MAC_INTERNAL_EMAIL: INTERNAL_EMAIL } },
+    );
+    assert.equal(result.preview, true);
+    const bodies = result.messages.map((message) => `${message.subject}\n${message.text}`).join("\n");
+    assert.match(bodies, /not a loan/i);
+    assert.doesNotMatch(
+      bodies.replaceAll("not a loan", ""),
+      /\b(loan|lender|interest|debt|financing|vesting|paid off)\b/i,
+    );
+  });
 });

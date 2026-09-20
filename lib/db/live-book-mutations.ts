@@ -20,6 +20,7 @@ import {
   assertScenario60Floors,
 } from "@/lib/contract/repo-scale.mjs";
 import { parseLiveBookOperation } from "@/lib/live-book-operation.mjs";
+import { dispatchMail } from "@/lib/mail";
 import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import type { Agreement } from "@/lib/types";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS } from "@/lib/theme";
@@ -30,6 +31,7 @@ import {
   liveAgreementHasDocuments,
   recoverCurrentStageDocument,
   renderStageDocument,
+  sendExecutedDocumentEmails,
 } from "./agreement-documents";
 import { consumeAccessRateLimit } from "./collector-sessions";
 import { centsToDollars, dollarsToCents } from "./money.mjs";
@@ -86,6 +88,15 @@ type OperationContext = {
   documentStore?: DocumentStore;
   rootDb: Database;
   clientAddress?: string;
+  sendEmail?: (message: {
+    from: string;
+    to: string[];
+    replyTo: string;
+    subject: string;
+    html: string;
+    text: string;
+    tags: { name: string; value: string }[];
+  }, options?: { idempotencyKey?: string }) => Promise<{ data: { id?: string } | null; error: unknown }>;
 };
 
 /** A request row as the API returns it. `customerSuccess` is desk-only (KTD22). */
@@ -115,7 +126,10 @@ export type RequestSubmitResult = {
   afterCommit: Array<() => Promise<unknown>>;
 };
 
-export type RequestTransitionResult = { agreement: RequestProjection };
+export type RequestTransitionResult = {
+  agreement: RequestProjection;
+  afterCommit?: Array<() => Promise<unknown>>;
+};
 
 /** `applyTransition` is plain JS; this is the shape its two answers take. */
 type TransitionOutcome =
@@ -273,7 +287,9 @@ function projectRequestRow(
     status: row.status,
     createdAt: row.createdOn,
     version: row.version,
-    lastActionAt: row.lastActionAt.toISOString(),
+    lastActionAt: row.lastActionAt instanceof Date
+      ? row.lastActionAt.toISOString()
+      : String(row.lastActionAt),
   };
   if (row.agreementCode) projection.agreementCode = row.agreementCode;
   if (row.closeReason) projection.closeReason = row.closeReason;
@@ -286,13 +302,55 @@ function projectRequestRow(
   return projection;
 }
 
+function chainedJobs(jobs: Array<() => Promise<unknown>>) {
+  return [async () => {
+    for (const job of jobs) await job();
+  }];
+}
+
+function noticeMail(
+  kind:
+    | "request_submitted"
+    | "request_confirmed"
+    | "request_declined"
+    | "request_withdrawn"
+    | "request_signed"
+    | "request_inspected"
+    | "request_expired",
+  agreement: Pick<LiveAgreementRow, "ownerName" | "email" | "agreementCode" | "amountCents" | "delivery" | "termMonths">,
+  context: OperationContext,
+  message = "",
+) {
+  return () => dispatchMail({
+    kind,
+    name: agreement.ownerName,
+    email: agreement.email,
+    watch: agreement.agreementCode ?? "",
+    amount: String(centsToDollars(agreement.amountCents)),
+    delivery: agreement.delivery,
+    termMonths: agreement.termMonths,
+    message,
+  }, { env: context.env, sendEmail: context.sendEmail });
+}
+
+function renderThen(
+  context: OperationContext,
+  documentId: string,
+  extra: Array<() => Promise<unknown>> = [],
+) {
+  return chainedJobs([
+    () => renderStageDocument(context.rootDb, documentId, context.documentStore, context.env),
+    ...extra,
+  ]);
+}
+
 /**
  * KTD12. A request whose retail window ran out is closed for real before any
  * move against it, in its own transaction, so the close stays committed even
  * though the move is then refused. Ownership answers before state: a retail
  * caller who does not own the row reads `AGREEMENT_NOT_FOUND`, never a state.
  */
-async function closeIfExpiredBeforeMove(db: Database, actor: Actor, id: string) {
+async function closeIfExpiredBeforeMove(db: Database, actor: Actor, id: string, context: OperationContext) {
   const where = !isDesk(actor)
     ? and(eq(liveAgreements.id, id), eq(liveAgreements.customerId, actor.customerId))
     : eq(liveAgreements.id, id);
@@ -304,7 +362,10 @@ async function closeIfExpiredBeforeMove(db: Database, actor: Actor, id: string) 
   if (!row) throw new Error("AGREEMENT_NOT_FOUND");
   if (!isRequestExpired({ status: row.status, lastActionAt: row.lastActionAt.toISOString() })) return;
   const closed = await db.transaction((tx) => closeExpiredRequest(tx as unknown as Database, id));
-  if (closed) throw new Error("REQUEST_EXPIRED");
+  if (closed) {
+    await noticeMail("request_expired", closed, context)();
+    throw new Error("REQUEST_EXPIRED");
+  }
 }
 
 function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
@@ -462,6 +523,7 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "request.recordDelivery",
   "request.inspect",
   "request.executeMac",
+  "request.resendExecuted",
   "request.recordReturn",
   "agreement.updateScale",
   "agreement.recordEnd",
@@ -496,6 +558,7 @@ const LOCKED_AGREEMENT_ACTIONS = new Set([
   "request.recordDelivery",
   "request.inspect",
   "request.executeMac",
+  "request.resendExecuted",
   "request.recordReturn",
   "agreement.updateScale",
   "agreement.recordEnd",
@@ -559,27 +622,44 @@ function auditDetail(
   if (operation.action === "request.executeMac") {
     return { paymentReference: operation.paymentReference, note: String(operation.note ?? "") };
   }
+  if (operation.action === "request.resendExecuted") {
+    return { note: String(operation.note ?? "") };
+  }
   return {};
+}
+
+function operationEnv(optionsEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  if (optionsEnv) return optionsEnv;
+  if (process.env.NODE_TEST_CONTEXT) {
+    return { ...process.env, RESEND_API_KEY: "" };
+  }
+  return process.env;
 }
 
 export async function executeLiveBookOperation(
   db: Database,
   actor: Actor,
   input: unknown,
-  options: { clientAddress?: string; env?: NodeJS.ProcessEnv; documentStore?: DocumentStore } = {},
+  options: {
+    clientAddress?: string;
+    env?: NodeJS.ProcessEnv;
+    documentStore?: DocumentStore;
+    sendEmail?: OperationContext["sendEmail"];
+  } = {},
 ) {
   const operation = parseLiveBookOperation(input) as Operation & Record<string, unknown>;
   const context: OperationContext = {
-    env: options.env ?? process.env,
+    env: operationEnv(options.env),
     documentStore: options.documentStore,
     rootDb: db,
     clientAddress: options.clientAddress,
+    sendEmail: options.sendEmail,
   };
   if (operation.action === "request.submit" || operation.action === "request.withdraw") {
     await consumeRequestThrottle(db, actor, operation.action);
   }
   if (REQUEST_TRANSITIONS.has(operation.action)) {
-    await closeIfExpiredBeforeMove(db, actor, String(operation.id));
+    await closeIfExpiredBeforeMove(db, actor, String(operation.id), context);
   }
   if (
     isDesk(actor) &&
@@ -637,8 +717,9 @@ async function executeLiveBookOperationCore(
   if (action === "request.recordDelivery") return recordDeliveryRequest(db, actor, operation);
   if (action === "request.inspect") return inspectRequest(db, actor, operation, context);
   if (action === "request.executeMac") return executeMacRequest(db, actor, operation, context);
+  if (action === "request.resendExecuted") return resendExecutedRequest(db, actor, operation, context);
   if (action === "request.recordReturn") return recordReturnRequest(db, actor, operation);
-  if (REQUEST_TRANSITIONS.has(action)) return transitionRequest(db, actor, operation);
+  if (REQUEST_TRANSITIONS.has(action)) return transitionRequest(db, actor, operation, context);
 
   if (action === "appraisal.submit") {
     return submitAppraisalAttempt(db, actor, {
@@ -1344,13 +1425,20 @@ async function submitRequest(
     ))
     .orderBy(liveAgreements.id);
   const seen = new Set<string>();
+  const expiredNotices: Array<() => Promise<unknown>> = [];
   for (const holder of holders) {
     if (seen.has(holder.agreementId)) continue;
     seen.add(holder.agreementId);
     const expired =
       REQUEST_STATES.includes(holder.status) &&
       isRequestExpired({ status: holder.status, lastActionAt: holder.lastActionAt.toISOString() }, today);
-    if (expired && await closeExpiredRequest(db, holder.agreementId)) continue;
+    if (expired) {
+      const closed = await closeExpiredRequest(db, holder.agreementId);
+      if (closed) {
+        expiredNotices.push(noticeMail("request_expired", closed, context));
+        continue;
+      }
+    }
     throw new Error("LIVE_WATCH_CONFLICT");
   }
 
@@ -1417,10 +1505,12 @@ async function submitRequest(
     createdAt: now,
   });
   const document = await insertStageDocumentRow(db, row, "proposal", actor, context.env);
-  const { rootDb, documentStore, env } = context;
   return {
     agreement: projectRequestRow(row, watchIds, actor),
-    afterCommit: [() => renderStageDocument(rootDb, document.id, documentStore, env)],
+    afterCommit: chainedJobs([
+      ...expiredNotices,
+      ...renderThen(context, document.id, [noticeMail("request_submitted", row, context)]),
+    ]),
   };
 }
 
@@ -1433,6 +1523,7 @@ async function transitionRequest(
   db: Database,
   actor: Actor,
   operation: Operation & Record<string, unknown>,
+  context: OperationContext,
 ): Promise<RequestTransitionResult> {
   const id = String(operation.id);
   const action = operation.action.slice("request.".length);
@@ -1494,7 +1585,23 @@ async function transitionRequest(
     internal: result.event.internal,
     createdAt: now,
   });
-  return { agreement: projectRequestRow(row, agreement.watchIds, actor) };
+  const jobs: Array<() => Promise<unknown>> = [];
+  if (result.event.action === "deskReturn" && next.status === "returned") {
+    jobs.push(noticeMail("request_confirmed", row, context));
+  }
+  if (result.event.action === "deskReturn" && next.status === "closed") {
+    jobs.push(noticeMail("request_declined", row, context));
+  }
+  if (result.event.action === "decline") {
+    jobs.push(noticeMail("request_declined", row, context, "collector"));
+  }
+  if (result.event.action === "withdraw") {
+    jobs.push(noticeMail("request_withdrawn", row, context));
+  }
+  return {
+    agreement: projectRequestRow(row, agreement.watchIds, actor),
+    afterCommit: jobs.length ? chainedJobs(jobs) : [],
+  };
 }
 
 function transitionActorOf(actor: Actor) {
@@ -1627,7 +1734,7 @@ async function signCollectorRequest(
   const document = await insertStageDocumentRow(db, persisted.row, "collector_signed", actor, context.env);
   return {
     agreement: projectRequestRow(persisted.row, agreement.watchIds, actor),
-    afterCommit: [() => renderStageDocument(context.rootDb, document.id, context.documentStore, context.env)],
+    afterCommit: renderThen(context, document.id, [noticeMail("request_signed", persisted.row, context)]),
   };
 }
 
@@ -1689,7 +1796,10 @@ async function inspectRequest(
         eq(liveAgreementMembers.agreementId, agreement.id),
         eq(liveAgreementMembers.status, "reserved"),
       ));
-    return { agreement: projectRequestRow(persisted.row, [], actor), afterCommit: [] };
+    return {
+      agreement: projectRequestRow(persisted.row, [], actor),
+      afterCommit: chainedJobs([noticeMail("request_declined", persisted.row, context)]),
+    };
   }
 
   const kept: string[] = [];
@@ -1736,7 +1846,10 @@ async function inspectRequest(
       action: "declineAtInspection",
       note: String(operation.note ?? ""),
     }, now);
-    return { agreement: projectRequestRow(persisted.row, [], actor), afterCommit: [] };
+    return {
+      agreement: projectRequestRow(persisted.row, [], actor),
+      afterCommit: chainedJobs([noticeMail("request_declined", persisted.row, context)]),
+    };
   }
   const needsReturn = dropped || signedAmount > maximum;
   if (!needsReturn) {
@@ -1772,7 +1885,7 @@ async function inspectRequest(
   const document = await insertStageDocumentRow(db, persisted.row, "proposal", actor, context.env);
   return {
     agreement: projectRequestRow(persisted.row, kept, actor),
-    afterCommit: [() => renderStageDocument(context.rootDb, document.id, context.documentStore, context.env)],
+    afterCommit: renderThen(context, document.id, [noticeMail("request_inspected", persisted.row, context)]),
   };
 }
 
@@ -1853,7 +1966,57 @@ async function executeMacRequest(
   const document = await insertStageDocumentRow(db, persisted.row, "executed", actor, context.env);
   return {
     agreement: projectRequestRow(persisted.row, reserved.map((row) => row.timepieceId), actor),
-    afterCommit: [() => renderStageDocument(context.rootDb, document.id, context.documentStore, context.env)],
+    afterCommit: renderThen(context, document.id, [
+      () => sendExecutedDocumentEmails(context.rootDb, document.id, context.documentStore, {
+        env: context.env,
+        sendEmail: context.sendEmail,
+      }),
+    ]),
+  };
+}
+
+async function resendExecutedRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+  context: OperationContext,
+): Promise<RequestSubmitResult> {
+  requireDesk(actor);
+  const agreement = await ownedAgreement(db, actor, String(operation.id));
+  if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+    throw new Error("AGREEMENT_STATE_CONFLICT");
+  }
+  if (agreement.status !== "executed") throw new Error("AGREEMENT_STATE_CONFLICT");
+  const [document] = await db
+    .select({ id: agreementDocuments.id })
+    .from(agreementDocuments)
+    .where(and(
+      eq(agreementDocuments.liveAgreementId, agreement.id),
+      eq(agreementDocuments.version, agreement.version ?? 1),
+      eq(agreementDocuments.stage, "executed"),
+    ))
+    .limit(1);
+  if (!document) throw new Error("DOCUMENT_NOT_READY");
+  const [row] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, agreement.id)).limit(1);
+  if (!row) throw new Error("AGREEMENT_NOT_FOUND");
+  return {
+    agreement: projectRequestRow(row, agreement.watchIds, actor),
+    afterCommit: chainedJobs([
+      async () => {
+        const recovered = await recoverCurrentStageDocument(
+          context.rootDb,
+          agreement.id,
+          agreement.version ?? 1,
+          "executed",
+          context.documentStore,
+          context.env,
+        );
+        await sendExecutedDocumentEmails(context.rootDb, recovered.id, context.documentStore, {
+          env: context.env,
+          requirePending: true,
+        });
+      },
+    ]),
   };
 }
 

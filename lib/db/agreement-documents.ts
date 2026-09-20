@@ -4,20 +4,22 @@ import {
   SENDS_PER_HOUR,
   SEND_WINDOW_MS,
   composeAgreementDocumentMail,
+  composeExecutedDocumentMail,
   dispatchAgreementDocumentMail,
   resolveSendRecipient,
 } from "@/lib/agreement-document-mail.mjs";
-import { buildAgreementSnapshot, renderAgreementSnapshotPdf } from "@/lib/contract/repo-agreement-snapshot.mjs";
+import { buildAgreementSnapshot, INSPECTION_CONDITION, renderAgreementSnapshotPdf } from "@/lib/contract/repo-agreement-snapshot.mjs";
 import {
   captureOperationalError,
   captureOperationalErrorOnce,
 } from "@/lib/observability.mjs";
 import { agreementObjectKey } from "@/lib/storage/agreement-object-key.mjs";
 import { sha256Hex } from "@/lib/storage/object-store.mjs";
+import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
-import { agreementDocumentSends, agreementDocuments, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
+import { agreementDocumentSends, agreementDocuments, agreementSignatures, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
 
 type QueryDb = Pick<Database, "select" | "insert" | "update">;
 
@@ -76,6 +78,7 @@ function frozenFields(value: FrozenSnapshot) {
     facts: value.facts,
     label: value.label,
     text: value.text,
+    signatures: value.signatures ?? [],
   };
 }
 
@@ -177,8 +180,17 @@ async function reconcileBuilding(db: Database, store: DocumentStore, row: typeof
  * Every member of the agreement, whatever its status: a request's pieces are
  * `reserved`, an executed repo's are `live`, and the document names them all.
  */
-async function freezeSnapshot(db: QueryDb, agreement: LiveAgreementRow) {
+async function freezeSnapshot(db: QueryDb, agreement: LiveAgreementRow, stage: DocumentStage = "proposal") {
   const pieces = await livePieces(db, agreement.id);
+  const signatureRows = stage === "proposal"
+    ? []
+    : await db
+      .select()
+      .from(agreementSignatures)
+      .where(and(
+        eq(agreementSignatures.agreementId, agreement.id),
+        eq(agreementSignatures.version, agreement.version ?? 1),
+      ));
   return buildAgreementSnapshot({
     sellerName: agreement.ownerName,
     sellerEmail: agreement.email,
@@ -188,6 +200,13 @@ async function freezeSnapshot(db: QueryDb, agreement: LiveAgreementRow) {
     delivery: agreement.delivery,
     agreementCode: agreement.agreementCode ?? "",
     scale: agreement.scale,
+    stage,
+    signatures: signatureRows.map((row) => ({
+      party: row.party,
+      typedName: row.typedName,
+      signedAt: row.signedAt instanceof Date ? row.signedAt.toISOString() : String(row.signedAt),
+      snapshotHash: row.snapshotHash,
+    })),
     timepieces: pieces.map((piece) => ({
       name: [piece.brand, piece.model].filter(Boolean).join(" "),
       brand: piece.brand,
@@ -324,7 +343,7 @@ export async function insertStageDocumentRow(
   actor: Actor,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  const snapshot = await freezeSnapshot(tx, agreement);
+  const snapshot = await freezeSnapshot(tx, agreement, stage);
   if (!snapshot.ok || !snapshot.value) {
     throw new Error(snapshot.errors[0] ?? "SCALE_UNFROZEN");
   }
@@ -413,7 +432,10 @@ export async function renderStageDocument(
   });
   try {
     if (!store) throw new Error("DOCUMENT_STORE_UNAVAILABLE");
-    const pdf = await renderAgreementSnapshotPdf(row.snapshot as FrozenSnapshot);
+    const pdf = await renderAgreementSnapshotPdf({
+      ...(row.snapshot as FrozenSnapshot),
+      snapshotHash: row.snapshotHash,
+    });
     if (!pdf.ok || !pdf.bytes) {
       throw new Error(pdf.errors[0] ?? "CONTRACT_PDF_FAILED");
     }
@@ -687,6 +709,189 @@ export async function listAgreementDocumentSends(
     .from(agreementDocumentSends)
     .where(inArray(agreementDocumentSends.documentId, ids))
     .orderBy(desc(agreementDocumentSends.createdAt));
+}
+
+type ExecutedSendEmail = (message: {
+  from: string;
+  to: string[];
+  replyTo: string;
+  subject: string;
+  html: string;
+  text: string;
+  tags: { name: string; value: string }[];
+}, options?: { idempotencyKey?: string }) => Promise<{ data: { id?: string } | null; error: unknown }>;
+
+type ExecutedSendOptions = {
+  env?: NodeJS.ProcessEnv;
+  sendEmail?: ExecutedSendEmail;
+  deskEmail?: string;
+  requirePending?: boolean;
+};
+
+/**
+ * One system send per executed document and recipient (KTD23). Collector
+ * throttle does not apply. A checksum mismatch records the failure and
+ * attaches nothing (AE8).
+ */
+export async function sendExecutedDocumentEmails(
+  db: Database,
+  documentId: string,
+  store: DocumentStore | undefined,
+  options: ExecutedSendOptions = {},
+) {
+  const [row] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, documentId)).limit(1);
+  if (!row || row.stage !== "executed") return [];
+  const [agreement] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, row.liveAgreementId)).limit(1);
+  if (!agreement) return [];
+  const recipients = [
+    { recipientKind: "retail", recipientEmail: agreement.email },
+    { recipientKind: "desk", recipientEmail: options.deskEmail ?? DEFAULT_SETTINGS.financingEmail },
+  ];
+  const results = [];
+  let pending = 0;
+  for (const recipient of recipients) {
+    const [existing] = await db
+      .select()
+      .from(agreementDocumentSends)
+      .where(and(
+        eq(agreementDocumentSends.documentId, row.id),
+        eq(agreementDocumentSends.recipientKind, recipient.recipientKind),
+        eq(agreementDocumentSends.actorKind, "system"),
+      ))
+      .limit(1);
+    if (existing?.result === "accepted") {
+      results.push(existing);
+      continue;
+    }
+    pending += 1;
+    results.push(await sendSystemExecutedOnce(db, row, agreement, store, recipient, options));
+  }
+  if (options.requirePending && pending === 0) throw new Error("DOCUMENT_ALREADY_SENT");
+  return results;
+}
+
+async function sendSystemExecutedOnce(
+  db: Database,
+  row: DocumentRow,
+  agreement: LiveAgreementRow,
+  store: DocumentStore | undefined,
+  recipient: { recipientKind: string; recipientEmail: string },
+  options: ExecutedSendOptions,
+) {
+  const [existing] = await db
+    .select()
+    .from(agreementDocumentSends)
+    .where(and(
+      eq(agreementDocumentSends.documentId, row.id),
+      eq(agreementDocumentSends.recipientKind, recipient.recipientKind),
+      eq(agreementDocumentSends.actorKind, "system"),
+    ))
+    .limit(1);
+  if (existing?.result === "accepted") {
+    return existing;
+  }
+
+  let failureCode: string | null = null;
+  let bytes: Uint8Array | null = null;
+  if (!store || row.status !== "stored" || !row.objectKey || !row.checksum || row.bytes == null) {
+    failureCode = "DOCUMENT_NOT_STORED";
+  } else {
+    const body = await store.get(row.objectKey);
+    if (sha256Hex(body) !== row.checksum || body.byteLength !== row.bytes) {
+      await captureOperationalErrorOnce(
+        new Error("DOCUMENT_CHECKSUM_MISMATCH"),
+        {
+          operation: "agreement_document.send_executed",
+          errorCode: "DOCUMENT_CHECKSUM_MISMATCH",
+          recordId: row.id,
+        },
+      );
+      failureCode = "DOCUMENT_CHECKSUM_MISMATCH";
+    } else {
+      bytes = body;
+    }
+  }
+
+  const sendId = existing?.id ?? randomUUID();
+  if (!existing) {
+    try {
+      await db.insert(agreementDocumentSends).values({
+        id: sendId,
+        documentId: row.id,
+        actorKind: "system",
+        actorId: "system",
+        recipientEmail: recipient.recipientEmail,
+        recipientKind: recipient.recipientKind,
+        result: "sending",
+      });
+    } catch (error) {
+      if (uniqueConstraint(error) !== "agreement_document_sends_system_uidx") throw error;
+      const [raced] = await db
+        .select()
+        .from(agreementDocumentSends)
+        .where(and(
+          eq(agreementDocumentSends.documentId, row.id),
+          eq(agreementDocumentSends.recipientKind, recipient.recipientKind),
+          eq(agreementDocumentSends.actorKind, "system"),
+        ))
+        .limit(1);
+      if (raced?.result === "accepted") {
+        return raced;
+      }
+      if (!raced) throw error;
+      return sendSystemExecutedOnce(db, row, agreement, store, recipient, options);
+    }
+  } else {
+    await db.update(agreementDocumentSends).set({ result: "sending", failureCode: null }).where(eq(agreementDocumentSends.id, sendId));
+  }
+
+  if (failureCode || !bytes) {
+    const [failed] = await db
+      .update(agreementDocumentSends)
+      .set({ result: "failed", failureCode: failureCode ?? "DOCUMENT_NOT_STORED" })
+      .where(eq(agreementDocumentSends.id, sendId))
+      .returning();
+    return failed;
+  }
+
+  const mail = composeExecutedDocumentMail({
+    agreementCode: agreement.agreementCode ?? String(
+      (row.snapshot as { contract?: { agreementCode?: string } } | null)?.contract?.agreementCode ?? "",
+    ),
+    recipientEmail: recipient.recipientEmail,
+    inspectionCondition: INSPECTION_CONDITION,
+  });
+  try {
+    const delivered = await dispatchAgreementDocumentMail(
+      { ...mail, bytes },
+      {
+        env: options.env ?? process.env,
+        sendEmail: options.sendEmail as ((message: Record<string, unknown>) => Promise<{
+          data: { id?: string } | null;
+          error: unknown;
+        }>) | undefined,
+      },
+    );
+    const [accepted] = await db
+      .update(agreementDocumentSends)
+      .set({ result: "accepted", providerMessageId: delivered.id, failureCode: null })
+      .where(eq(agreementDocumentSends.id, sendId))
+      .returning();
+    return accepted;
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "DOCUMENT_SEND_FAILED";
+    const [failed] = await db
+      .update(agreementDocumentSends)
+      .set({ result: "failed", failureCode: code.slice(0, 80) })
+      .where(eq(agreementDocumentSends.id, sendId))
+      .returning();
+    await captureOperationalError(error, {
+      operation: "agreement_document.send_executed",
+      errorCode: "DOCUMENT_SEND_FAILED",
+      recordId: sendId,
+    });
+    return failed;
+  }
 }
 
 async function countRecentSends(
