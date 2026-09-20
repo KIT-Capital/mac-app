@@ -33,6 +33,41 @@ type ListedDocument = {
   snapshotHash?: string;
 };
 
+type LoadedDocuments = {
+  mode: "browser" | "live" | "unavailable";
+  documents: ListedDocument[];
+  events: RetailThreadEvent[];
+};
+
+async function fetchAgreementDocuments(agreementId: string): Promise<LoadedDocuments> {
+  const response = await fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreementId)}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  const body = (await response.json().catch(() => null)) as {
+    mode?: string;
+    error?: string;
+    documents?: ListedDocument[];
+    events?: RetailThreadEvent[];
+  } | null;
+  if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+    window.location.replace("/admin/password");
+    return { mode: "browser", documents: [], events: [] };
+  }
+  if (body?.mode === "live") {
+    return {
+      mode: "live",
+      documents: Array.isArray(body.documents) ? body.documents : [],
+      events: Array.isArray(body.events) ? body.events : [],
+    };
+  }
+  if (body?.mode === "unavailable") {
+    // A missing live prerequisite is not browser mode: no preview mint, no stored list.
+    return { mode: "unavailable", documents: [], events: [] };
+  }
+  return { mode: "browser", documents: [], events: [] };
+}
+
 function moneyExact(amount: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -105,49 +140,35 @@ export default function AgreementDetailPage() {
       })
     : { ok: false, errors: ["AGREEMENT_NOT_FOUND"], value: null };
 
-  async function loadDocuments(): Promise<{ mode: "browser" | "live" | "unavailable"; documents: ListedDocument[] }> {
-    if (!agreement) return { mode: "browser", documents: [] };
-    const response = await fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreement.id)}`, {
-      credentials: "include",
-      cache: "no-store",
-    });
-    const body = (await response.json().catch(() => null)) as {
-      mode?: string;
-      error?: string;
-      documents?: ListedDocument[];
-      events?: RetailThreadEvent[];
-    } | null;
-    if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
-      window.location.replace("/admin/password");
-      return { mode: "browser", documents: [] };
-    }
-    if (body?.mode === "live") {
-      const listed = Array.isArray(body.documents) ? body.documents : [];
-      setBookMode("live");
-      setDocuments(listed);
-      setThreadEvents(Array.isArray(body.events) ? body.events : []);
-      return { mode: "live", documents: listed };
-    }
-    if (body?.mode === "unavailable") {
-      // A missing live prerequisite is not browser mode: no preview mint, no stored list.
-      setBookMode("unavailable");
-      setDocuments([]);
-      return { mode: "unavailable", documents: [] };
-    }
-    setBookMode("browser");
-    setDocuments([]);
-    return { mode: "browser", documents: [] };
+  function applyDocuments(loaded: LoadedDocuments) {
+    setBookMode(loaded.mode);
+    setDocuments(loaded.documents);
+    if (loaded.mode === "live") setThreadEvents(loaded.events);
+  }
+
+  async function loadDocuments(): Promise<LoadedDocuments> {
+    if (!agreement) return { mode: "browser", documents: [], events: [] };
+    const loaded = await fetchAgreementDocuments(agreement.id);
+    applyDocuments(loaded);
+    return loaded;
   }
 
   useEffect(() => {
     if (!agreement) return;
     let cancelled = false;
-    loadDocuments().catch(() => {
-      if (!cancelled) {
-        setBookMode("browser");
-        setDocuments([]);
-      }
-    });
+    fetchAgreementDocuments(agreement.id)
+      .then((loaded) => {
+        if (cancelled) return;
+        setBookMode(loaded.mode);
+        setDocuments(loaded.documents);
+        if (loaded.mode === "live") setThreadEvents(loaded.events);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBookMode("browser");
+          setDocuments([]);
+        }
+      });
     return () => {
       cancelled = true;
     };
