@@ -106,6 +106,29 @@ describe("live-book adapter mapping", () => {
     assert.equal(state.agreements[0].executedOn, undefined);
   });
 
+  it("does not turn an unrecognised status into an active repo", () => {
+    const state = mapLiveBookRows({
+      customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
+      timepieces: [{ id: "piece-a", customerId: "cust-a" }],
+      agreements: [{
+        id: "odd-a",
+        customerId: "cust-a",
+        amountCents: 10000,
+        termMonths: 12,
+        delivery: "",
+        ownerName: "A",
+        email: "a@example.com",
+        status: "not-a-real-status",
+        createdOn: "2026-01-01",
+      }],
+      members: [{ agreementId: "odd-a", timepieceId: "piece-a", status: "live" }],
+      ends: [],
+      previews: [],
+    });
+    assert.equal(state.agreements[0].status, "not-a-real-status");
+    assert.equal(state.agreements[0].executedOn, undefined);
+  });
+
   it("keeps collector reads scoped while desk reads all rows", () => {
     const rows = {
       customers: [

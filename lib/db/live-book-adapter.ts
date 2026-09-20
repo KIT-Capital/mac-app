@@ -216,13 +216,15 @@ const AGREEMENT_STATUSES: readonly AgreementStatus[] = [
 
 /**
  * Carry a stored status through as-is. Collapsing an unrecognised value to a
- * legacy one would let the legacy mapping convert a live request into an
- * executed repo.
+ * legacy one would let the legacy mapping turn it into an executed, live repo:
+ * a malformed import would silently become an active repo holding pieces.
+ * An unknown value stays itself, so it has no book label and holds nothing
+ * until someone looks at it. Only a missing value takes the legacy default.
  */
 function agreementStatus(value: unknown): AgreementStatus {
-  return AGREEMENT_STATUSES.includes(value as AgreementStatus)
-    ? (value as AgreementStatus)
-    : "pending_signature";
+  if (AGREEMENT_STATUSES.includes(value as AgreementStatus)) return value as AgreementStatus;
+  const text = typeof value === "string" ? value.trim() : "";
+  return text ? (text as AgreementStatus) : "pending_signature";
 }
 
 function profile(row: Row): Profile {
