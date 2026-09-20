@@ -2,13 +2,15 @@ import { expect, test } from "@playwright/test";
 import { issueDeskToken } from "../lib/desk-session";
 import { DEFAULT_SETTINGS } from "../lib/theme";
 import {
-  APPRAISER,
   DESK,
   DESK_PASSWORD,
   HALE,
+  addTimepieceWithPhotos,
   completeTimepieceIntakePhotos,
   openCollectorAgreements,
   openDeskAgreements,
+  openDeskReview,
+  sendForAppraisal,
   signIn,
   signInAppraiser,
   signInDesk,
@@ -172,27 +174,106 @@ test.describe("desk", () => {
     await expect(page.getByText("one-time-password-value")).toHaveCount(0);
   });
 
-  test("desk appraises a reviewing piece from the catalog range", async ({ page }) => {
+  test("appraiser accepts from the queue and the collector sees a provisional value", async ({ page }) => {
     await signInHale(page);
-    await page.getByRole("link", { name: /Logical One/ }).click();
-    if (await page.getByRole("button", { name: "Request Certified Appraisal" }).isVisible()) {
-      await page.getByRole("button", { name: "Request Certified Appraisal" }).click();
-      await expect(page.getByText(/Desk specialists are reviewing/i)).toBeVisible();
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+    await sendForAppraisal(page);
+    await signOutFromMenu(page);
+
+    await signInAppraiser(page);
+    await openDeskReview(page, "UR-100V");
+    await page.getByRole("radio", { name: "Accept", exact: true }).check();
+    // A blank Accept must never be able to record a $0 appraisal.
+    await page.getByLabel("Appraisal value").fill("");
+    await expect(page.getByRole("button", { name: "Decide" })).toBeDisabled();
+    await page.getByLabel("Range low").fill("100000");
+    await page.getByLabel("Range high").fill("140000");
+    await page.getByLabel("Appraisal value").fill("150000");
+    await expect(page.getByText(/above the advisory range/i)).toBeVisible();
+    await page.getByRole("button", { name: "Decide" }).click();
+    await expect(page.getByRole("button", { name: "Reopen decision" })).toBeVisible();
+    await signOutFromMenu(page);
+
+    await signInHale(page);
+    await page.getByRole("link", { name: /UR-100V/ }).click();
+    await expect(page.getByTestId("appraisal-state")).toHaveText("Accepted");
+    await expect(page.getByText("$150,000")).toBeVisible();
+    await expect(page.getByText(/Provisional — physical inspection required/i)).toBeVisible();
+    await expect(page.getByText(/attempt 1 of 3/i)).toBeVisible();
+
+    await page.goto("/appraisal");
+    await expect(page.getByText("UR-100V")).toBeVisible();
+    await expect(page.getByText("$150,000")).toBeVisible();
+    await expect(page.getByText(/liquidation/i)).toHaveCount(0);
+    await expect(page.getByText(/loan/i)).toHaveCount(0);
+  });
+
+  test("appraiser refuses and the collector sees not accepted with the attempt count", async ({ page }) => {
+    await signInHale(page);
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+    await sendForAppraisal(page);
+    await signOutFromMenu(page);
+
+    await signInAppraiser(page);
+    await openDeskReview(page, "UR-100V");
+    await page.getByRole("radio", { name: /Does not meet appraisal criteria/i }).check();
+    await page.getByRole("button", { name: "Decide" }).click();
+    await expect(page.getByRole("button", { name: "Reopen decision" })).toBeVisible();
+    await signOutFromMenu(page);
+
+    await signInHale(page);
+    await page.getByRole("link", { name: /UR-100V/ }).click();
+    await expect(page.getByTestId("appraisal-state")).toHaveText("Not accepted");
+    await expect(page.getByText(/does not meet the MAC appraisal criteria/i)).toBeVisible();
+    await expect(page.getByText(/attempt 1 of 3/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Edit details/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toBeEnabled();
+  });
+
+  test("admin opens the appraisal review read-only", async ({ page }) => {
+    await signInHale(page);
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+    await sendForAppraisal(page);
+    await signOutFromMenu(page);
+
+    await signInDesk(page);
+    await openDeskReview(page, "UR-100V");
+    await expect(page.getByRole("button", { name: "Decide" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Return with note" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reopen decision" })).toHaveCount(0);
+    await expect(page.getByText(/Appraiser or super admin required/i)).toBeVisible();
+  });
+
+  test("three refusals close the piece to further appraisal", async ({ page }) => {
+    await signInHale(page);
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+
+    for (let round = 1; round <= 3; round += 1) {
+      await sendForAppraisal(page);
+      await signOutFromMenu(page);
+      await signInAppraiser(page);
+      await openDeskReview(page, "UR-100V");
+      await page.getByRole("radio", { name: /Does not meet appraisal criteria/i }).check();
+      await page.getByRole("button", { name: "Decide" }).click();
+      await expect(page.getByRole("button", { name: "Reopen decision" })).toBeVisible();
+      await signOutFromMenu(page);
+      await signInHale(page);
+      await page.getByRole("link", { name: /UR-100V/ }).click();
+      await expect(page.getByText(new RegExp(`attempt ${round} of 3`, "i"))).toBeVisible();
     }
-    await page.goto("/login");
-    await signIn(page, APPRAISER, DESK_PASSWORD);
-    await page.getByRole("link", { name: "Client Assets" }).click();
-    const row = page.getByRole("row").filter({ hasText: "Logical One" });
-    await row.getByRole("button", { name: "Appraise" }).click();
-    await expect(row.getByText("$145,000 – $175,000")).toBeVisible();
+
+    await expect(page.getByTestId("appraisal-state")).toHaveText("Closed");
+    await expect(page.getByText(/Appraisal closed/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toHaveCount(0);
   });
 
   test("admin reads appraisal numbers but cannot write them", async ({ page }) => {
     await signInDesk(page);
     await page.getByRole("link", { name: "Client Assets" }).click();
     const row = page.getByRole("row").filter({ hasText: "Royal Oak Selfwinding" });
-    await expect(row.getByRole("button", { name: "Appraise" })).toBeDisabled();
-    await expect(row.getByRole("button", { name: "Review" })).toBeEnabled();
+    await expect(row.getByText("$38,000 – $48,000")).toBeVisible();
+    // One-click appraisal is gone; a value is only written by deciding a submission.
+    await expect(page.getByRole("button", { name: "Appraise" })).toHaveCount(0);
     await page.getByRole("link", { name: "Timepiece Catalog" }).click();
     await expect(page.getByTestId("catalog-read-only")).toBeVisible();
     await expect(page.getByRole("button", { name: "Add Reference" })).toBeHidden();

@@ -35,17 +35,57 @@ export async function signInAppraiser(page: Page) {
   await expect(page.getByText(/Desk ·/)).toBeVisible();
 }
 
-export async function appraiseHaleRoyalOak(page: Page) {
+/**
+ * Give Hale one accepted, purchaseable piece through the real appraisal path:
+ * the collector submits evidence and an appraiser decides it.
+ */
+export async function appraiseNewHalePiece(page: Page, model = "UR-100V") {
+  await signInHale(page);
+  await addTimepieceWithPhotos(page, "Urwerk", model);
+  await sendForAppraisal(page);
+  await signOutFromMenu(page);
+
   await signInAppraiser(page);
-  await page.getByRole("link", { name: "Client Assets" }).click();
-  const row = page.getByRole("row").filter({ hasText: "Royal Oak Selfwinding" });
-  await row.getByRole("button", { name: "Appraise" }).click();
-  await expect(row.getByText(/\$\d/)).toBeVisible();
+  await openDeskReview(page, model);
+  await page.getByRole("radio", { name: "Accept", exact: true }).check();
+  await page.getByLabel("Range low").fill("100000");
+  await page.getByLabel("Range high").fill("140000");
+  await page.getByLabel("Appraisal value").fill("120000");
+  await page.getByRole("button", { name: "Decide" }).click();
+  await expect(page.getByRole("button", { name: "Reopen decision" })).toBeVisible();
   await signOutFromMenu(page);
 }
 
 export async function openMenu(page: Page) {
   await page.getByRole("button", { name: "Open menu" }).click();
+}
+
+/** Intake a piece that carries every required shot, so it can be submitted. */
+export async function addTimepieceWithPhotos(page: Page, brand: string, model: string) {
+  await page.goto("/collection/add");
+  await page.getByRole("button", { name: /Missing a brand/i }).click();
+  await page.getByPlaceholder("Manufacturer name").fill(brand);
+  await page.getByLabel(/Your Model/).fill(model);
+  await completeTimepieceIntakePhotos(page);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: model })).toBeVisible();
+}
+
+export async function sendForAppraisal(page: Page, note?: string) {
+  if (note) await page.getByLabel("Anything MAC should know?").fill(note);
+  await page.getByRole("button", { name: "Send for appraisal" }).click();
+  await expect(page.getByTestId("appraisal-state")).toHaveText("With MAC");
+}
+
+export async function openDeskReview(page: Page, model: string) {
+  await page.getByRole("link", { name: "Client Assets" }).click();
+  await page
+    .getByRole("row")
+    .filter({ hasText: model })
+    .getByRole("link", { name: "Review" })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: /Appraisal review/i })).toBeVisible();
 }
 
 export async function openCollectorAgreements(page: Page) {

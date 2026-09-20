@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { HALE, appraiseHaleRoyalOak, completeTimepieceIntakePhotos, openCollectorAgreements, openMenu, signIn, signInHale, signOutFromMenu } from "./helpers";
+import { HALE, addTimepieceWithPhotos, appraiseNewHalePiece, completeTimepieceIntakePhotos, openCollectorAgreements, openMenu, sendForAppraisal, signIn, signInHale, signOutFromMenu } from "./helpers";
 
 test.describe("collector app", () => {
   test("splash shows the official lockup and collector actions", async ({ page }) => {
@@ -124,11 +124,43 @@ test.describe("collector app", () => {
     await fresh.close();
   });
 
-  test("requesting appraisal sends the piece to reviewing", async ({ page }) => {
+  test("sending a piece for appraisal shows With MAC and locks the piece", async ({ page }) => {
+    await signInHale(page);
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+    await expect(page.getByTestId("appraisal-state")).toHaveText("Not sent");
+    await expect(page.getByText(/attempt \d of 3/i)).toHaveCount(0);
+
+    await sendForAppraisal(page, "Serviced last spring.");
+
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Edit details/i })).toBeDisabled();
+    await expect(page.getByText(/attempt \d of 3/i)).toHaveCount(0);
+    await expect(page.getByText(/reviewing|under review/i)).toHaveCount(0);
+  });
+
+  test("a piece missing a guided photo names the shot instead of failing", async ({ page }) => {
     await signInHale(page);
     await page.getByRole("link", { name: /Logical One/ }).click();
-    await page.getByRole("button", { name: "Request Certified Appraisal" }).click();
-    await expect(page.getByText(/Desk specialists are reviewing/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toBeDisabled();
+    await expect(page.getByText(/a photo of the back of the timepiece/i)).toBeVisible();
+    await expect(page.getByText(/a photo of the clasp or band/i)).toBeVisible();
+  });
+
+  test("a legacy reviewing piece is not stranded on a review that never existed", async ({ page }) => {
+    await signInHale(page);
+    await page.getByRole("link", { name: /Royal Oak Selfwinding/ }).click();
+    await expect(page.getByTestId("appraisal-state")).toHaveText("Not sent");
+    await expect(page.getByRole("button", { name: /Edit details/i })).toBeEnabled();
+  });
+
+  test("intake records the piece without sending it to MAC", async ({ page }) => {
+    await signInHale(page);
+    await page.goto("/collection/add");
+    // Submitting is a separate, evidence-freezing step on the detail screen.
+    await expect(page.getByRole("button", { name: "Appraise" })).toHaveCount(0);
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+    await expect(page.getByTestId("appraisal-state")).toHaveText("Not sent");
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toBeEnabled();
   });
 
   test("saving a timepiece without photos asks for the guided shots", async ({ page }) => {
@@ -490,9 +522,7 @@ test.describe("collector app", () => {
   });
 
   test("repurchase application is in dollars and creates a signable agreement", async ({ page }) => {
-    await signInHale(page);
-    await signOutFromMenu(page);
-    await appraiseHaleRoyalOak(page);
+    await appraiseNewHalePiece(page);
     await signInHale(page);
     await page.goto("/repurchase");
     await expect(page.getByText(/Enter Amount Up to/i)).toBeVisible();

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { catalogAppraisalPatch, catalogValuation } from "./catalog";
+import { catalogValuation } from "./catalog";
 
 describe("catalogValuation", () => {
   it("uses the matched desk catalog eligibility", () => {
@@ -90,8 +90,8 @@ describe("catalogValuation", () => {
     assert.equal(valuation.financeable, true);
   });
 
-  it("builds one current appraisal snapshot for the desk update", () => {
-    const patch = catalogAppraisalPatch(
+  it("prefills the appraiser's advisory range from a catalog match", () => {
+    const suggested = catalogValuation(
       {
         brand: "Audemars Piguet",
         model: "Royal Oak Selfwinding",
@@ -106,12 +106,9 @@ describe("catalogValuation", () => {
         typicalHigh: 65000,
         financeable: true,
       }],
-      "2026-09-19",
     );
 
-    assert.deepEqual(patch, {
-      status: "appraised",
-      evaluatedAt: "2026-09-19",
+    assert.deepEqual(suggested, {
       valueLow: 50000,
       valueHigh: 65000,
       financeable: true,

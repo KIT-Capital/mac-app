@@ -1,16 +1,19 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Clock, XCircle } from "lucide-react";
 import { WatchPhoto } from "@/components/watch-photo";
+import { APPRAISAL_WORDS } from "@/lib/appraisal-words";
 import { moneyRange } from "@/lib/catalog";
-import type { Timepiece } from "@/lib/types";
+import type { AppraisalStateWord, Timepiece } from "@/lib/types";
 
-const STATUS: Record<Timepiece["status"], string> = {
-  appraised: "Appraised",
-  reviewing: "Reviewing",
-  not_evaluated: "Not evaluated",
-};
-
-export function WatchCard({ watch }: { watch: Timepiece }) {
+export function WatchCard({
+  watch,
+  word,
+  decisionsUsed,
+}: {
+  watch: Timepiece;
+  word: AppraisalStateWord;
+  decisionsUsed: number;
+}) {
   return (
     <Link href={`/collection/${watch.id}`} className="block">
       <div className="aspect-square w-full overflow-hidden bg-mac-card">
@@ -22,8 +25,11 @@ export function WatchCard({ watch }: { watch: Timepiece }) {
         />
       </div>
       <p className="mt-2 flex items-center gap-1 text-[10px] tracking-[0.12em] text-mac-faint uppercase">
-        {STATUS[watch.status]}
-        {watch.status === "appraised" ? <Check className="h-3 w-3" strokeWidth={2.5} /> : null}
+        {APPRAISAL_WORDS[word]}
+        {word === "accepted" ? <Check className="h-3 w-3" strokeWidth={2.5} /> : null}
+        {word === "not_accepted" ? <XCircle className="h-3 w-3" /> : null}
+        {word === "with_mac" ? <Clock className="h-3 w-3" /> : null}
+        {decisionsUsed > 0 ? <span className="text-mac-faint">{decisionsUsed}/3</span> : null}
       </p>
       <p className="mt-1 text-[13px] leading-tight text-mac-fg">{watch.brand}</p>
       <p className="text-[13px] leading-tight text-mac-fg">{watch.model}</p>

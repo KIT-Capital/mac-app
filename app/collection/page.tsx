@@ -5,11 +5,12 @@ import { FileDown, Plus } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { WatchCard } from "@/components/watch-card";
 import { WatchPhoto } from "@/components/watch-photo";
+import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function CollectionPage() {
-  const { user } = useStore();
+  const { user, appraisalAttempts } = useStore();
   const { timepieces } = useOwnedAssets();
   const empty = timepieces.length === 0;
 
@@ -62,9 +63,17 @@ export default function CollectionPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-3 md:gap-5 xl:grid-cols-4">
-            {timepieces.map((watch) => (
-              <WatchCard key={watch.id} watch={watch} />
-            ))}
+            {timepieces.map((watch) => {
+              const view = appraisalView(appraisalAttempts, watch.id, watch);
+              return (
+                <WatchCard
+                  key={watch.id}
+                  watch={watch}
+                  word={view.word}
+                  decisionsUsed={view.decisionsUsed}
+                />
+              );
+            })}
           </div>
         )}
 
