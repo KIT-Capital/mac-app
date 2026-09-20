@@ -147,6 +147,13 @@ function settings(rows: Row[]): AppSettings {
       typeof row.membershipMonthlyCents === "number"
         ? row.membershipMonthlyCents / 100
         : DEFAULT_SETTINGS.membershipMonthly,
+    // The Desk's minimum sale amount (R28). Still named `minAdvance` on the
+    // client until KTD20 renames it; projecting it keeps the browser check
+    // and the server refusal on the same number.
+    minAdvance:
+      typeof row.minSaleAmountCents === "number"
+        ? row.minSaleAmountCents / 100
+        : DEFAULT_SETTINGS.minAdvance,
     vaultLocation: text(row, "vaultLocation", DEFAULT_SETTINGS.vaultLocation),
     requiredPhotoKinds: normalizeRequiredPhotoKinds(
       row.requiredPhotoKinds as string[] | undefined,

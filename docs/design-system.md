@@ -10,7 +10,7 @@ Kit `design-system.md` (Inter, house report faces) is **not** this product. Do n
 
 | Token | Hex | Use |
 |---|---|---|
-| Navy | `#0E2A44` | Headers, Sign in, Appraise, Send Application |
+| Navy | `#0E2A44` | Headers, Sign in, Appraise, Apply |
 | Gold | `#FCB040` | CAPITAL wordmark, active tab, desk accents |
 | Champagne | `#E8D5C0` | Add-timepiece FAB |
 | Black / ink / field | `#000000` / `#111111` / `#0A0A0A` | Dark collector surfaces |

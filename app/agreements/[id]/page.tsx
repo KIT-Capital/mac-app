@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
-import { COMPANY, hasApplication, maxPurchaseAmount, money } from "@/lib/catalog";
-import { LIVE_WATCH_CONFLICT, bookLabel, isLiveBookLabel, heldWatchIds } from "@/lib/contract/repo-book.mjs";
+import { COMPANY, hasApplication, money } from "@/lib/catalog";
+import { REQUEST_STATES, bookLabel } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
 import { PENDING_COUNSEL_LABEL, buildAgreementSnapshot } from "@/lib/contract/repo-agreement-snapshot.mjs";
+import { retailRequestWord } from "@/lib/contract/request-transitions.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
+import type { Agreement } from "@/lib/types";
 
 type ListedDocument = {
   id: string;
@@ -19,6 +21,26 @@ type ListedDocument = {
   checksum?: string | null;
   templateVersion?: string;
 };
+
+/** A row that has not executed is a request; executed and legacy rows read the book. */
+function isRequestRow(agreement: Agreement) {
+  return (
+    !agreement.executedOn &&
+    (REQUEST_STATES.includes(agreement.status) || agreement.status === "closed")
+  );
+}
+
+/** The one line a retail user reads under each of the four words (R29). */
+function requestLine(word: ReturnType<typeof retailRequestWord>) {
+  switch (word) {
+    case "Your turn":
+      return "MAC confirmed your request. Signing arrives with the next update.";
+    case "Closed":
+      return "This request is closed.";
+    default:
+      return "MAC is reviewing your request.";
+  }
+}
 
 function moneyExact(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -31,16 +53,15 @@ function moneyExact(amount: number) {
 
 export default function AgreementDetailPage() {
   const params = useParams<{ id: string }>();
-  const { signAgreement, addAgreementWatches, setAgreementAmount, user, settings, shells, agreements: book } =
-    useStore();
+  const { signAgreement, withdrawRequest, declineRequest, user, settings } = useStore();
   const { agreements, timepieces } = useOwnedAssets();
   const agreement = agreements.find((a) => a.id === params.id);
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
   const [started, setStarted] = useState(false);
   const [pdfError, setPdfError] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [pieceError, setPieceError] = useState("");
-  const [raiseAmount, setRaiseAmount] = useState("");
+  const [requestError, setRequestError] = useState("");
+  const [requestBusy, setRequestBusy] = useState(false);
   const [bookMode, setBookMode] = useState<"browser" | "live" | "unavailable">("browser");
   const [documents, setDocuments] = useState<ListedDocument[]>([]);
   const [docError, setDocError] = useState("");
@@ -281,122 +302,75 @@ export default function AgreementDetailPage() {
       <main className="flex flex-1 items-center justify-center text-mac-faint">Agreement not found.</main>
     );
   }
-  const liveAgreement = agreement;
+  const request = isRequestRow(agreement);
+  const word = retailRequestWord(agreement);
+  // Before inspection nothing moves the amount or the pieces (KTD8): the
+  // owner's only exits are to withdraw, or to decline a confirmed request.
+  const canWithdraw = request && (agreement.status === "submitted" || agreement.status === "returned");
+  const canDecline = request && agreement.status === "returned";
 
-  // A signed repo is frozen. Signature state now lives on `signedAt` rather
-  // than a status the request model replaced.
-  const live =
-    isLiveBookLabel(bookLabel(liveAgreement)) &&
-    !liveAgreement.signedAt &&
-    !liveAgreement.bookEnd;
-  const openShell = shells.find((shell) => shell.status === "open");
-  const share = openShell?.ltv || settings.maxLtv;
-  const cap = watches.reduce(
-    (sum, watch) => sum + maxPurchaseAmount(watch.valueLow, watch.valueHigh, share),
-    0,
-  );
-  const held = heldWatchIds(book);
-  const freePieces = timepieces.filter(
-    (watch) =>
-      watch.status === "appraised" &&
-      watch.financeable &&
-      !liveAgreement.watchIds.includes(watch.id) &&
-      !held.has(watch.id),
-  );
-
-  async function addFreePiece(watchId: string) {
-    const result = await addAgreementWatches(liveAgreement.id, [watchId]);
-    if (!result.ok) {
-      setPieceError(
-        result.error === LIVE_WATCH_CONFLICT
-          ? "That timepiece is already on a live repo."
-          : "That timepiece is not free to add to this repo.",
-      );
-      return;
-    }
-    setPieceError("");
-  }
-
-  async function onRaiseAmount() {
-    const n = Number(raiseAmount.replace(/[^0-9.]/g, ""));
-    const result = await setAgreementAmount(liveAgreement.id, n);
-    if (!result.ok) {
-      setPieceError(
-        result.error === "OVER_LTV"
-          ? `The desk can purchase up to ${money(cap)} on these appraisals.`
-          : result.error === "AMOUNT_RAISE_FORBIDDEN"
-            ? "The sale amount can only be lowered."
-            : "Enter a sale amount the desk can purchase.",
-      );
-      return;
-    }
-    setPieceError("");
-    setRaiseAmount("");
+  async function onRequestExit(kind: "withdraw" | "decline") {
+    if (!agreement || requestBusy) return;
+    setRequestBusy(true);
+    setRequestError("");
+    const result = kind === "withdraw"
+      ? await withdrawRequest(agreement.id)
+      : await declineRequest(agreement.id);
+    setRequestBusy(false);
+    if (!result.ok) setRequestError("That could not be recorded. Refresh and try again.");
   }
 
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Repurchase Agreement" backHref="/agreements" />
       <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-relaxed text-mac-muted">
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-mac-line bg-mac-card p-3">
-          <div>
-            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Book: {bookLabel(agreement)}</span>
-            <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
-          </div>
-          {!agreement.signedAt ? (
-            <button
-              onClick={() => setStarted(true)}
-              className="rounded-lg bg-[#FCB040] px-4 py-2 text-[11px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm"
-            >
-              {started ? "Ready to Sign" : "Review Terms"}
-            </button>
-          ) : null}
-        </div>
-
-        {live ? (
-          <div className="mb-4 space-y-3 rounded-xl border border-mac-line bg-mac-card p-3">
-            <p className="text-[12px] text-mac-muted">
-              Free appraised timepieces can join this repo. You may raise the sale amount only up to
-              the desk purchase cap of {money(cap)}.
-            </p>
-            {freePieces.length ? (
-              <ul className="space-y-2">
-                {freePieces.map((watch) => (
-                  <li key={watch.id} className="flex items-center justify-between gap-3 text-[13px]">
-                    <span>
-                      {watch.brand} {watch.model}
-                    </span>
-                    <button
-                      type="button"
-                      className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
-                      onClick={() => addFreePiece(watch.id)}
-                    >
-                      Add to this repo
-                    </button>
-                  </li>
-                ))}
-              </ul>
+        {request ? (
+          <div className="mb-4 rounded-xl border border-mac-line bg-mac-card p-3">
+            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">{word}</span>
+            <p className="text-[12px] text-mac-muted">Request #{agreement.agreementCode || agreement.id}</p>
+            <p className="mt-2 text-[13px] text-mac-fg">{requestLine(word)}</p>
+            {canWithdraw || canDecline ? (
+              <div className="mt-3 flex gap-4">
+                {canDecline ? (
+                  <button
+                    type="button"
+                    disabled={requestBusy}
+                    className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase disabled:opacity-40"
+                    onClick={() => void onRequestExit("decline")}
+                  >
+                    Decline
+                  </button>
+                ) : null}
+                {canWithdraw ? (
+                  <button
+                    type="button"
+                    disabled={requestBusy}
+                    className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase disabled:opacity-40"
+                    onClick={() => void onRequestExit("withdraw")}
+                  >
+                    Withdraw
+                  </button>
+                ) : null}
+              </div>
             ) : null}
-            <div className="flex gap-2">
-              <input
-                aria-label="Raise sale amount"
-                inputMode="numeric"
-                value={raiseAmount}
-                onChange={(event) => setRaiseAmount(event.target.value)}
-                placeholder={money(Math.min(agreement.amount, cap || agreement.amount))}
-                className="min-w-0 flex-1 bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
-              />
-              <button
-                type="button"
-                className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
-                onClick={onRaiseAmount}
-              >
-                Update amount
-              </button>
-            </div>
-            {pieceError ? <p className="text-xs text-red-400">{pieceError}</p> : null}
+            {requestError ? <p className="mt-2 text-xs text-red-400">{requestError}</p> : null}
           </div>
-        ) : null}
+        ) : (
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-mac-line bg-mac-card p-3">
+            <div>
+              <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Book: {bookLabel(agreement)}</span>
+              <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
+            </div>
+            {!agreement.signedAt ? (
+              <button
+                onClick={() => setStarted(true)}
+                className="rounded-lg bg-[#FCB040] px-4 py-2 text-[11px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm"
+              >
+                {started ? "Ready to Sign" : "Review Terms"}
+              </button>
+            ) : null}
+          </div>
+        )}
 
         <article className="space-y-4 rounded-2xl bg-white p-5 text-[#1a1a1a] shadow-md font-sans">
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
@@ -618,16 +592,20 @@ export default function AgreementDetailPage() {
           </div>
         ) : null}
         {pdfError ? <p className="mb-2 text-center text-[12px] text-red-300">{pdfError}</p> : null}
-        <p className="mb-2 text-center text-[11px] text-mac-faint">
-          Electronic signing is not available.
-        </p>
-        <PillButton
-          variant="gold"
-          disabled={!started || Boolean(agreement.signedAt)}
-          onClick={() => signAgreement(agreement.id)}
-        >
-          {agreement.signedAt ? "Executed & Verified" : "Sign Repurchase Agreement"}
-        </PillButton>
+        {request ? null : (
+          <>
+            <p className="mb-2 text-center text-[11px] text-mac-faint">
+              Electronic signing is not available.
+            </p>
+            <PillButton
+              variant="gold"
+              disabled={!started || Boolean(agreement.signedAt)}
+              onClick={() => signAgreement(agreement.id)}
+            >
+              {agreement.signedAt ? "Executed & Verified" : "Sign Repurchase Agreement"}
+            </PillButton>
+          </>
+        )}
         <p className="mt-2 text-center text-[11px] text-mac-faint">
           Custody Questions: {COMPANY.phone} · {COMPANY.financingEmail}
         </p>

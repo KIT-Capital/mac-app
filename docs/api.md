@@ -1,6 +1,6 @@
 # API
 
-**Tier: CONTRACT** · Last verified: 2026-09-18
+**Tier: CONTRACT** · Last verified: 2026-09-20
 
 There is no tRPC router. Server surface is App Router handlers. Everything else is client state.
 
@@ -175,8 +175,21 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   desk viewers are rebuilt from the trusted desk-role profiles.
 - `POST` accepts a validated operation action, never a whole-book snapshot.
   Collector actions are limited to own profile, intake-safe piece fields, own
-  pending repos, collector signature, eligible added pieces, and permitted amount
-  raises. Appraisal actions are `appraisal.submit` (retail owner),
+  requests, and the collector signature on legacy rows. Request actions are
+  `request.submit` (retail owner: 1–200 owned pieces whose Accept is current
+  within seven days, a term, a whole-dollar amount at or above the Desk minimum
+  and at or below the frozen per-piece caps, a delivery method, an optional
+  note; five per customer per day, else `THROTTLED`), `request.deskReturn`
+  (any desk role, `decision: confirm | decline` — never an amount),
+  `request.decline` and `request.withdraw` (retail owner), and
+  `request.flagCustomerSuccess` (desk, internal). Every transition carries
+  `expectedStatus` and `expectedVersion`; a stale row is `AGREEMENT_STATE_CONFLICT`
+  and a foreign id is `AGREEMENT_NOT_FOUND`. A request left in "Your turn" past
+  the response window closes as expired on the next touch and the touch is
+  refused with `REQUEST_EXPIRED`. The Desk never changes the amount before
+  inspection. Submit reserves the pieces, writes the event, and inserts the
+  `proposal` document row; the PDF renders after commit and re-renders on read.
+  Appraisal actions are `appraisal.submit` (retail owner),
   `appraisal.return`, `appraisal.decide`, and `appraisal.reopen` (appraiser or
   super admin). A submission freezes piece fields plus normalized stored-photo
   evidence. At most three completed decisions are allowed; Return consumes none.
@@ -204,13 +217,18 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   previews are never included in ordinary mutations.
 - Store actions that show success await the live mutation response; rejected or
   timed-out operations reconcile before returning a stable failure.
-- Signed or ended agreements reject repeated signing, scale edits, removal,
-  added pieces, and amount changes with `AGREEMENT_IMMUTABLE`; the UI hides
-  controls that no longer apply.
-- In live mode `agreement.create` and `agreement.renew` ignore any client scale
-  and derive the new row's frozen scale inside the transaction from server
-  settings and the open agreement shell. Existing frozen agreement scales are
-  never recomputed when settings or shells change.
+- Requests, signed, and ended agreements reject scale edits, removal, and
+  legacy signing with `AGREEMENT_IMMUTABLE`; the UI hides controls that no
+  longer apply. `agreement.create`, `agreement.addWatches`, and
+  `agreement.setAmount` no longer exist; a piece set or amount change is a
+  withdraw and a new request.
+- In live mode `request.submit` and `agreement.renew` ignore any client scale
+  and derive the new row's frozen scale and per-piece caps inside the
+  transaction from server settings and the open agreement shell. Existing
+  frozen scales are never recomputed when settings or shells change.
+- Every stage document states that MAC accepts only after physical inspection
+  of each timepiece and other checks, will re-appraise each timepiece on
+  inspection, and reserves the right not to execute.
 
 ## Client store
 

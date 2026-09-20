@@ -1,6 +1,6 @@
 # Users, timepieces, and repos
 
-**Tier: CONTRACT** · Last verified: 2026-09-19
+**Tier: CONTRACT** · Last verified: 2026-09-20
 
 This is the lifecycle map for Mechanical Art Capital. Money math stays in `business-logic.md`. Visual chrome stays in `design-system.md`. Identity implementation that is **not yet in the app** lives in `plans/2026-09-19-roles-identity-repo-parties-plan.md` and is marked **proposed** below. Do not treat proposed boxes as shipped.
 
@@ -21,6 +21,9 @@ Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-l
 | Appraisal value (retail) | Appraiser-entered dollar value | May sit outside the range with a warning only |
 | Liquidation value (desk) | The same appraiser-entered dollar value | 47th Street wholesale if the retail party does not buy back |
 | Free piece | Not on any active repo | May join a new application |
+| Request (retail) | **With MAC**, **Your turn**, **Active**, **Closed** | The only four words a collector or dealer reads for a request; internal states never appear |
+| Current appraisal | An Accept decided within the last seven days | Only current pieces can be placed on a new request; older ones read "Appraisal expired — send again" |
+| Desk answer | Confirm or decline | The Desk never changes the amount before inspection; the app exists to avoid negotiation |
 
 Forbidden on retail copy: loan, lender, interest, debt, vesting, paid off.
 
@@ -107,10 +110,10 @@ A repo is the center of the product: one retail party (collector or dealer) + MA
 
 ```mermaid
 flowchart TD
-  apply[Retail application: pieces + term + amount up to LTV cap]
-  draft[Signature draft / pending]
-  checks[Desk confirms conditions]
-  seller[Retail signs]
+  apply[Retail request: ticked current pieces + term + amount up to the cap]
+  draft[With MAC: pieces reserved, proposal PDF v1]
+  checks[Desk confirms or declines - never reprices]
+  seller[Your turn: retail signs or declines]
   mac[MAC signs last - appraiser or super admin proposed]
   active[Activated: open or later past due]
   buy[Whole-collection buyback]
@@ -143,7 +146,9 @@ flowchart TD
 
 Signing does not write a book end. A book end does not change the signature flag.
 
-**Shipped:** collector HTML Sign or desk Mark signed. A repo appears in the book only once it has an execution date, and its term clock runs from that date; rows written before the request model were mapped once to executed on the day they were created, so Hale still reads **past due**.
+**Shipped:** collector HTML Sign or desk Mark signed on legacy and executed rows. A repo appears in the book only once it has an execution date, and its term clock runs from that date; rows written before the request model were mapped once to executed on the day they were created, so Hale still reads **past due**.
+
+**Shipped 2026-09-20 (U10):** Apply creates a **request**, not a repo. The collector ticks accepted pieces whose Accept is current (seven days), keeps the Desk's typical term, and sends an amount at or below the maximum for those pieces; the pieces are reserved and a proposal PDF is recorded. The Desk **confirms or declines**; the collector may decline or withdraw. Confirm returns the request at the same amount ("Your turn"). Signing, delivery, and the inspection re-appraisal arrive with U11; until then a returned request shows a status line only. Every proposal states that MAC accepts only after physical inspection and other checks, will re-appraise each timepiece, and reserves the right not to execute.
 
 **Proposed:** MAC signs last; desk checklist first; only appraiser or super admin signs for MAC; admin cannot. Software sign is not counsel approval. E-sign vendor still deferred.
 
