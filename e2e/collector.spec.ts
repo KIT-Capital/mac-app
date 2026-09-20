@@ -521,23 +521,38 @@ test.describe("collector app", () => {
     await expect(page.getByRole("button", { name: /Apply to Sell/i })).toHaveCount(0);
   });
 
-  test("repurchase application is in dollars and creates a signable agreement", async ({ page }) => {
-    await appraiseNewHalePiece(page);
+  test("apply sends a request for the ticked pieces", async ({ page }) => {
+    await appraiseNewHalePiece(page, "UR-100V");
+    await appraiseNewHalePiece(page, "UR-220");
     await signInHale(page);
     await page.goto("/repurchase");
-    await expect(page.getByText(/Enter Amount Up to/i)).toBeVisible();
+    // Both fresh Accepts are ticked, so the cap is their sum in dollars, never a rate.
+    await expect(page.getByText("Enter Amount Up to $120,000")).toBeVisible();
     await expect(page.getByText(/%/)).toHaveCount(0);
-    await page.getByLabel(/Enter Amount/).fill("20000");
+    await expect(page.getByLabel(/Enter Amount/)).toHaveValue("120,000");
+    await page.getByRole("checkbox", { name: "Urwerk UR-220" }).uncheck();
+    await expect(page.getByText("Enter Amount Up to $60,000")).toBeVisible();
+    await expect(page.getByLabel(/Enter Amount/)).toHaveValue("60,000");
     await page.getByText("I confirm that I am at least 18 years old").click();
-    await page.getByRole("button", { name: "Send Application" }).click();
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Repurchase Agreement", exact: true })).toBeVisible();
-    // A repo is on the book from the moment it exists, and stays there through
-    // signing — its label never blinks out.
-    await expect(page.getByText(/Book:\s*open/i)).toBeVisible();
-    await page.getByRole("button", { name: "Review Terms" }).click();
-    await page.getByRole("button", { name: "Sign Repurchase Agreement" }).click();
-    await expect(page.getByRole("button", { name: "Executed & Verified" })).toBeVisible();
-    await expect(page.getByText(/Book:\s*open/i)).toBeVisible();
+    await expect(page.getByText("With MAC", { exact: true })).toBeVisible();
+    await expect(page.getByText(/MAC is reviewing your request/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Review Terms" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Sign Repurchase Agreement" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
+    // Internal states and loan-adjacent words never reach a collector (R29).
+    await expect(page.getByText(/originated|submitted|advance|principal|borrower/i)).toHaveCount(0);
+    await page.goto("/agreements");
+    const request = page.getByRole("link").filter({ hasText: "With MAC" });
+    await expect(request).toHaveCount(1);
+    await expect(request.getByText("$60,000")).toBeVisible();
+    await expect(request.getByText(/Sent on \d{4}-\d{2}-\d{2}/)).toBeVisible();
+    await expect(page.getByText(/Originated/i)).toHaveCount(0);
+    // The unticked piece stays free: it is still eligible for another request.
+    await page.goto("/repurchase");
+    await expect(page.getByRole("checkbox", { name: "Urwerk UR-220" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Urwerk UR-100V" })).toHaveCount(0);
   });
 
   test("first live application uses term-specific server purchase caps without disclosing terms", async ({ page }) => {
@@ -557,6 +572,9 @@ test.describe("collector app", () => {
               model: "Overseas",
               images: [],
               status: "appraised",
+              // An Accept is good for seven days (R42); a legacy piece with no
+              // attempts is read through its evaluation date alone.
+              evaluatedAt: new Date().toISOString().slice(0, 10),
               valueLow: 100_000,
               valueHigh: 120_000,
               financeable: true,

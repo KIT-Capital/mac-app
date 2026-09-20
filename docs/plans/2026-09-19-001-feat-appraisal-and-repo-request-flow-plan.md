@@ -3,6 +3,7 @@ title: Appraisal and Repo Request Flow - Plan
 type: feat
 date: 2026-09-19
 deepened: 2026-09-19
+amended: 2026-09-20 (owner — no negotiation; 7-day appraisal validity; inspection re-appraisal)
 artifact_contract: ce-unified-plan/v1
 artifact_readiness: implementation-ready
 product_contract_source: ce-plan-bootstrap
@@ -18,6 +19,8 @@ execution: code
 - **Stop conditions.** Stop and report if a unit would change which dollar drives the LTV cap, raise the 60% purchase share, post cash, enable Neon Auth or WorkOS, add a server file proxy, or auto-migrate `localStorage`.
 - **Execution profile.** One PR per unit on `KIT-Capital/mac-app`, dependency order below, gates green before merge. Migrations apply to Neon `development` only through `npm run db:migrate`.
 - **Tail.** Merge on green is standing authorization. Production migrate and `MAC_LIVE_BOOK` flip stay owner actions.
+- **Shipped.** U1 (#53), U2 (#55), U3 (#56), U4 (#57), U5 (#58, #59, #60). Next in order: U10.
+- **Owner amendment 2026-09-20.** The app exists to avoid negotiation. The Desk only confirms or declines a request; nobody lowers or counter-offers. An Accept is valid for repo purposes for 7 days. At inspection MAC re-appraises every piece and may reprice; the inspected value is final for that repo. Every proposal states that MAC accepts only after physical inspection and other checks, will re-appraise each piece, and reserves the right not to execute. Rules R12, R13, R15, R33, R42–R45, KTD6, KTD8, and units U10, U11, U6, U7, U8 were rewritten in place; the earlier "lower / ask for less" text is superseded, not preserved.
 
 ---
 
@@ -25,7 +28,7 @@ execution: code
 
 ### Summary
 
-A collector or dealer photographs a piece with five required shots, submits it with a note, and an appraiser accepts it with a dollar value or marks it **Does not meet appraisal criteria**. That appraiser owns the decision. The piece may be resubmitted with added photos up to three decisions. With appraised pieces in hand, the person selects any number of free pieces and a term; the app instantly shows the maximum MAC would pay and the month-by-month buyback table. They choose an amount at or below the maximum, add a note, and apply. The Desk returns a proposal; the person accepts, declines, or asks for less; then signs. At one inspection occasion an appraiser or super admin verifies the pieces, may amend by hand, and MAC signs last, pays, and takes possession. A stored PDF records each stage. A second repo with other pieces can start any time.
+A collector or dealer photographs a piece with five required shots, submits it with a note, and an appraiser accepts it with a dollar value or marks it **Does not meet appraisal criteria**. That appraiser owns the decision. The piece may be resubmitted with added photos up to three decisions. With appraised pieces in hand, the person selects any number of free pieces and a term; the app instantly shows the maximum MAC would pay and the month-by-month buyback table. They choose an amount at or below the maximum, add a note, and apply. The Desk confirms or declines; the person signs. At one inspection occasion an appraiser or super admin re-appraises every piece in hand; if the signed amount still fits the inspected values MAC signs last, pays, and takes possession, otherwise the request returns to the person at the new maximum to sign or decline. A stored PDF records each stage. A second repo with other pieces can start any time.
 
 ### Problem Frame
 
@@ -52,10 +55,14 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 
 - R10. The retail user selects any number of their free appraised pieces (accepted, not under review, and not on a reserved or live repo) and a term; the app computes the maximum sale amount and the month-by-month buyback table immediately, before any application is sent.
 - R11. Apply freezes the scale, the per-piece caps, the pieces, the term, the chosen amount (≤ maximum), and a note; pieces become reserved.
-- R12. The Desk may confirm the amount, lower it, decline with a reason, or flag the request for customer-success handling by phone; the Desk never raises the amount.
-- R13. When the Desk returns a proposal the retail user may sign it, decline it, or ask for a lower amount, always with an optional note; a higher amount is never offered. There is no separate "accept" step — accepting is signing. When the Desk confirms the amount the retail user already chose, the request goes straight to "Your turn to sign".
+- R12. The Desk may confirm the request as sent, decline it with a reason, or flag it for customer-success handling by phone. The Desk never changes the amount before inspection. `(owner 2026-09-20: the app exists to avoid negotiation)`
+- R13. When the Desk confirms, the request goes straight to "Your turn": the retail user signs or declines, with an optional note. There is no counter-offer and no separate "accept" step — accepting is signing.
 - R14. Signing in-app stores signature evidence bound to the exact document the signer was shown, and refuses a signature whose shown document is no longer the current version.
-- R15. The Desk records delivery when the pieces arrive. Inspection is one occasion: an appraiser or super admin confirms or refuses each piece, may amend (drop pieces, lower amount) into a new version the retail user re-accepts and re-signs, then MAC signs last and the repo executes.
+- R15. The Desk records delivery when the pieces arrive. Inspection is one occasion: an appraiser or super admin re-appraises every piece in hand and records an inspected value per piece, confirms or refuses each, may drop a failed piece, and MAC signs last. The inspected value is final for this repo.
+- R42. For repo purposes an Accept is valid for **7 days** from its decision. A piece whose Accept is older cannot be placed on a new request; its owner sees "Appraisal expired — send again" and resubmits. Pieces already on an open request are not removed when the 7 days pass; inspection re-appraises them regardless.
+- R43. At inspection the app recomputes the maximum from the inspected values at the frozen share. If the signed amount is within the new maximum, MAC executes exactly as signed. If not — or if a piece was dropped — the request returns to the retail user at the new maximum as a new version ("Your turn": sign or decline). The retail user never sees an amount higher than they asked for. Inspected values may be above or below the remote value; only the maximum moves, never the collector's requested amount upward.
+- R44. Every proposal, collector-signed, and executed document states in plain words that MAC accepts only after physical inspection and other checks, will re-appraise each piece, and reserves the right not to execute the agreement.
+- R45. An inspection re-appraisal and a post-expiry resubmission are refreshes of an existing Accept; neither spends one of the three decisions (R2). Only a new Accept or refusal does.
 - R16. Only an appraiser or super admin may sign for MAC, and only when every remaining piece has a final inspected acceptance and the checklist is complete. The checklist attests: seller identity verified against government ID, each piece's serial matches its record, condition matches the submitted photos, term and schedule agreed, seller signature present for the current version, sale amount paid with a payment reference recorded, pieces in MAC custody.
 - R27. When a request closes after pieces were delivered (declined at inspection or withdrawn), the Desk records the return of the pieces as an event; until then the retail user sees "Awaiting return of your pieces".
 - R28. A request's sale amount is whole dollars, at least the Desk-configured minimum sale amount, and at most the computed maximum.
@@ -70,7 +77,7 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 - R30. New repo opens pre-filled: every free accepted piece selected, the Desk's typical term, the amount at the maximum. Apply works with no edits; the retail user changes only what they want.
 - R31. A closed request (declined, withdrawn, expired) offers one-tap **Start again** that opens New repo with the same pieces preselected when they are still free.
 - R32. Notes are one optional field labeled "Anything MAC should know?" wherever they appear; the appraisal note and the request note are the same control.
-- R33. The retail user re-signs an amended version on the same screen they signed the first time — "Accept changes and sign" — and may do so on their own device or the Desk's at the inspection occasion.
+- R33. When inspection returns a request at a new maximum (R43), the retail user signs that version on the same screen they signed the first time — "Accept the inspected amount and sign" — and may do so on their own device or the Desk's at the inspection occasion.
 
 #### Brand presets
 
@@ -100,9 +107,9 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 
 ### Actors
 
-- A1. Collector / dealer — owns pieces; submits, resubmits, requests, accepts, asks lower, declines, withdraws, signs first.
-- A2. Admin — reviews the queue, confirms or lowers, declines, flags customer success; cannot decide appraisals, inspect, amend, or sign for MAC.
-- A3. Appraiser — everything an admin does, plus appraisal decisions, inspection, amendment, MAC signature, and catalog writes including Sparkle research and retail-visible checkmarks.
+- A1. Collector / dealer — owns pieces; submits, resubmits, requests, declines, withdraws, signs first.
+- A2. Admin — reviews the queue, confirms or declines, flags customer success, records delivery; cannot decide appraisals, inspect, re-appraise, or sign for MAC.
+- A3. Appraiser — everything an admin does, plus appraisal decisions, inspection re-appraisal, MAC signature, and catalog writes including Sparkle research and retail-visible checkmarks.
 - A4. Super admin — everything an appraiser does, plus reopening any appraiser's decision, editing mandatory photo kinds, and selecting the brand preset.
 
 ### Key Flows
@@ -119,13 +126,13 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
   - **Trigger:** owner opens New repo.
   - **Steps:** multi-select free pieces → term → maximum and schedule update live → amount ≤ maximum → note → Apply.
   - **Outcome:** `submitted`; pieces `reserved`; proposal PDF v1; Desk and owner mailed.
-- F4. Negotiate
+- F4. Desk answers
   - **Trigger:** Desk opens the queue item.
-  - **Steps:** confirm | lower | decline | flag CS → `returned` ("Your turn") → owner signs | asks lower (back to `submitted`) | declines.
+  - **Steps:** confirm | decline | flag CS → `returned` ("Your turn") → owner signs | declines.
   - **Outcome:** `collector_signed` or closed.
 - F5. Sign and inspect
   - **Trigger:** owner signs from `returned`.
-  - **Steps:** collector-signed PDF → delivery method → Desk records delivery → per-piece inspection finalizes attempts → confirm | amend (new version, F4 again) | decline → checklist → MAC signs.
+  - **Steps:** collector-signed PDF → delivery method → Desk records delivery → appraiser re-appraises each piece (inspected value, confirm | refuse | drop) → app recomputes the maximum → within maximum: checklist → MAC signs; below the signed amount or a piece dropped: `returned` at the new maximum (v+1) → owner signs or declines → back to inspection checklist.
   - **Outcome:** `executed`; members `live`; executed PDF mailed; book label **open** from `executedOn`.
 - F6. Second request
   - **Trigger:** owner opens New repo while another request or repo exists.
@@ -138,7 +145,10 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 - AE2. A piece with three completed decisions (any mix) shows "Appraisal closed" and no Request appraisal button; the server refuses a fourth submission. Covers R2.
 - AE3. A piece under review refuses a photo add and a field edit from its owner with `REVIEW_LOCKED`; after Return, both succeed for unused slots. A kind with no one of the seven intake slots is refused with `PHOTO_UPLOAD_INVALID`. Covers R7, R8.
 - AE4. A collector with four appraised pieces selects three and a 12-month term; the maximum equals the sum of the three per-piece caps and the table shows twelve rows before any Apply. Covers R10, R26.
-- AE5. After Apply, the desk lowers the amount; the collector asks lower again; the desk confirms; the collector's screen reads "Your turn" with Sign as the only primary action; the amount never rose across the thread and every step is an event. Covers R12, R13, R20, R29.
+- AE5. After Apply, the desk confirms; the collector's screen reads "Your turn" with Sign as the only primary action and no way to change the amount; the desk has no control to change it either; every step is an event. Covers R12, R13, R20, R29.
+- AE13. A piece accepted 8 days ago does not appear in the picker and shows "Appraisal expired — send again"; the owner resubmits, the appraiser accepts, and the decisions-used count is unchanged. Covers R42, R45.
+- AE14. Collector signs $30,000 on two pieces; at inspection the appraiser records inspected values whose combined maximum is $27,000; the request returns to the collector at $27,000 as v2; the collector signs v2; MAC signs. A second case where inspected values raise the maximum to $35,000 executes at the signed $30,000. Covers R43.
+- AE15. Every proposal PDF carries the sentence that MAC accepts only after physical inspection and other checks and reserves the right not to execute. Covers R44.
 - AE11. A collector with three free accepted pieces opens New repo and taps Apply without touching anything; a `submitted` request exists for all three pieces at the typical term and the maximum amount. Covers R30.
 - AE12. A collector retakes the front photo twice before ever submitting; after the first submission, the front slot offers no retake and an "Add photo" control appears. Covers R7.
 - AE6. A submitted request left untouched shows no book label, and its pieces do not appear in a second request's picker; once declined they do. Covers R17, R18, R19.
@@ -168,6 +178,7 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 - Login by one-time code: retail signs in with a code sent to email or phone, no password and no third-party accounts; Desk staff keep a password plus the code. Owner decision 2026-09-19 after reviewing the 2021 app and 2020 RFQ, which used passwords and Google/Facebook/Amazon logins. Lands in the roles plan (U-passwords, U-sms), not here.
 - Evidence retention period and deletion-request pseudonymization (KTD10) — pending counsel.
 - Expiry windows as Desk settings (KTD12) — on the first owner request.
+- Appraisal validity (R42, 7 days) as a Desk setting — on the first owner request; ships as a constant.
 - Membership perk from the 2020 RFQ — periodic re-appraisal for members — only as an owner-requested resubmission with no attempt consumed, never automatic repricing (Sparkle rule).
 - Retire the unused Stage 4 `applications` / `agreements` / `allocations` tables.
 
@@ -182,7 +193,7 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 - KTD3. **One `requiredPhotoKinds` setting replaces `requireFourPhotos`.** Stored as a text array on `desk_settings` and in `AppSettings`, default `front, back, left, right, clasp`; the five defaults are not removable in the UI; super admin may add kinds. `TIMEPIECE_SHOTS` reads the setting. `(session-settled: user-directed — chosen over a second boolean flag: super admin picks mandatory extras)` Governs R6.
 - KTD4. **Photos are add-only from the first submission; the seven-slot model is the bound.** Before a piece has any `appraisal_attempts` row, today's replace-in-slot behavior stays (there is no evidence yet to protect). Once one exists, `requestPhotoUpload` checks the checksum first (an identical re-request of a stored photo returns the existing row, as today), then refuses a *different* photo for any occupied kind — required or extra — with `PHOTO_KIND_TAKEN`. Only the seven slot-backed kinds can be uploaded; `more`, `buckle`, `other`, and any unknown kind are `PHOTO_UPLOAD_INVALID`. There is no row-count cap or `PHOTO_LIMIT`: superseded retakes remain stored evidence and must not consume another slot. `(session-settled: user-directed — chosen over replace-in-slot: the appraiser can tell what a photo shows; 7 total including the five required)` Governs R7, R9.
 - KTD5. **Book-and-hold predicates live in the existing `lib/contract/repo-book.mjs`;** the only new contract module is `request-transitions.mjs`. `repo-book.mjs` gains `heldWatchIds(agreements, today)` (renaming `liveWatchIds` in place: reserved + live, excluding derived-expired requests), `isRequestExpired(agreement, today)`, `isUnderReview(piece, attempts)`, `canRetailEditPiece(...)`, `nextAppraisalAttemptNo(...)`, and `deskToday()` (replacing `utcToday`). Layering: `repo-book.mjs` ← `request-transitions.mjs`; `appraisal-attempts.ts` imports only `repo-book.mjs`. Both `lib/store.tsx` and `lib/db/live-book-mutations.ts` / `lib/db/photos.ts` call these. Governs R8, R19, R25.
-- KTD6. **Request states live on `live_agreements.status`; members gain `reserved`.** States: `submitted`, `returned`, `collector_signed`, `inspecting`, `executed`, `closed` with `close_reason` in `declined_by_desk | declined_by_collector | withdrawn | expired`. There is no `accepted` state: the retail user signs directly from `returned`. A status check constraint covers the new set plus legacy `draft | pending_signature | signed`. **`version` increments on every change to amount or pieces** — desk lower, collector ask-lower, inspection amend — and each version freezes its own snapshot, so `expectedVersion` guards the money. An amendment is a `returned` state at `version + 1`, not a separate status. The partial unique index on members widens to `status in ('reserved','live')`. `(session-settled: user-directed — chosen over create-then-sign: everything is settled before inspection; MAC signs last at inspection)` Governs R11, R15, R18, R19, R21.
+- KTD6. **Request states live on `live_agreements.status`; members gain `reserved`.** States: `submitted`, `returned`, `collector_signed`, `inspecting`, `executed`, `closed` with `close_reason` in `declined_by_desk | declined_by_collector | withdrawn | expired`. There is no `accepted` state: the retail user signs directly from `returned`. A status check constraint covers the new set plus legacy `draft | pending_signature | signed`. **`version` increments on every change to amount or pieces** — only the inspection re-appraisal return (R43) does this after 2026-09-20 — and each version freezes its own snapshot, so `expectedVersion` guards the money. An inspection return is a `returned` state at `version + 1`, not a separate status. The partial unique index on members widens to `status in ('reserved','live')`. `(session-settled: user-directed — chosen over create-then-sign: everything is settled before inspection; MAC signs last at inspection)` Governs R11, R15, R18, R19, R21.
 - KTD21. **Legacy rows map once, in the migration.** `signed` → `executed` with `executed_on = coalesce(signed_on, created_on)`; `pending_signature` → `executed` with `executed_on = created_on`, because those rows were on the book from `createdAt` with `live` members and the Hale demo depends on it; every legacy row gets `version = 1`, `last_action_at = updated_at`, and one `legacy_backfill` event recording the prior status. Legacy `draft` rows, if any exist, close as `closed` / `withdrawn` with members released. `agreement.renew` successors are inserted `executed` with `executed_on = closeDate` and a `renewed_from` event, no signature rows, because the pieces are already in MAC custody; the request-path renewal stays deferred. No legacy row lands in a request state. The same mapping ships once as `legacyAgreementToRequest()` in `lib/contract/` and is used by the migration SQL fixture test, the browser persisted-state upgrade, and the desk import planner. Rollback is a Neon restore from the pre-migrate snapshot; there is no down migration.
 - KTD22. **Retail reads receive an allowlisted projection.** The projection also maps internal status to the four retail words: `submitted` → With MAC; `returned` → Your turn; `collector_signed`, `inspecting` → With MAC (with a delivery sub-line); `executed` → Active; `closed` → Closed. Events with `internal = true`, staff ids and emails, client addresses, `customer_success`, `decided_by_staff_id`, and desk-side close detail never serialize to a retail actor; desk actors render as "MAC Desk", the owner as "You". The filter lives in the adapter, server-side. Governs R20.
 - KTD23. **Two throttles, both through existing machinery.** `request.submit` and `request.withdraw` are limited to 5 per customer per day through `consumeAccessRateLimit` on the existing `access_rate_limits` table and refuse with `THROTTLED` — a transition never succeeds silently without its notice. The executed system send is unique per `(document_id, recipient_kind)` on `agreement_document_sends` so a retry never resends. Governs R22.
@@ -191,7 +202,9 @@ Appraisal today is a three-value flag overwritten by any desk role with a one-cl
 - KTD26. **Brand is one setting resolved to CSS variables at the root.** `desk_settings.brand_preset` (`mac | mbf`, default `mac`) and `AppSettings.brandPreset` drive `<html data-brand>`; `app/globals.css` defines `--brand-primary`, `--brand-accent`, `--brand-soft`, `--brand-name` per preset and remaps `--color-mac-navy` / `--color-mac-gold` / `--color-mac-champagne` to them, so existing token classes switch without edits. The 97 hardcoded `#FCB040`, 32 `#0E2A44`, and 20 `#E8D5C0` literals in `app/` and `components/` become token classes in the same unit — a preset cannot work while a single screen keeps a literal. Logo components take the preset from context and render the MAC Logo-FF assets or the MB&F assets. `(session-settled: user-directed — chosen over per-field brand editing: two preset brands for now)` Governs R34, R35, R36.
 - KTD25. **Invariants live in the database where they can.** Check constraints: `live_agreements.status` in the six states plus legacy, `(status = 'executed') = (executed_on is not null)`, `(status = 'closed') = (close_reason is not null)`, `version >= 1`; members status in `reserved | live | released`; attempts status in the four states, `value_cents >= 0`, `decision_no between 1 and 3` with `UNIQUE (timepiece_id, decision_no)`; documents stage enum with the unique on (agreement, version, stage) partial `where stage <> 'legacy' and status <> 'failed'`; settings `required_photo_kinds @> '{front,back,left,right,clasp}'`. Attempt snapshots are immutable through a `BEFORE UPDATE` trigger that raises when `snapshot` or `submitted_at` changes. Triggers are hand-appended to the generated migration on the `0011` pattern and proven by SQL fixture tests, because `--schema-check` does not see them. Governs R2, R9, R17, R21.
 - KTD7. **Book labels derive from `executed_on`, and the term clock starts there.** `bookLabel` returns `null` for unexecuted rows; `liveWatchIds` becomes `heldWatchIds`. The Hale demo fixture gets an `executedOn` so it still reads **past due**. This is a doc–code conflict with "Unsigned rows still appear in the book" in `docs/workflows.md`; U5 rewrites that sentence in the same PR as the code. Governs R17.
-- KTD8. **Amount is monotonically non-increasing after Apply.** `validateSaleAmountRaise` is replaced by `validateSaleAmountLower`; collector `addWatches` and `setAmount` are removed from the request path (change pieces = withdraw and reapply). `(session-settled: user-directed — chosen over an in-app counter-offer: MAC will not consider higher amounts)` Governs R12, R13.
+- KTD8. **Amount is fixed at Apply and moves only by inspection re-appraisal, never upward.** `validateSaleAmountLower` remains the single guard for the R43 return; there is no desk `lower`, no collector `askLower`, and no `AMOUNT_RAISE_FORBIDDEN` path reachable from the UI. Collector `addWatches` and `setAmount` are removed from the request path (change pieces = withdraw and reapply). `(owner 2026-09-20 — chosen over the approved lower / ask-lower loop: the app exists to avoid negotiation; the only price authority after Apply is the appraiser holding the piece)` Governs R12, R13, R43.
+- KTD28. **Appraisal validity is a constant checked at Apply, not a scheduler.** `APPRAISAL_VALID_DAYS = 7` ships in `repo-book.mjs`; `isAppraisalCurrent(attempts, timepieceId, today)` is true when the latest completed Accept is within the window. `request.submit` refuses a stale piece with `APPRAISAL_EXPIRED`; the picker and the grid card read the same helper for "Appraisal expired — send again". Pieces already reserved on an open request are exempt (R42). Becomes a Desk setting on the first owner request. Governs R42.
+- KTD29. **Inspected values are written on the attempt, not on the piece's remote value.** `request.inspect` records `inspected_value_cents` per member on the attempt finalize; `valueLow`/`valueHigh` projections are untouched so the appraisal history stays honest. The R43 recompute uses inspected values at the frozen `piece_caps` share; the result is snapshotted into the new version's `piece_caps`. A refresh (inspection or post-expiry resubmit) does not increment `completedAppraisalDecisions` (R45). Governs R15, R43, R45.
 - KTD9. **Offer math runs client-side from server-disclosed terms, and is recomputed server-side at Apply.** The picker uses `applicationPurchaseShares` + `maxPurchaseAmount` per piece + `repurchaseSchedule`; `request.submit` recomputes the cap from the frozen scale and refuses an amount above it (`AMOUNT_ABOVE_CAP`). Per-piece caps are snapshotted into the request so later appraisal edits never reprice it. `(session-settled: user-directed — chosen over hiding the scale until an application is sent: calculations are immediate; the PDF is a record, not the source)` Governs R10, R11, R26.
 - KTD10. **Two new evidence tables: `agreement_events` and `agreement_signatures`.** Events: actor kind (`retail | desk | system`) and id, action, from/to status, amount cents, version, note (≤ 1000 chars), `internal` boolean, created at. Signatures: agreement id, version, party `collector | mac`, signer id, typed name, `document_id`, `snapshot_hash`, client address, `book` (`live | browser`), signed at. **A signature binds to the document the signer was shown** — the `proposal` row of that version for the collector, the `collector_signed` row for MAC — through `document_id` plus that row's `snapshot_hash`; the client submits the hash it displayed and the server refuses a mismatch with `DOCUMENT_STALE`. Constraints: `document_id` NOT NULL with a composite FK `(document_id, agreement_id)` so a signature can never point at another agreement's document; `UNIQUE (agreement_id, version, party)`. Both tables are append-only through a `BEFORE UPDATE OR DELETE` trigger on the `0011` pattern. `agreement_documents` gains `UNIQUE (id, live_agreement_id)` so the composite FK is valid. `customer.remove` refuses when attempts or signatures exist (U3). Retention period and deletion-request pseudonymization are deferred follow-ups pending counsel. Governs R14, R20.
 - KTD11. **`agreement_documents` gains only `stage`; the existing `version` column becomes the agreement version.** Unique per (agreement, version, stage), partial `where stage <> 'legacy' and status <> 'failed'`; legacy rows are backfilled `stage = 'legacy'` and keep their numbers; the `nextVersion` retry loop retires. The transition transaction inserts the document row as `building` with its snapshot and hash; render and R2 put run **after commit** (KTD27). **Render-on-read recovery:** `renderStageDocument(documentId)` is idempotent (conditional update where `status = 'building'`, `putIfAbsent`, compensating `failed`), and is invoked from the read paths (`listAgreementDocuments`, `mintAgreementDocumentUrl`) and from the `signCollector` / `executeMac` preconditions whenever the current version's row is `building` without an object or `failed` (a fresh row is inserted for the same key, which the partial unique allows). A single failed render therefore never blocks signing. No button-triggered build on the request path. Holding a row lock across PDF render and R2 I/O is exactly what the existing compensating design avoids; this plan keeps it. Governs R21.
@@ -233,14 +246,13 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   [*] --> submitted: Apply (pieces reserved, proposal v1)
-  submitted --> returned: desk confirm (same v) or lower (v+1, new proposal)
+  submitted --> returned: desk confirm (same v)
   submitted --> closed: desk decline / owner withdraw
   returned --> collector_signed: owner signs current version\n(collector_signed doc for that v)
-  returned --> submitted: owner asks lower (v+1, new proposal)
   returned --> closed: owner declines / expired
   collector_signed --> inspecting: desk records delivery
   collector_signed --> closed: owner withdraws / delivery expired
-  inspecting --> returned: amend (v+1, new proposal; owner re-accepts, re-signs)
+  inspecting --> returned: re-appraisal lowers the maximum or drops a piece\n(v+1, new proposal; owner signs or declines)
   inspecting --> closed: desk declines at inspection / owner withdraws
   inspecting --> executed: checklist + MAC signs (executed doc, members live)
   executed --> [*]: book axis takes over (open, past due, ends)
@@ -268,7 +280,7 @@ flowchart TB
   U3 --> U4[U4 Appraisal UI]
   U1 --> U5[U5 Request schema and rules]
   U3 --> U5
-  U5 --> U10[U10 Negotiation transitions]
+  U5 --> U10[U10 Request transitions]
   U10 --> U11[U11 Sign, inspect, execute]
   U3 --> U11
   U10 --> U6[U6 Collector request UI]
@@ -308,12 +320,12 @@ flowchart TB
 
 | U-ID | Title | Key files | Depends on |
 |---|---|---|---|
-| U1 | Appraisal authorization fence | `lib/db/live-book-mutations.ts`, `lib/roles.mjs` | — |
-| U2 | Photo policy: required kinds setting, add-only photos | `lib/timepiece-shots.mjs`, `lib/db/photos.ts`, `app/collection/add/page.tsx` | — |
-| U3 | Appraisal attempts model and shared locks | `lib/db/appraisal-attempts.ts`, `lib/contract/repo-book.mjs`, `lib/store.tsx` | U1, U2 |
-| U4 | Appraisal UI: collector states and Desk review | `app/collection/[id]/page.tsx`, `app/admin/appraisals/[id]/page.tsx` | U3 |
-| U5 | Repo request schema, rules module, book semantics | `lib/db/schema.ts`, `lib/contract/request-transitions.mjs`, `lib/contract/repo-book.mjs` | U1, U3 |
-| U10 | Request transitions through negotiation and closure, after-commit hook, stage render | `lib/db/live-book-mutations.ts`, `lib/db/agreement-documents.ts`, `lib/store.tsx` | U5 |
+| U1 | Appraisal authorization fence — **shipped #53** | `lib/db/live-book-mutations.ts`, `lib/roles.mjs` | — |
+| U2 | Photo policy: required kinds setting, add-only photos — **shipped #55** | `lib/timepiece-shots.mjs`, `lib/db/photos.ts`, `app/collection/add/page.tsx` | — |
+| U3 | Appraisal attempts model and shared locks — **shipped #56** | `lib/db/appraisal-attempts.ts`, `lib/contract/repo-book.mjs`, `lib/store.tsx` | U1, U2 |
+| U4 | Appraisal UI: collector states and Desk review — **shipped #57** | `app/collection/[id]/page.tsx`, `app/admin/appraisals/[id]/page.tsx` | U3 |
+| U5 | Repo request schema, rules module, book semantics — **shipped #58, #59, #60** | `lib/db/schema.ts`, `lib/contract/request-transitions.mjs`, `lib/contract/repo-book.mjs` | U1, U3 |
+| U10 | Request transitions (submit, confirm, decline, withdraw, expiry), after-commit hook, stage render, Apply bridge | `lib/db/live-book-mutations.ts`, `lib/db/agreement-documents.ts`, `lib/store.tsx`, `components/application-form.tsx` | U5 |
 | U11 | Signature, delivery, inspection, MAC execution | `lib/db/live-book-mutations.ts`, `lib/db/appraisal-attempts.ts` | U10, U3 |
 | U6 | Collector request UI: picker, live offer, states | `components/application-form.tsx`, `app/agreements/[id]/page.tsx` | U10, U11 |
 | U7 | Desk queue, review, inspection UI | `app/admin/agreements/page.tsx`, `app/admin/requests/[id]/page.tsx` | U11 |
@@ -466,16 +478,17 @@ flowchart TB
   - Retail live GET JSON contains no staff id, staff email, IP literal, or `customer_success` key (negative-content test).
 - **Verification:** migration applies on Neon development with the verification queries returning zero violations; all `lib/contract/*.test.mjs` green; `repo-allocation.test.mjs` "refuses a lower amount" inverted; every existing `lib/db/live-book.test.ts` agreement test still passes against the legacy shape.
 
-### U10. Request transitions through negotiation and closure
+### U10. Request transitions and the Apply bridge
 
-- **Goal:** Implement submit, desk return, ask-lower, decline, withdraw, expiry, the customer-success flag, the after-commit hook, and stage rendering in both books.
-- **Requirements:** R10–R13, R18–R21, R28, KTD8, KTD9, KTD11–KTD13, KTD16, KTD19, KTD23, KTD27.
+- **Goal:** Implement submit, desk confirm / decline, collector decline, withdraw, expiry, the customer-success flag, the after-commit hook, and stage rendering in both books — and point the existing Apply screen at `request.submit` so `main` never ships a broken Apply between this unit and U6.
+- **Requirements:** R10–R13, R18–R21, R28, R42, R44 (proposal sentence only), KTD8, KTD9, KTD11–KTD13, KTD16, KTD19, KTD23, KTD27, KTD28.
 - **Dependencies:** U5.
-- **Files:** `lib/live-book-operation.mjs` (`request.submit`, `request.deskReturn`, `request.askLower`, `request.decline`, `request.withdraw`, `request.flagCustomerSuccess`; limit 200; `expectedStatus`/`expectedVersion`; remove `agreement.create`, `addWatches`, `setAmount`), `lib/db/live-book-mutations.ts` (`afterCommit` return), `app/api/live-book/route.ts` (`after()` scheduling), `lib/db/agreement-documents.ts` (`renderStageDocument`, render-on-read), `lib/db/request-events.ts` (new), `lib/store.tsx` (`applyOnAck`), `lib/live-book-errors.mjs`; tests `lib/db/live-book.test.ts`, `lib/live-book-operation.test.mjs`, `lib/db/agreement-documents.test.ts`, `lib/contract/request-transitions.test.mjs` (parity table run against both the pure module and the db layer — there is no `lib/store.test.tsx`; the store delegates its recipes to `applyTransition`, and e2e covers the wiring).
+- **Files:** `lib/live-book-operation.mjs` (`request.submit`, `request.deskReturn`, `request.decline`, `request.withdraw`, `request.flagCustomerSuccess`; limit 200; `expectedStatus`/`expectedVersion`; remove `agreement.create`, `addWatches`, `setAmount`), `lib/contract/request-transitions.mjs` (remove the `askLower` cell and the `lower` desk decision; keep `amend` for U11's R43 return), `lib/contract/repo-book.mjs` (`APPRAISAL_VALID_DAYS`, `isAppraisalCurrent`), `lib/db/live-book-mutations.ts` (`afterCommit` return), `app/api/live-book/route.ts` (`after()` scheduling), `lib/db/agreement-documents.ts` (`renderStageDocument`, render-on-read), `lib/contract/repo-agreement-snapshot.mjs` (R44 inspection sentence on the proposal), `lib/db/request-events.ts` (new), `lib/store.tsx` (`applyOnAck`; `submitRequest` replaces `createAgreement`), `lib/live-book-errors.mjs` (`APPRAISAL_EXPIRED`), `components/application-form.tsx` (Apply bridge, below), `app/agreements/[id]/page.tsx` (request states read-only), `app/agreements/page.tsx` (four retail words); tests `lib/db/live-book.test.ts`, `lib/live-book-operation.test.mjs`, `lib/db/agreement-documents.test.ts`, `lib/contract/request-transitions.test.mjs`, `lib/contract/repo-book.test.mjs`, `e2e/collector.spec.ts` (parity table run against both the pure module and the db layer — there is no `lib/store.test.tsx`; the store delegates its recipes to `applyTransition`, and e2e covers the wiring).
+- **Apply bridge (owner 2026-09-20):** the current `ApplicationForm` keeps its layout and becomes the interim request screen. It lists the collector's free accepted pieces whose Accept is current (R42) as checkboxes, all ticked by default; term defaults to the Desk's typical term; the amount field is bounded by the maximum for the ticked pieces and pre-filled at that maximum. Apply calls `request.submit` with the ticked pieces. No live buyback schedule and no offer card yet — that is U6. The agreement page shows the retail word (R29) and, on `returned`, nothing more than a status line until U11 ships Sign. The retired e2e `repurchase application is in dollars and creates a signable agreement` is replaced here by `apply sends a request for the ticked pieces`.
 - **Approach:**
-  1. `request.submit` (retail): consume the KTD23 rate limit, freeze scale via `serverAgreementScale`, compute per-piece caps from `valueLow` at the frozen share, snapshot them, validate amount per R28 and KTD9, insert members `reserved`, close any expired request holding those pieces (KTD12, id-ordered locks), write event, insert the `proposal` v1 document row as `building`, and return an after-commit job that renders it (KTD11, KTD27).
-  2. `request.deskReturn` with `decision: confirm | lower | decline` (any desk); `lower` bumps version and inserts a new `proposal` document row; `request.flagCustomerSuccess` toggles the flag and writes an event, never blocks.
-  3. `request.askLower` (bumps version, new `proposal` row), `request.decline`, `request.withdraw` (retail, `isRetailRole`). There is no `request.accept`; signing (U11) is the acceptance.
+  1. `request.submit` (retail): consume the KTD23 rate limit, refuse any piece whose Accept is not current with `APPRAISAL_EXPIRED` (KTD28), freeze scale via `serverAgreementScale`, compute per-piece caps from `valueLow` at the frozen share, snapshot them, validate amount per R28 and KTD9, insert members `reserved`, close any expired request holding those pieces (KTD12, id-ordered locks), write event, insert the `proposal` v1 document row as `building`, and return an after-commit job that renders it (KTD11, KTD27).
+  2. `request.deskReturn` with `decision: confirm | decline` (any desk); `confirm` keeps the version and moves to `returned`; `decline` closes with `declined_by_desk`. `request.flagCustomerSuccess` toggles the flag and writes an event, never blocks. There is no `lower`.
+  3. `request.decline`, `request.withdraw` (retail, `isRetailRole`). There is no `request.accept` and no `request.askLower`; signing (U11) is the acceptance.
   4. Every transition: ownership first, then the expiry check — an expired request is closed in a separate committed transaction before the requested transition is refused with `REQUEST_EXPIRED` (KTD12); otherwise lock pieces then agreement per KTD13, check `expectedStatus`/`expectedVersion`, apply via `applyTransition`, bump `last_action_at`, write event, audit desk actions, and return after-commit jobs (render then notices, in order) per KTD27.
   5. `agreement.updateScale` is refused on any row in a request state or `executed` (`AGREEMENT_IMMUTABLE`); the scale is frozen at Apply.
   6. `renderStageDocument` (idempotent) plus render-on-read in `listAgreementDocuments` and `mintAgreementDocumentUrl` (KTD11).
@@ -484,8 +497,10 @@ flowchart TB
 - **Test scenarios:**
   - Submit three pieces at the cap → `submitted` v1, three `reserved` members, `piece_caps` snapshot, event with note, one `proposal` document row `building`.
   - Submit at cap + $1 → `AMOUNT_ABOVE_CAP`; $499 with `minSaleAmount` $500 → `AMOUNT_BELOW_MINIMUM`; $500.50 → `AMOUNT_WHOLE_DOLLARS`; a piece already `reserved` elsewhere → `LIVE_WATCH_CONFLICT`; 201 pieces → parse error; 200 → accepted.
-  - Desk lower to $X → `returned` v2 with a new proposal row; collector askLower to $Y < $X → `submitted` v3; desk confirm → `returned` v3; desk attempt at $X + 1 → `AMOUNT_RAISE_FORBIDDEN`.
-  - Ask-lower with `expectedVersion` 2 when the row is at 3 → `AGREEMENT_STATE_CONFLICT`.
+  - Covers AE13. Submit with a piece accepted 8 days ago → `APPRAISAL_EXPIRED`; the same piece accepted 6 days ago → accepted. A piece reserved on an open request is not re-checked when its window passes.
+  - Desk confirm → `returned` v1, no new proposal row; desk `decision: lower` → `REQUEST_DECISION_INVALID`; a retail `askLower` action → `AGREEMENT_STATE_CONFLICT` (no such cell).
+  - Desk confirm with `expectedVersion` 0 when the row is at 1 → `AGREEMENT_STATE_CONFLICT`.
+  - Apply bridge (e2e): a collector with three current accepted pieces unticks one and taps Apply → a `submitted` request for two pieces at the typical term and their combined maximum; the agreement page reads "With MAC"; after desk confirm it reads "Your turn". The proposal snapshot contains the R44 sentence.
   - Two desk users return the same request concurrently → one `AGREEMENT_STATE_CONFLICT`.
   - Request 15 days in `returned` with `REQUEST_RESPONSE_DAYS` 14: any transition closes it `expired` (actor `system`, members released) and returns `REQUEST_EXPIRED`; the close is committed even though the call returned an error; a new submit with its pieces succeeds and closes it in the same transaction.
   - Withdraw from `returned` → `closed/withdrawn`, members released.
@@ -499,18 +514,18 @@ flowchart TB
   - Concurrent `submit` (pieces A, B) and `inspect drop` on another request holding B → no deadlock; one side gets `AGREEMENT_STATE_CONFLICT`.
   - Foreign agreement id with a wrong `expectedStatus` → `AGREEMENT_NOT_FOUND`, never a state error.
   - Browser and live produce identical states and error codes for every scenario above.
-- **Verification:** `lib/db/live-book.test.ts` "keeps signed and ended agreements immutable to desk edit and removal" rewritten for `executed`; the parity table in `request-transitions.test.mjs` passes against the pure module and the db layer; e2e `repurchase application is in dollars and creates a signable agreement` is retired here with the legacy create path.
+- **Verification:** `lib/db/live-book.test.ts` "keeps signed and ended agreements immutable to desk edit and removal" rewritten for `executed`; the parity table in `request-transitions.test.mjs` passes against the pure module and the db layer; e2e `repurchase application is in dollars and creates a signable agreement` is replaced by `apply sends a request for the ticked pieces`; `first live application uses term-specific server purchase caps` still passes through the bridge. Money is touched (caps, freeze), so this unit gets the full review `AGENTS.md` requires.
 
 ### U11. Signature, delivery, inspection, and MAC execution
 
-- **Goal:** Implement the signing and inspection occasion, including amendment and the MAC-signs-last gate.
-- **Requirements:** R14–R16, R27, KTD2, KTD10, KTD11, KTD13, KTD14, KTD16, KTD24.
+- **Goal:** Implement the signing and inspection occasion, including the inspection re-appraisal, the R43 return, and the MAC-signs-last gate.
+- **Requirements:** R14–R16, R27, R33, R43, R44, R45, KTD2, KTD10, KTD11, KTD13, KTD14, KTD16, KTD24, KTD29.
 - **Dependencies:** U10, U3.
 - **Files:** `lib/live-book-operation.mjs` (`request.signCollector`, `request.recordDelivery`, `request.inspect`, `request.executeMac`, `request.recordReturn`; remove `agreement.signCollector`, `agreement.markSigned`), `lib/db/live-book-mutations.ts`, `lib/db/appraisal-attempts.ts` (finalize/reverse helpers), `lib/db/request-events.ts`, `lib/store.tsx`, `lib/live-book-errors.mjs`; tests `lib/db/live-book.test.ts`, `lib/db/appraisal-attempts.test.ts`, `lib/live-book-operation.test.mjs`, `lib/contract/request-transitions.test.mjs`.
 - **Approach:**
   1. `request.signCollector` (retail, from `returned`): runs render-on-read recovery (KTD11) on the current version's `proposal` row when it is `building` without an object or `failed`, then requires it `stored` (`DOCUMENT_NOT_READY` only if recovery itself failed); the client submits the `snapshotHash` it displayed and the server refuses a mismatch with `DOCUMENT_STALE`; writes an `agreement_signatures` row with `document_id` = that proposal row, typed name, client address, `book`; inserts the `collector_signed` document row `building`; records delivery method.
   2. `request.recordDelivery` (any desk — receiving a package is intake, per R15) sets `delivered_on` → `inspecting`.
-  3. `request.inspect` (`canInspect`) with per-piece `confirm | refuse | drop` and `outcome: proceed | amend | decline`: `confirm` finalizes the attempt; `refuse` reverses the Accept in place (KTD14, R1 exception); `drop` releases the member; `amend` requires remaining cap ≥ amount and moves to `returned` at `version + 1` with a new `proposal` row; `decline` closes and releases.
+  3. `request.inspect` (`canInspect`) with per-piece `{ decision: confirm | refuse | drop, inspectedValueCents }` and `outcome: proceed | decline`: `confirm` records the inspected value on the attempt and finalizes it (KTD29); `refuse` reverses the Accept in place (KTD14, R1 exception) and drops the member; `drop` releases the member without touching the attempt; `decline` closes and releases. Then the server recomputes the maximum from inspected values at the frozen share (R43): if the signed amount fits and no member was dropped, the request stays `inspecting` awaiting the checklist; otherwise the server itself applies the `amend` cell — `returned` at `version + 1`, amount = min(signed amount, new maximum), a new `proposal` row — and the collector signs or declines. The appraiser never types the new amount; the app derives it. No inspected value spends a decision (R45).
   4. `request.executeMac` (`canInspect`, `staffId` required): runs the same recovery on the `collector_signed` row first, then refuses unless every remaining member's attempt is finalized, the R16 checklist is all true, payment reference present, and a collector signature exists whose `document_id` belongs to the current version (`SIGNATURE_STALE` otherwise) and whose `collector_signed` document is `stored`; MAC's signature binds to that `collector_signed` row; set `executed_on`, members `live`, MAC signature row, `executed` document row `building`, event. Mail is never inside this transaction.
   5. `request.recordReturn` (any desk) on a closed request with `delivered_on` set writes the return event (R27).
   6. Store mirrors each transition (`deferLive: true`); browser mode records signature rows and snapshot hashes but no PDF.
@@ -518,11 +533,12 @@ flowchart TB
 - **Test scenarios:**
   - Sign while the proposal row is `failed` and R2 is back → the sign call itself re-renders to `stored` and succeeds; sign while R2 is still down → `DOCUMENT_NOT_READY` and the row stays recoverable. After a stored proposal → `collector_signed`, signature row with the version's `snapshot_hash`.
   - Sign with `expectedVersion` stale → `AGREEMENT_STATE_CONFLICT`; sign with a `snapshotHash` from a superseded proposal → `DOCUMENT_STALE`; a collector signing another collector's request → not found.
-  - Collector signs v1, desk amends to v2, `executeMac` → `SIGNATURE_STALE`; collector signs v2 ("Accept changes and sign") → succeeds.
+  - Covers AE14. Collector signs $30,000; inspected values put the maximum at $27,000 → `returned` v2 at $27,000 with a new proposal; `executeMac` → `SIGNATURE_STALE`; collector signs v2 ("Accept the inspected amount and sign") → succeeds. Inspected values put the maximum at $35,000 → stays `inspecting` at $30,000; `executeMac` succeeds at $30,000.
+  - Inspecting a piece with a confirm and no `inspectedValueCents` → `INSPECTED_VALUE_REQUIRED`. `completedAppraisalDecisions` is unchanged after inspection.
   - Browser-mode sign → signature row `book: "browser"`, screen shows "Demo — not evidence", no document claimed stored.
   - Admin `request.inspect` → `ROLE_FORBIDDEN`; appraiser succeeds.
   - Inspect `refuse` on a piece accepted by another appraiser → attempt becomes `refused`, decisions-used unchanged, event names both staff ids.
-  - Amend dropping one piece and lowering the amount → `returned` v(n+1), dropped member released, its attempt still provisional; `executeMac` refused until the collector signs v(n+1).
+  - Dropping one piece → `returned` v(n+1) at min(signed amount, recomputed maximum), dropped member released, its attempt still provisional; `executeMac` refused until the collector signs v(n+1).
   - Execute with one provisional piece → `INSPECTION_INCOMPLETE`; with an empty payment reference → `PAYMENT_REFERENCE_REQUIRED`; with all conditions true → `executed`, members `live`, MAC signature row, `executed_on` set, `bookLabel` = open.
   - Withdraw after `collector_signed` → `closed/withdrawn`, members released, signature row retained.
   - Closed after delivery → `recordReturn` writes the event; on a request never delivered → `RETURN_NOT_APPLICABLE`.
@@ -539,17 +555,18 @@ flowchart TB
   1. Picker opens pre-filled (R30): every free accepted piece selected, the Desk's typical term, amount at the maximum; the sticky offer card shows the maximum and the schedule for the current amount, recomputed on every change from `applicationPurchaseShares`, `maxPurchaseAmount`, `repurchaseSchedule`. Deselecting pieces or lowering the amount is optional.
   2. Amount input bounded to the maximum; one optional note "Anything MAC should know?" (R32); Apply calls `request.submit`.
   3. Agreements list groups rows under the four retail words (R29): Your turn, With MAC, Active, Closed. "Executed on" replaces "Originated on". A Closed row offers Start again (R31).
-  4. Request detail: one primary action per state — Sign on `returned`, nothing to do on `submitted` / `collector_signed` / `inspecting` (status line plus delivery instructions), Start again on `closed`. Secondary links: Ask for less, Decline, Withdraw. Also the visible event thread, "Awaiting return of your pieces" after a post-delivery close (R27), "Released from request" on a dropped piece, and the stored PDFs (U8).
-  5. Sign sheet: typed name, one attestation checkbox, delivery method with "Desk arranges intake" preselected; calls `request.signCollector`. The same sheet titled "Accept changes and sign" serves amended versions (R33).
+  4. Request detail: one primary action per state — Sign on `returned`, nothing to do on `submitted` / `collector_signed` / `inspecting` (status line plus delivery instructions), Start again on `closed`. Secondary links: Decline, Withdraw. There is no Ask for less. Also the visible event thread, "Awaiting return of your pieces" after a post-delivery close (R27), "Released from request" on a dropped piece, and the stored PDFs (U8).
+  5. Sign sheet: typed name, one attestation checkbox, delivery method with "Desk arranges intake" preselected; calls `request.signCollector`. The same sheet titled "Accept the inspected amount and sign" serves an R43 return (R33). The sheet shows the R44 sentence above the signature line.
+  6. Picker excludes pieces whose Accept is older than 7 days and shows "Appraisal expired — send again" on their card (R42).
 - **Patterns to follow:** `LineField`, `NativeSelect`, `WatchPhoto`; MAC palette and Geist per `docs/design-system.md`; `mac-tap` feedback per `docs/plans/2026-09-19-button-press-feedback.md`.
 - **Test scenarios:**
   - Covers AE4. Three of four pieces selected, 12 months → maximum equals the sum of caps; twelve schedule rows; changing amount to half re-renders lower buyback prices.
   - Under-review, reserved, and live pieces do not appear in the picker.
   - Covers AE11. Open New repo with three free accepted pieces and tap Apply with no edits → `submitted` for all three at the typical term and maximum amount.
-  - Apply → row under "With MAC"; after desk confirm-as-is → row under "Your turn" showing Sign as the only primary action, no Accept step; after desk lower → "Your turn" with Sign at the new amount plus Ask for less and Decline as secondary links.
+  - Apply → row under "With MAC"; after desk confirm → row under "Your turn" showing Sign as the only primary action, no Accept step, Decline and Withdraw as secondary links; after an R43 inspection return → "Your turn" with "Accept the inspected amount and sign" at the new amount.
   - Closed request → Start again opens New repo with the same pieces preselected; a piece since reserved elsewhere is omitted with a one-line note.
   - No retail screen shows an internal status word (`submitted`, `returned`, `inspecting`).
-  - Ask for less above the current amount is blocked in the UI and, if forced, returns `AMOUNT_RAISE_FORBIDDEN` copy.
+  - No retail screen offers a way to change the amount after Apply; a piece accepted 8 days ago is absent from the picker and its card reads "Appraisal expired — send again".
   - Sign → state "Awaiting inspection", delivery method saved, signature recorded.
   - A second request with the remaining piece succeeds while the first is pending.
   - Every screen has zero forbidden-word matches (R24 list).
@@ -564,12 +581,12 @@ flowchart TB
 - **Approach:**
   1. Tabs: Queue (`submitted`), Awaiting collector (`returned`), Awaiting intake (`collector_signed`), Inspection (`inspecting`), Book (executed rows with today's end/renew controls), Closed.
   2. Request page: party, pieces with caps and attempt states, amount vs cap, thread with internal-note toggle, actions per `nextAllowedActions(agreement, actor)`; customer-success flag with outcome note.
-  3. Inspection: record delivery; per-piece confirm / refuse / drop with serial-match and condition-match toggles; amend amount; the R16 checklist with a payment-reference field; MAC sign button enabled only when `canInspect` and all items true; admin sees it disabled with the reason.
+  3. Inspection: record delivery; per piece an inspected-value field plus confirm / refuse / drop with serial-match and condition-match toggles; the screen shows the recomputed maximum against the signed amount and says whether MAC can execute as signed or the request will return to the collector — the appraiser never types the amount; the R16 checklist with a payment-reference field; MAC sign button enabled only when `canInspect`, the signed amount fits, and all items true; admin sees it disabled with the reason.
   4. Closed tab: requests closed after delivery show a Record return action until the return event exists (R27).
 - **Patterns to follow:** existing `admin/agreements` table and `AdminScaleFields`. The thread renders `agreement_events` only; the audit log is not shown.
 - **Test scenarios:**
-  - Admin sees Queue and can lower and return, and can Record delivery; the per-piece inspection and MAC-sign actions are disabled with "Appraiser or super admin required".
-  - Appraiser records delivery, confirms two pieces, drops one → request returns to the collector at v2; after re-sign the checklist enables MAC sign.
+  - Admin sees Queue and can confirm or decline, and can Record delivery; the queue has no amount field; the per-piece inspection and MAC-sign actions are disabled with "Appraiser or super admin required".
+  - Appraiser records delivery, enters inspected values, confirms two pieces, drops one → request returns to the collector at v2 at the derived amount; after re-sign the checklist enables MAC sign.
   - Covers AE7. Execute with a checklist item unchecked stays disabled; all checked → executed and the row moves to Book as **open**.
   - Customer-success flag shows on the queue row; recording a phone outcome writes an event and keeps the collector's accept and sign required.
   - Desk-visible note containing a forbidden word shows a warning before send.
@@ -586,11 +603,11 @@ flowchart TB
   2. The PDF prints the version's `snapshot_hash`; the executed PDF's signature block prints both parties' typed names, timestamps, and the hash each signature binds to.
   3. Labels per KTD15; the browser-mode preview keeps its watermark.
   4. `executed` mail runs after the `executed` document reaches `stored`, recorded in `agreement_document_sends` with `actor_kind = 'system'`; a failed send leaves the agreement executed with "PDF preparing" and a desk `request.resendExecuted` action (unique per document and recipient, KTD23) recovers it.
-  5. Letters, each sent from the transition that causes it: request submitted (desk + retail), returned or lowered (retail), accepted / asked lower / declined / withdrawn (desk), signed (desk + retail with delivery instructions), amended (retail), declined by desk (retail), expired (both, from the closing transition), executed (retail with attachment, desk copy). No "expiring soon" letter (KTD12). All from `info@mechartcap.com`; all carry the not-a-loan line; the executed send is a system send exempt from the collector per-actor throttle but capped at one per executed version.
+  5. Letters, each sent from the transition that causes it: request submitted (desk + retail), confirmed — your turn to sign (retail), declined / withdrawn (desk), signed (desk + retail with delivery instructions), inspected — new amount to sign (retail, R43), declined by desk (retail), expired (both, from the closing transition), executed (retail with attachment, desk copy). Every letter and PDF carries the R44 sentence. No "expiring soon" letter (KTD12). All from `info@mechartcap.com`; all carry the not-a-loan line; the executed send is a system send exempt from the collector per-actor throttle but capped at one per executed version.
   6. Remove the `financing` alias for the repurchase letter.
 - **Patterns to follow:** `buildAgreementDocument` compensating workflow; `composeAgreementDocumentMail` attachments; `letter()` HTML builder.
 - **Test scenarios:**
-  - Submit → `proposal` v1 `building` then `stored`; desk lower → `proposal` v2; sign → `collector_signed` v2; amend → `proposal` v3; collector signs v3 → `collector_signed` v3; execute → `executed` v3; a second execute attempt mints nothing.
+  - Submit → `proposal` v1 `building` then `stored`; desk confirm → no new row; sign → `collector_signed` v1; inspection return → `proposal` v2; collector signs v2 → `collector_signed` v2; execute → `executed` v2; a second execute attempt mints nothing.
   - A retried executed send for the same document and recipient → refused by the unique; the first send row stands.
   - Covers AE8. Executed email carries the verified attachment; a checksum mismatch sends nothing and records the failure without claiming a send.
   - Proposal PDF label is the pending-counsel text; collector-signed and executed PDFs carry the attestation text; the executed PDF prints both signatures and the bound hash.

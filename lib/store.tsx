@@ -27,7 +27,8 @@ import {
 } from "@/lib/appraisal-attempt-apply.mjs";
 import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
-import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
+import { agreementScaleFromDesk, applicationPurchaseShare } from "@/lib/contract/repo-scale.mjs";
+import { applyTransition } from "@/lib/contract/request-transitions.mjs";
 import { nextId } from "@/lib/ids";
 import {
   mergeLocalDataPreviews,
@@ -51,16 +52,16 @@ import {
   bookLabel,
   clearAgreementEnd as stripAgreementEnd,
   conflictingHeldWatchIds,
-  isEligibleLiveAddWatch,
+  isAppraisalCurrent,
   isLiveBookLabel,
+  isRequestExpired,
   isUnderReview,
   heldWatchIds,
   LIVE_WATCH_CONFLICT,
   deskToday,
   validateRecordedEndKind,
-  validateSaleAmountLower,
 } from "@/lib/contract/repo-book.mjs";
-import { DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
+import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
 import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
@@ -103,14 +104,18 @@ type Store = AppState & {
   addTimepiece: (watch: Timepiece) => Promise<OperationAck>;
   updateTimepiece: (id: string, patch: Partial<Timepiece>) => Promise<OperationAck>;
   removeTimepiece: (id: string) => Promise<OperationAck>;
-  createAgreement: (input: Omit<Agreement, "id" | "createdAt" | "status">) => Promise<Agreement>;
+  /** Apply: one request for the ticked pieces at a fixed amount (KTD8). */
+  submitRequest: (input: RequestSubmitInput) => Promise<OperationAck & { agreementId?: string }>;
+  /** The Desk's two answers to a request: confirm or decline (R12). */
+  deskReturnRequest: (id: string, decision: RequestDeskDecision, note?: string) => Promise<OperationAck>;
+  declineRequest: (id: string, note?: string) => Promise<OperationAck>;
+  withdrawRequest: (id: string, note?: string) => Promise<OperationAck>;
+  flagRequestCustomerSuccess: (id: string, flag: boolean, note?: string) => Promise<OperationAck>;
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
   removeAgreement: (id: string) => Promise<OperationAck>;
   signAgreement: (id: string) => Promise<OperationAck>;
   recordAgreementEnd: (id: string, end: AgreementEnd) => Promise<{ ok: true } | { ok: false; error: string }>;
   renewAgreement: (id: string, closeDate: string) => Promise<{ ok: true; successor: Agreement } | { ok: false; error: string }>;
-  addAgreementWatches: (id: string, watchIds: string[]) => Promise<{ ok: true } | { ok: false; error: string }>;
-  setAgreementAmount: (id: string, amount: number) => Promise<{ ok: true } | { ok: false; error: string }>;
   clearAgreementEnd: (id: string) => Promise<boolean>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<OperationAck>;
   upsertUser: (user: ManagedUser) => Promise<OperationAck>;
@@ -181,6 +186,19 @@ type OperationAck = {
   mode?: "browser" | "live";
   rangeWarning?: "below" | "above";
 };
+export type RequestSubmitInput = {
+  watchIds: string[];
+  termMonths: number;
+  amount: number;
+  delivery: string;
+  note?: string;
+};
+export type RequestDeskDecision = "confirm" | "decline";
+type RequestTransitionAction = "deskReturn" | "decline" | "withdraw" | "flagCustomerSuccess";
+/** `applyTransition` is typed through JSDoc; this is its answer read from TypeScript. */
+type TransitionOutcome =
+  | { ok: false; error: string }
+  | { ok: true; agreement: Agreement; mintsStage?: string };
 let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
 let loadStarted = false;
 let optimisticGeneration = 0;
@@ -667,6 +685,12 @@ function updateStore(
         } else {
           await reconcileFreshLiveStore();
         }
+      } else if (
+        !result.ok &&
+        storeMode === "live" &&
+        (result.error === "REQUEST_EXPIRED" || result.error === "AGREEMENT_STATE_CONFLICT")
+      ) {
+        await reconcileFreshLiveStore();
       }
       return result;
     });
@@ -684,6 +708,88 @@ function updateStore(
     }).catch(() => undefined);
   }
   return acknowledgement;
+}
+
+function expireRequestRow(row: Agreement, now: Date): Agreement | null {
+  const result = applyTransition(
+    { ...row, version: row.version ?? 1 },
+    { action: "expire" },
+    {
+      now: now.toISOString(),
+      today: deskToday(now),
+      actor: { kind: "system", id: "system" },
+    },
+  ) as TransitionOutcome;
+  return result.ok ? result.agreement : null;
+}
+
+/**
+ * One request move through the shared transition table (R25). The browser
+ * book plans the next row first and returns the same refusal codes the live
+ * book would; in live mode the row is only replaced by the server's answer.
+ */
+function transitionRequest(
+  id: string,
+  action: RequestTransitionAction,
+  input: { decision?: RequestDeskDecision; flag?: boolean; note?: string },
+): Promise<OperationAck> {
+  const current = getStoreSnapshot();
+  const user = current.user;
+  if (!user) return Promise.resolve({ ok: false, error: "SESSION_REQUIRED" });
+  const desk = isDeskRole(user.role);
+  const row = current.agreements.find((item) => item.id === id);
+  // Ownership resolves first, so a foreign id is never a state error (KTD13).
+  if (!row || (!desk && profileKey(row.email) !== profileKey(user.email))) {
+    return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
+  }
+  const now = new Date();
+  if (isRequestExpired(row, deskToday(now))) {
+    const expired = expireRequestRow(row, now);
+    if (expired && storeMode !== "live") {
+      return updateStore((prev) => ({
+        ...prev,
+        agreements: prev.agreements.map((item) => (item.id === id ? expired : item)),
+      })).then(() => ({ ok: false, error: "REQUEST_EXPIRED" } as OperationAck));
+    }
+    return Promise.resolve({ ok: false, error: "REQUEST_EXPIRED" });
+  }
+  const expectedStatus = row.status;
+  const expectedVersion = row.version ?? 1;
+  const result = applyTransition(
+    { ...row, version: expectedVersion },
+    { action, decision: input.decision, note: String(input.note ?? "") },
+    {
+      now: now.toISOString(),
+      today: deskToday(now),
+      actor: desk
+        ? { kind: "desk", id: user.email, role: user.role }
+        : { kind: "retail", id: user.email },
+    },
+  ) as TransitionOutcome;
+  if (!result.ok) return Promise.resolve({ ok: false, error: result.error });
+  const next: Agreement =
+    action === "flagCustomerSuccess"
+      ? { ...result.agreement, customerSuccess: Boolean(input.flag) }
+      : result.agreement;
+  return updateStore(
+    (prev) => ({
+      ...prev,
+      agreements: prev.agreements.map((item) => (item.id === id ? next : item)),
+    }),
+    {
+      operation: {
+        action: `request.${action}`,
+        id,
+        ...(action === "deskReturn" ? { decision: input.decision } : {}),
+        ...(action === "flagCustomerSuccess" ? { flag: Boolean(input.flag) } : {}),
+        note: String(input.note ?? ""),
+        expectedStatus,
+        expectedVersion,
+      },
+      deferLive: true,
+      applyOnAck: false,
+    },
+  );
 }
 
 function demoState(): AppState {
@@ -1106,44 +1212,116 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             .map((a) => ({ ...a, watchIds: a.watchIds.filter((wid) => wid !== id) }))
             .filter((a) => a.watchIds.length > 0),
         }), { operation: { action: "timepiece.remove", id }, deferLive: true }),
-      createAgreement: async (input) => {
-        const current = refreshStoreFromDisk();
-        const conflicts = conflictingHeldWatchIds(input.watchIds, current.agreements);
-        if (conflicts.length > 0) {
-          throw new Error(LIVE_WATCH_CONFLICT);
+      submitRequest: async (input) => {
+        // The same fences, in the same order, as the live book's
+        // `request.submit`, so both books answer an Apply alike (R25, AE9).
+        const current = getStoreSnapshot();
+        const user = current.user;
+        if (!user) return { ok: false, error: "SESSION_REQUIRED" };
+        if (isDeskRole(user.role)) return { ok: false, error: "COLLECTOR_REQUIRED" };
+        const watchIds = [...new Set(input.watchIds)];
+        if (watchIds.length === 0) return { ok: false, error: "WATCH_IDS_REQUIRED" };
+        const owner = profileKey(user.email);
+        const today = deskToday();
+        const pieces: Timepiece[] = [];
+        for (const watchId of watchIds) {
+          const piece = current.timepieces.find((item) => item.id === watchId);
+          if (!piece || profileKey(piece.ownerEmail || "") !== owner) {
+            return { ok: false, error: "TIMEPIECE_NOT_OWNED" };
+          }
+          if (isUnderReview(current.appraisalAttempts, watchId)) {
+            return { ok: false, error: "REVIEW_LOCKED" };
+          }
+          if (piece.status !== "appraised" || !piece.financeable) {
+            return { ok: false, error: "INELIGIBLE_PIECE" };
+          }
+          if (!isAppraisalCurrent(current.appraisalAttempts, watchId, today, piece)) {
+            return { ok: false, error: "APPRAISAL_EXPIRED" };
+          }
+          pieces.push(piece);
         }
+        if (conflictingHeldWatchIds(watchIds, current.agreements, today).length > 0) {
+          return { ok: false, error: LIVE_WATCH_CONFLICT };
+        }
+        if (!Number.isInteger(input.amount)) return { ok: false, error: "AMOUNT_WHOLE_DOLLARS" };
+        // `minAdvance` is the browser book's minimum until KTD20 renames it;
+        // live settings do not carry it, so they read the server's own default.
+        const minimum =
+          typeof current.settings.minAdvance === "number" && current.settings.minAdvance > 0
+            ? current.settings.minAdvance
+            : DEFAULT_MIN_SALE_AMOUNT;
+        if (input.amount < minimum) return { ok: false, error: "AMOUNT_BELOW_MINIMUM" };
         const openShell = current.shells.find((shell) => shell.status === "open");
-        const createdAt = deskToday();
+        const share = applicationPurchaseShare(
+          current.applicationPurchaseShares,
+          current.settings,
+          openShell,
+          input.termMonths,
+        );
+        const pieceCaps = Object.fromEntries(
+          pieces.map((piece) => [piece.id, maxPurchaseAmount(piece.valueLow, piece.valueHigh, share)]),
+        );
+        const cap = Object.values(pieceCaps).reduce((sum, value) => sum + value, 0);
+        if (input.amount > cap) return { ok: false, error: "AMOUNT_ABOVE_CAP" };
+
+        const id = nextId("agr");
+        const agreementCode = `MAC-${nextId("r").slice(-6).toUpperCase()}`;
+        const note = String(input.note ?? "").trim();
         const agreement: Agreement = {
-          ...input,
-          id: nextId("agr"),
-          agreementCode: `MAC-${nextId("r").slice(-6).toUpperCase()}`,
-          createdAt,
-          // The legacy create path writes the KTD21 shape directly, so a new
-          // repo is on the book and holding its pieces from the moment it
-          // exists — not only after the next read.
-          status: "executed",
-          executedOn: createdAt,
+          id,
+          agreementCode,
+          watchIds,
+          amount: input.amount,
+          termMonths: input.termMonths,
+          delivery: input.delivery,
+          ownerName: user.name,
+          email: user.email,
+          createdAt: today,
+          // A request reserves its pieces from the moment it exists; the term
+          // clock only starts once MAC executes (KTD7).
+          status: "submitted",
           version: 1,
           lastActionAt: new Date().toISOString(),
-          scale: input.scale ?? agreementScaleFromDesk(current.settings, openShell, input.termMonths),
+          pieceCaps,
+          scale: agreementScaleFromDesk(current.settings, openShell, input.termMonths),
         };
+        const now = new Date();
         const acknowledgement = await updateStore((prev) => {
-          const user = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;
+          const nextUser = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;
+          const closed = prev.agreements.map((item) => {
+            if (!isRequestExpired(item, today)) return item;
+            if (!item.watchIds.some((watchId) => watchIds.includes(watchId))) return item;
+            return expireRequestRow(item, now) ?? item;
+          });
           return {
             ...prev,
-            agreements: [agreement, ...prev.agreements],
-            user,
-            profiles: user ? { ...prev.profiles, [profileKey(user.email)]: user } : prev.profiles,
+            agreements: [agreement, ...closed],
+            user: nextUser,
+            profiles: nextUser ? { ...prev.profiles, [profileKey(nextUser.email)]: nextUser } : prev.profiles,
           };
-        }, { operation: { action: "agreement.create", agreement }, deferLive: true });
-        if (!acknowledgement.ok) throw new Error(acknowledgement.error);
-        if (acknowledgement.mode === "live") {
-          await reconcileLiveStore(true);
-          return snapshot.agreements.find((item) => item.id === agreement.id) ?? agreement;
-        }
-        return agreement;
+        }, {
+          operation: {
+            action: "request.submit",
+            id,
+            agreementCode,
+            watchIds,
+            termMonths: input.termMonths,
+            amount: input.amount,
+            delivery: input.delivery,
+            note,
+          },
+          deferLive: true,
+          applyOnAck: false,
+        });
+        if (!acknowledgement.ok) return acknowledgement;
+        return { ...acknowledgement, agreementId: id };
       },
+      deskReturnRequest: (id, decision, note) =>
+        transitionRequest(id, "deskReturn", { decision, note }),
+      declineRequest: (id, note) => transitionRequest(id, "decline", { note }),
+      withdrawRequest: (id, note) => transitionRequest(id, "withdraw", { note }),
+      flagRequestCustomerSuccess: (id, flag, note) =>
+        transitionRequest(id, "flagCustomerSuccess", { flag, note }),
       updateAgreement: (id, patch) =>
         updateStore((prev) => ({
           ...prev,
@@ -1258,63 +1436,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         }
         return { ok: true, successor };
-      },
-      addAgreementWatches: async (id, watchIds) => {
-        const current = refreshStoreFromDisk();
-        const agreement = current.agreements.find((item) => item.id === id);
-        if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
-          return { ok: false, error: "NOT_LIVE" };
-        }
-        // Both books refuse to reshape a signed or ended repo (AGREEMENT_IMMUTABLE).
-        if (agreement.signedAt || agreement.bookEnd) {
-          return { ok: false, error: "AGREEMENT_IMMUTABLE" };
-        }
-        const extras = watchIds.filter((watchId) => !agreement.watchIds.includes(watchId));
-        const others = current.agreements.filter((item) => item.id !== id);
-        if (conflictingHeldWatchIds(extras, others).length > 0) {
-          return { ok: false, error: LIVE_WATCH_CONFLICT };
-        }
-        const eligible = extras.every((watchId) => {
-          const watch = current.timepieces.find((item) => item.id === watchId);
-          return isEligibleLiveAddWatch(watch, agreement.email);
-        });
-        if (!eligible) return { ok: false, error: "INELIGIBLE_PIECE" };
-        if (extras.length === 0) return { ok: true };
-        const acknowledgement = await updateStore((prev) => ({
-          ...prev,
-          agreements: prev.agreements.map((item) =>
-            item.id === id ? { ...item, watchIds: [...item.watchIds, ...extras] } : item,
-          ),
-        }), { operation: { action: "agreement.addWatches", id, watchIds: extras }, deferLive: true });
-        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
-        return { ok: true };
-      },
-      setAgreementAmount: async (id, amount) => {
-        const current = refreshStoreFromDisk();
-        const agreement = current.agreements.find((item) => item.id === id);
-        if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
-          return { ok: false, error: "NOT_LIVE" };
-        }
-        // Both books refuse to reshape a signed or ended repo (AGREEMENT_IMMUTABLE).
-        if (agreement.signedAt || agreement.bookEnd) {
-          return { ok: false, error: "AGREEMENT_IMMUTABLE" };
-        }
-        const raised = validateSaleAmountLower(agreement.amount, amount);
-        if (!raised.ok) return raised;
-        const openShell = current.shells.find((shell) => shell.status === "open");
-        const share = openShell?.ltv || current.settings.maxLtv;
-        const pieces = current.timepieces.filter((watch) => agreement.watchIds.includes(watch.id));
-        const cap = pieces.reduce(
-          (sum, watch) => sum + maxPurchaseAmount(watch.valueLow, watch.valueHigh, share),
-          0,
-        );
-        if (amount > cap) return { ok: false, error: "OVER_LTV" };
-        const acknowledgement = await updateStore((prev) => ({
-          ...prev,
-          agreements: prev.agreements.map((item) => (item.id === id ? { ...item, amount } : item)),
-        }), { operation: { action: "agreement.setAmount", id, amount }, deferLive: true });
-        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
-        return { ok: true };
       },
       clearAgreementEnd: async (id) => {
         const current = refreshStoreFromDisk();

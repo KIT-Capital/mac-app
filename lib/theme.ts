@@ -28,6 +28,9 @@ export const SERVER_SETTING_KEYS = [
   "requiredPhotoKinds",
 ] as const;
 
+/** Floor the server and both books use when desk settings have no row (R28). */
+export const DEFAULT_MIN_SALE_AMOUNT = 1_000;
+
 export const DEFAULT_SETTINGS = {
   companyName: "Mechanical Art Capital",
   phone: "+1 (833) 209-0972",
@@ -35,7 +38,7 @@ export const DEFAULT_SETTINGS = {
   financingEmail: "financing@mechartcap.com",
   handle: "@mechartcap",
   startingRate: 0.185,
-  minAdvance: 10_000,
+  minAdvance: DEFAULT_MIN_SALE_AMOUNT,
   maxLtv: 0.6,
   setupFee: 0.01,
   earlyRepurchaseAmount: 0.035,

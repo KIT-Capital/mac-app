@@ -58,7 +58,7 @@
       "sensitivity": "client-safe"
     },
     "docs/api.md": {
-      "sha256": "11a05985d1ace346fc9f16176dc8ab99e79c1099afd10fbdd32d28291d1a8afa",
+      "sha256": "c0ec2fb4e1128e72b3bade569e9128260ea91062674cd120956e28be1e128b6a",
       "sensitivity": "client-safe"
     },
     "docs/architecture.md": {
@@ -74,7 +74,7 @@
       "sensitivity": "client-safe"
     },
     "docs/design-system.md": {
-      "sha256": "6839fb0c74f3c513e674fc84c0dc014ab598613b481ac8bec146a2b3bd280b2b",
+      "sha256": "b6949248b837370063d8eeea92ea4c197a42e29a330069e3d4b9780aa205b3d5",
       "sensitivity": "client-safe"
     },
     "docs/harness.md": {

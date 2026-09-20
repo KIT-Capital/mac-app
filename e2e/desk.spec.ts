@@ -6,6 +6,7 @@ import {
   DESK_PASSWORD,
   HALE,
   addTimepieceWithPhotos,
+  appraiseNewHalePiece,
   completeTimepieceIntakePhotos,
   openCollectorAgreements,
   openDeskAgreements,
@@ -348,6 +349,41 @@ test.describe("desk", () => {
     await haleRow.getByRole("button", { name: "Mark signed" }).click();
     await expect(haleRow.getByText("signed", { exact: true })).toBeVisible();
     await expect(haleRow.getByText("past due")).toBeVisible();
+  });
+
+  test("desk confirms a request and the collector reads Your turn", async ({ page }) => {
+    await appraiseNewHalePiece(page);
+    await signInHale(page);
+    await page.goto("/repurchase");
+    await page.getByText("I confirm that I am at least 18 years old").click();
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByText("With MAC", { exact: true })).toBeVisible();
+    await signOutFromMenu(page);
+
+    await signInDesk(page);
+    await openDeskAgreements(page);
+    const request = page.getByRole("row").filter({ has: page.getByRole("button", { name: "Confirm" }) });
+    await expect(request).toHaveCount(1);
+    await expect(request.getByText("Jonathan Hale")).toBeVisible();
+    await expect(request.getByRole("button", { name: "Decline" })).toBeVisible();
+    // A request is not on the book, so it has no book label and no Mark signed.
+    await expect(request.getByRole("button", { name: "Mark signed" })).toHaveCount(0);
+    await request.getByRole("button", { name: "Confirm" }).click();
+    const confirmed = page.getByRole("row").filter({ hasText: "Your turn" });
+    await expect(confirmed).toHaveCount(1);
+    await expect(confirmed.getByRole("button", { name: "Confirm" })).toHaveCount(0);
+    await expect(page.getByText(/loan|paid off|vesting/i)).toHaveCount(0);
+    await page.getByRole("button", { name: "Log out" }).click();
+
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    const card = page.getByRole("link").filter({ hasText: "Your turn" });
+    await expect(card).toHaveCount(1);
+    await card.click();
+    await expect(page.getByText(/MAC confirmed your request/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Decline" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign Repurchase Agreement" })).toHaveCount(0);
   });
 
   test("desk records bought back and the collector chip matches", async ({ page }) => {

@@ -7,6 +7,7 @@ import { Field, NativeSelect, PillButton } from "@/components/field";
 import { isDesk, money } from "@/lib/catalog";
 import { bookLabel, deskToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
+import { isRequestRow, retailRequestWord } from "@/lib/contract/request-transitions.mjs";
 import { persistableState } from "@/lib/session-persist.mjs";
 import { useStore } from "@/lib/store";
 import type { Agreement, AgreementEnd, AgreementShell, AppState, BookEndKind } from "@/lib/types";
@@ -168,6 +169,7 @@ export default function AdminAgreementsPage() {
     removeShell,
     removeAgreement,
     signAgreement,
+    deskReturnRequest,
     updateAgreement,
     recordAgreementEnd,
     renewAgreement,
@@ -178,6 +180,7 @@ export default function AdminAgreementsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [endDraft, setEndDraft] = useState({ kind: "bought_back" as BookEndKind, date: "", amount: "" });
   const [endError, setEndError] = useState("");
+  const [requestError, setRequestError] = useState<{ id: string; text: string } | null>(null);
   const [shellError, setShellError] = useState("");
   const [documentNote, setDocumentNote] = useState<{ id: string; text: string } | null>(null);
   const [sendHistory, setSendHistory] = useState<{ id: string; rows: { actorKind: string; recipientKind: string; result: string }[] } | null>(null);
@@ -300,6 +303,20 @@ export default function AdminAgreementsPage() {
     setEndDraft({ kind: checked.end.kind as BookEndKind, date: checked.end.date, amount: String(checked.end.amount) });
   }
 
+  // The Desk confirms or declines; it never changes the amount (R12, KTD8).
+  async function onDeskReturn(agreement: Agreement, decision: "confirm" | "decline") {
+    setRequestError(null);
+    const result = await deskReturnRequest(agreement.id, decision);
+    if (!result.ok) {
+      setRequestError({
+        id: agreement.id,
+        text: result.error === "AGREEMENT_STATE_CONFLICT"
+          ? "This request moved on. Refresh the desk."
+          : "That answer could not be recorded.",
+      });
+    }
+  }
+
   async function onRenew(agreement: Agreement) {
     const closeDate = endDraft.date || deskToday();
     const result = await renewAgreement(agreement.id, closeDate);
@@ -388,11 +405,25 @@ export default function AdminAgreementsPage() {
           a.ownerName,
           money(a.amount),
           a.signedAt ? "signed" : a.status.replace("_", " "),
-          bookLabel(a),
-          <div key={a.id} className="flex gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
-            <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
-            {!a.signedAt && !a.bookEnd ? (
+          bookLabel(a) ?? "—",
+          <div key={a.id} className="flex flex-wrap items-center gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
+            {isRequestRow(a) ? (
+              a.status === "submitted" ? (
+                <>
+                  <button type="button" onClick={() => void onDeskReturn(a, "confirm")}>Confirm</button>
+                  <button type="button" onClick={() => void onDeskReturn(a, "decline")}>Decline</button>
+                </>
+              ) : (
+                <span className="text-white/60">{retailRequestWord(a)}</span>
+              )
+            ) : !a.signedAt ? (
+              <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
+            ) : null}
+            {!a.signedAt && !a.bookEnd && !isRequestRow(a) ? (
               <button type="button" onClick={() => void removeAgreement(a.id)}>Remove</button>
+            ) : null}
+            {requestError?.id === a.id ? (
+              <span className="text-[12px] text-red-400">{requestError.text}</span>
             ) : null}
           </div>,
         ])}
