@@ -62,7 +62,7 @@ import {
   validateRecordedEndKind,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
-import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { canEditAppraisal, canInspect, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
@@ -1412,15 +1412,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }),
       recordDeliveryRequest: (id, note) => transitionRequest(id, "recordDelivery", { note }),
       inspectRequest: async (id, input) => {
-        if (input.outcome === "decline") {
-          return transitionRequest(id, "declineAtInspection", {
-            note: input.note,
-            extra: { outcome: "decline", pieces: input.pieces },
-          });
-        }
         const current = getStoreSnapshot();
+        const user = current.user;
+        if (!user) return { ok: false, error: "SESSION_REQUIRED" };
+        if (!canInspect(user) || !isDeskRole(user.role)) {
+          return { ok: false, error: "ROLE_FORBIDDEN" };
+        }
         const row = current.agreements.find((item) => item.id === id);
-        if (!row) return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
+        if (!row) return { ok: false, error: "AGREEMENT_NOT_FOUND" };
+        const now = new Date();
+        if (isRequestExpired(row, deskToday(now))) {
+          return { ok: false, error: "REQUEST_EXPIRED" };
+        }
         const kept = input.pieces.filter((piece) => piece.decision === "confirm");
         const dropped = kept.length !== input.pieces.length;
         const share = row.scale?.purchaseShare ?? 0.6;
@@ -1428,51 +1431,61 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const dollars = (piece.inspectedValueCents ?? 0) / 100;
           return sum + maxPurchaseAmount(dollars, dollars, share);
         }, 0);
-        if (!kept.length) {
-          return transitionRequest(id, "declineAtInspection", {
-            note: input.note,
-            extra: { outcome: "proceed", pieces: input.pieces },
-          });
-        }
-        const applyInspectedAttempts = (prev: AppState): AppState => ({
+        const closes = input.outcome === "decline" || !kept.length;
+        const returns = !closes && (dropped || row.amount > maximum);
+        const actor = { kind: "desk" as const, id: user.email, role: user.role };
+        const transition = closes
+          ? applyTransition(
+              { ...row, version: row.version ?? 1 },
+              { action: "declineAtInspection", note: String(input.note ?? "") },
+              { now: now.toISOString(), today: deskToday(now), actor },
+            ) as TransitionOutcome
+          : returns
+            ? applyTransition(
+                { ...row, version: row.version ?? 1 },
+                {
+                  action: "amend",
+                  note: String(input.note ?? ""),
+                  amount: Math.min(row.amount, maximum),
+                  watchIds: kept.map((piece) => piece.timepieceId),
+                },
+                { now: now.toISOString(), today: deskToday(now), actor },
+              ) as TransitionOutcome
+            : null;
+        if (transition && !transition.ok) return { ok: false, error: transition.error };
+        return updateStore((prev) => ({
           ...prev,
-          appraisalAttempts: prev.appraisalAttempts.map((attempt) => {
-            const piece = input.pieces.find((item) => item.timepieceId === attempt.timepieceId);
-            if (!piece || attempt.status !== "accepted" || attempt.finalizedAt) return attempt;
-            if (piece.decision === "refuse") {
-              return {
-                ...attempt,
-                status: "refused" as const,
-                valueCents: undefined,
-                rangeLowCents: undefined,
-                rangeHighCents: undefined,
-                inspectedValueCents: undefined,
-              };
-            }
-            if (piece.decision !== "confirm") return attempt;
-            return {
-              ...attempt,
-              finalizedAt: new Date().toISOString(),
-              finalizedAgreementId: id,
-              inspectedValueCents: piece.inspectedValueCents,
-            };
-          }),
-        });
-        if (dropped || row.amount > maximum) {
-          const acknowledgement = await transitionRequest(id, "amend", {
-            note: input.note,
-            amount: Math.min(row.amount, maximum),
-            watchIds: kept.map((piece) => piece.timepieceId),
-            extra: { outcome: "proceed", pieces: input.pieces },
-          });
-          if (!acknowledgement.ok) return acknowledgement;
-          return updateStore(applyInspectedAttempts);
-        }
-        return updateStore((prev) => applyInspectedAttempts(prev), {
+          agreements: transition && transition.ok
+            ? prev.agreements.map((item) => (item.id === id ? transition.agreement : item))
+            : prev.agreements,
+          appraisalAttempts: input.outcome === "decline"
+            ? prev.appraisalAttempts
+            : prev.appraisalAttempts.map((attempt) => {
+                const piece = input.pieces.find((item) => item.timepieceId === attempt.timepieceId);
+                if (!piece || attempt.status !== "accepted" || attempt.finalizedAt) return attempt;
+                if (piece.decision === "refuse") {
+                  return {
+                    ...attempt,
+                    status: "refused" as const,
+                    valueCents: undefined,
+                    rangeLowCents: undefined,
+                    rangeHighCents: undefined,
+                    inspectedValueCents: undefined,
+                  };
+                }
+                if (piece.decision !== "confirm") return attempt;
+                return {
+                  ...attempt,
+                  finalizedAt: now.toISOString(),
+                  finalizedAgreementId: id,
+                  inspectedValueCents: piece.inspectedValueCents,
+                };
+              }),
+        }), {
           operation: {
             action: "request.inspect",
             id,
-            outcome: "proceed",
+            outcome: input.outcome,
             pieces: input.pieces,
             note: input.note ?? "",
             expectedStatus: row.status,
