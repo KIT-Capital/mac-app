@@ -62,7 +62,7 @@ import {
   validateRecordedEndKind,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
-import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { canEditAppraisal, canInspect, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
@@ -111,6 +111,30 @@ type Store = AppState & {
   declineRequest: (id: string, note?: string) => Promise<OperationAck>;
   withdrawRequest: (id: string, note?: string) => Promise<OperationAck>;
   flagRequestCustomerSuccess: (id: string, flag: boolean, note?: string) => Promise<OperationAck>;
+  signCollectorRequest: (
+    id: string,
+    input: { typedName: string; snapshotHash: string; delivery?: string; note?: string },
+  ) => Promise<OperationAck>;
+  recordDeliveryRequest: (id: string, note?: string) => Promise<OperationAck>;
+  inspectRequest: (
+    id: string,
+    input: {
+      outcome: "proceed" | "decline";
+      pieces: Array<{ timepieceId: string; decision: "confirm" | "refuse" | "drop"; inspectedValueCents?: number }>;
+      note?: string;
+    },
+  ) => Promise<OperationAck>;
+  executeMacRequest: (
+    id: string,
+    input: {
+      typedName: string;
+      snapshotHash: string;
+      paymentReference: string;
+      checklist: Record<string, true>;
+      note?: string;
+    },
+  ) => Promise<OperationAck>;
+  recordReturnRequest: (id: string, note?: string) => Promise<OperationAck>;
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
   removeAgreement: (id: string) => Promise<OperationAck>;
   signAgreement: (id: string) => Promise<OperationAck>;
@@ -194,7 +218,16 @@ export type RequestSubmitInput = {
   note?: string;
 };
 export type RequestDeskDecision = "confirm" | "decline";
-type RequestTransitionAction = "deskReturn" | "decline" | "withdraw" | "flagCustomerSuccess";
+type RequestTransitionAction =
+  | "deskReturn"
+  | "decline"
+  | "withdraw"
+  | "flagCustomerSuccess"
+  | "signCollector"
+  | "recordDelivery"
+  | "executeMac"
+  | "declineAtInspection"
+  | "amend";
 /** `applyTransition` is typed through JSDoc; this is its answer read from TypeScript. */
 type TransitionOutcome =
   | { ok: false; error: string }
@@ -731,7 +764,14 @@ function expireRequestRow(row: Agreement, now: Date): Agreement | null {
 function transitionRequest(
   id: string,
   action: RequestTransitionAction,
-  input: { decision?: RequestDeskDecision; flag?: boolean; note?: string },
+  input: {
+    decision?: RequestDeskDecision;
+    flag?: boolean;
+    note?: string;
+    extra?: Record<string, unknown>;
+    amount?: number;
+    watchIds?: string[];
+  },
 ): Promise<OperationAck> {
   const current = getStoreSnapshot();
   const user = current.user;
@@ -757,7 +797,13 @@ function transitionRequest(
   const expectedVersion = row.version ?? 1;
   const result = applyTransition(
     { ...row, version: expectedVersion },
-    { action, decision: input.decision, note: String(input.note ?? "") },
+    {
+      action,
+      decision: input.decision,
+      note: String(input.note ?? ""),
+      amount: input.amount,
+      watchIds: input.watchIds,
+    },
     {
       now: now.toISOString(),
       today: deskToday(now),
@@ -767,10 +813,46 @@ function transitionRequest(
     },
   ) as TransitionOutcome;
   if (!result.ok) return Promise.resolve({ ok: false, error: result.error });
-  const next: Agreement =
+  let next: Agreement =
     action === "flagCustomerSuccess"
       ? { ...result.agreement, customerSuccess: Boolean(input.flag) }
       : result.agreement;
+  if (action === "signCollector") {
+    next = {
+      ...next,
+      delivery: typeof input.extra?.delivery === "string" ? input.extra.delivery : next.delivery,
+      signatures: [
+        ...(row.signatures ?? []),
+        {
+          id: nextId("sig"),
+          version: next.version ?? 1,
+          party: "collector",
+          typedName: String(input.extra?.typedName ?? ""),
+          snapshotHash: String(input.extra?.snapshotHash ?? ""),
+          book: "browser",
+          signedAt: now.toISOString(),
+        },
+      ],
+    };
+  }
+  if (action === "executeMac") {
+    next = {
+      ...next,
+      paymentReference: String(input.extra?.paymentReference ?? ""),
+      signatures: [
+        ...(row.signatures ?? []),
+        {
+          id: nextId("sig"),
+          version: next.version ?? 1,
+          party: "mac",
+          typedName: String(input.extra?.typedName ?? ""),
+          snapshotHash: String(input.extra?.snapshotHash ?? ""),
+          book: "browser",
+          signedAt: now.toISOString(),
+        },
+      ],
+    };
+  }
   return updateStore(
     (prev) => ({
       ...prev,
@@ -785,6 +867,7 @@ function transitionRequest(
         note: String(input.note ?? ""),
         expectedStatus,
         expectedVersion,
+        ...(input.extra ?? {}),
       },
       deferLive: true,
       applyOnAck: false,
@@ -1322,6 +1405,124 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       withdrawRequest: (id, note) => transitionRequest(id, "withdraw", { note }),
       flagRequestCustomerSuccess: (id, flag, note) =>
         transitionRequest(id, "flagCustomerSuccess", { flag, note }),
+      signCollectorRequest: (id, input) =>
+        transitionRequest(id, "signCollector", {
+          note: input.note,
+          extra: { typedName: input.typedName, snapshotHash: input.snapshotHash, delivery: input.delivery },
+        }),
+      recordDeliveryRequest: (id, note) => transitionRequest(id, "recordDelivery", { note }),
+      inspectRequest: async (id, input) => {
+        const current = getStoreSnapshot();
+        const user = current.user;
+        if (!user) return { ok: false, error: "SESSION_REQUIRED" };
+        if (!canInspect(user) || !isDeskRole(user.role)) {
+          return { ok: false, error: "ROLE_FORBIDDEN" };
+        }
+        const row = current.agreements.find((item) => item.id === id);
+        if (!row) return { ok: false, error: "AGREEMENT_NOT_FOUND" };
+        const now = new Date();
+        if (isRequestExpired(row, deskToday(now))) {
+          return { ok: false, error: "REQUEST_EXPIRED" };
+        }
+        const kept = input.pieces.filter((piece) => piece.decision === "confirm");
+        const dropped = kept.length !== input.pieces.length;
+        const share = row.scale?.purchaseShare ?? 0.6;
+        const maximum = kept.reduce((sum, piece) => {
+          const dollars = (piece.inspectedValueCents ?? 0) / 100;
+          return sum + maxPurchaseAmount(dollars, dollars, share);
+        }, 0);
+        const closes = input.outcome === "decline" || !kept.length;
+        const returns = !closes && (dropped || row.amount > maximum);
+        const actor = { kind: "desk" as const, id: user.email, role: user.role };
+        const transition = closes
+          ? applyTransition(
+              { ...row, version: row.version ?? 1 },
+              { action: "declineAtInspection", note: String(input.note ?? "") },
+              { now: now.toISOString(), today: deskToday(now), actor },
+            ) as TransitionOutcome
+          : returns
+            ? applyTransition(
+                { ...row, version: row.version ?? 1 },
+                {
+                  action: "amend",
+                  note: String(input.note ?? ""),
+                  amount: Math.min(row.amount, maximum),
+                  watchIds: kept.map((piece) => piece.timepieceId),
+                },
+                { now: now.toISOString(), today: deskToday(now), actor },
+              ) as TransitionOutcome
+            : null;
+        if (transition && !transition.ok) return { ok: false, error: transition.error };
+        return updateStore((prev) => ({
+          ...prev,
+          agreements: transition && transition.ok
+            ? prev.agreements.map((item) => (item.id === id ? transition.agreement : item))
+            : prev.agreements,
+          appraisalAttempts: input.outcome === "decline"
+            ? prev.appraisalAttempts
+            : prev.appraisalAttempts.map((attempt) => {
+                const piece = input.pieces.find((item) => item.timepieceId === attempt.timepieceId);
+                if (!piece || attempt.status !== "accepted" || attempt.finalizedAt) return attempt;
+                if (piece.decision === "refuse") {
+                  return {
+                    ...attempt,
+                    status: "refused" as const,
+                    valueCents: undefined,
+                    rangeLowCents: undefined,
+                    rangeHighCents: undefined,
+                    inspectedValueCents: undefined,
+                  };
+                }
+                if (piece.decision !== "confirm") return attempt;
+                return {
+                  ...attempt,
+                  finalizedAt: now.toISOString(),
+                  finalizedAgreementId: id,
+                  inspectedValueCents: piece.inspectedValueCents,
+                };
+              }),
+        }), {
+          operation: {
+            action: "request.inspect",
+            id,
+            outcome: input.outcome,
+            pieces: input.pieces,
+            note: input.note ?? "",
+            expectedStatus: row.status,
+            expectedVersion: row.version ?? 1,
+          },
+          deferLive: true,
+          applyOnAck: false,
+        });
+      },
+      executeMacRequest: (id, input) =>
+        transitionRequest(id, "executeMac", {
+          note: input.note,
+          extra: {
+            typedName: input.typedName,
+            snapshotHash: input.snapshotHash,
+            paymentReference: input.paymentReference,
+            checklist: input.checklist,
+          },
+        }),
+      recordReturnRequest: (id, note) => {
+        const current = getStoreSnapshot();
+        const row = current.agreements.find((item) => item.id === id);
+        if (!row) return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
+        if (row.status !== "closed") return Promise.resolve({ ok: false, error: "AGREEMENT_STATE_CONFLICT" });
+        if (!row.deliveredOn) return Promise.resolve({ ok: false, error: "RETURN_NOT_APPLICABLE" });
+        return updateStore((prev) => prev, {
+          operation: {
+            action: "request.recordReturn",
+            id,
+            note: note ?? "",
+            expectedStatus: row.status,
+            expectedVersion: row.version ?? 1,
+          },
+          deferLive: true,
+          applyOnAck: false,
+        });
+      },
       updateAgreement: (id, patch) =>
         updateStore((prev) => ({
           ...prev,
@@ -1339,29 +1540,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           agreements: prev.agreements.filter((a) => a.id !== id),
         }), { operation: { action: "agreement.remove", id }, deferLive: true }),
-      signAgreement: async (id) =>
-        updateStore((prev) => ({
+      signAgreement: async (id) => {
+        const current = refreshStoreFromDisk();
+        const row = current.agreements.find((item) => item.id === id);
+        if (!row) return { ok: false, error: "AGREEMENT_NOT_FOUND" };
+        if (row.status === "returned") {
+          return { ok: false, error: "DOCUMENT_NOT_READY" };
+        }
+        // A book row already executed: record the day only. Request signing
+        // is request.signCollector.
+        return updateStore((prev) => ({
           ...prev,
-          agreements: prev.agreements.map((a) =>
-            a.id === id
-              ? {
-                  ...a,
-                  // Signing records the signature; the repo keeps the execution
-                  // date it already had, so its book label never blinks out.
-                  status: "executed" as const,
-                  signedAt: deskToday(),
-                  executedOn: a.executedOn ?? a.createdAt,
-                  lastActionAt: new Date().toISOString(),
-                }
-              : a
+          agreements: prev.agreements.map((item) =>
+            item.id === id ? { ...item, signedAt: item.signedAt ?? deskToday() } : item
           ),
-        }), {
-          operation: {
-            action: state.user?.role === "collector" ? "agreement.signCollector" : "agreement.markSigned",
-            id,
-          },
-          deferLive: true,
-        }),
+        }));
+      },
       recordAgreementEnd: async (id, end) => {
         const recordable = validateRecordedEndKind(end.kind);
         if (!recordable.ok) return recordable;

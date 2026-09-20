@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { maxPurchaseAmount } from "@/lib/catalog";
 import {
@@ -28,17 +28,20 @@ import {
   type DocumentStore,
   insertStageDocumentRow,
   liveAgreementHasDocuments,
+  recoverCurrentStageDocument,
   renderStageDocument,
 } from "./agreement-documents";
 import { consumeAccessRateLimit } from "./collector-sessions";
-import { dollarsToCents } from "./money.mjs";
+import { centsToDollars, dollarsToCents } from "./money.mjs";
 import { closeExpiredRequest, recordAgreementEvent } from "./request-events";
 import {
   assertAppraisalPhotoChangeAllowed,
   assertRetailPieceEditable,
   decideAppraisalAttempt,
+  finalizeAcceptedAttempt,
   reopenAppraisalAttempt,
   returnAppraisalAttempt,
+  reverseAcceptedAttempt,
   submitAppraisalAttempt,
   pieceHasAppraisalAttempt,
 } from "./appraisal-attempts";
@@ -65,9 +68,11 @@ import {
   photoObjects,
   staffAccounts,
   timepieces,
+  agreementDocuments,
+  agreementSignatures,
 } from "./schema";
 
-import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
+import { canEditAppraisal, canInspect, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
 import { normalizeRequiredPhotoKinds } from "../timepiece-shots.mjs";
 import type { DeskRole } from "../types";
 
@@ -79,6 +84,7 @@ type OperationContext = {
   env: NodeJS.ProcessEnv;
   documentStore?: DocumentStore;
   rootDb: Database;
+  clientAddress?: string;
 };
 
 /** A request row as the API returns it. `customerSuccess` is desk-only (KTD22). */
@@ -137,6 +143,10 @@ const REQUEST_TRANSITIONS = new Set([
   "request.decline",
   "request.withdraw",
   "request.flagCustomerSuccess",
+  "request.signCollector",
+  "request.recordDelivery",
+  "request.inspect",
+  "request.executeMac",
 ]);
 
 const REQUEST_SUBMITS_PER_DAY = 5;
@@ -224,7 +234,7 @@ async function ownedAgreement(db: Database, actor: Actor, id: string) {
     bookEnd: ends[0]
       ? { kind: ends[0].kind, date: ends[0].endedOn, amount: ends[0].amountCents / 100 }
       : undefined,
-  } as Agreement & { customerId: string };
+  } as Agreement & { customerId: string; amountCents: number };
 }
 
 /**
@@ -448,8 +458,11 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "timepiece.remove",
   "request.deskReturn",
   "request.flagCustomerSuccess",
+  "request.recordDelivery",
+  "request.inspect",
+  "request.executeMac",
+  "request.recordReturn",
   "agreement.updateScale",
-  "agreement.markSigned",
   "agreement.recordEnd",
   "agreement.clearEnd",
   "agreement.renew",
@@ -478,9 +491,12 @@ const LOCKED_AGREEMENT_ACTIONS = new Set([
   "request.decline",
   "request.withdraw",
   "request.flagCustomerSuccess",
+  "request.signCollector",
+  "request.recordDelivery",
+  "request.inspect",
+  "request.executeMac",
+  "request.recordReturn",
   "agreement.updateScale",
-  "agreement.signCollector",
-  "agreement.markSigned",
   "agreement.recordEnd",
   "agreement.clearEnd",
   "agreement.renew",
@@ -533,6 +549,15 @@ function auditDetail(
   if (operation.action === "request.flagCustomerSuccess") {
     return { flag: operation.flag, note: String(operation.note ?? "") };
   }
+  if (operation.action === "request.recordDelivery" || operation.action === "request.recordReturn") {
+    return { note: String(operation.note ?? "") };
+  }
+  if (operation.action === "request.inspect") {
+    return { outcome: operation.outcome, note: String(operation.note ?? "") };
+  }
+  if (operation.action === "request.executeMac") {
+    return { paymentReference: operation.paymentReference, note: String(operation.note ?? "") };
+  }
   return {};
 }
 
@@ -547,6 +572,7 @@ export async function executeLiveBookOperation(
     env: options.env ?? process.env,
     documentStore: options.documentStore,
     rootDb: db,
+    clientAddress: options.clientAddress,
   };
   if (operation.action === "request.submit" || operation.action === "request.withdraw") {
     await consumeRequestThrottle(db, actor, operation.action);
@@ -606,6 +632,11 @@ async function executeLiveBookOperationCore(
 
   if (action === "request.submit") return submitRequest(db, actor, operation, context);
 
+  if (action === "request.signCollector") return signCollectorRequest(db, actor, operation, context);
+  if (action === "request.recordDelivery") return recordDeliveryRequest(db, actor, operation);
+  if (action === "request.inspect") return inspectRequest(db, actor, operation, context);
+  if (action === "request.executeMac") return executeMacRequest(db, actor, operation, context);
+  if (action === "request.recordReturn") return recordReturnRequest(db, actor, operation);
   if (REQUEST_TRANSITIONS.has(action)) return transitionRequest(db, actor, operation);
 
   if (action === "appraisal.submit") {
@@ -1002,21 +1033,6 @@ async function executeLiveBookOperationCore(
         .where(and(eq(photoObjects.timepieceId, id), eq(photoObjects.status, "abandoned")));
       await tx.delete(timepieces).where(eq(timepieces.id, id));
     });
-    return;
-  }
-
-  if (action === "agreement.signCollector" || action === "agreement.markSigned") {
-    const agreement = await ownedAgreement(db, actor, String(operation.id));
-    if (action === "agreement.markSigned") requireDesk(actor);
-    if (action === "agreement.signCollector" && actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
-    requireMutableAgreement(agreement);
-    // Signing records who signed and when. It does not move the repo off the
-    // book, so the status the row already carries stands.
-    await db.update(liveAgreements).set({
-      signedOn: new Date().toISOString().slice(0, 10),
-      lastActionAt: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(liveAgreements.id, agreement.id));
     return;
   }
 
@@ -1477,5 +1493,394 @@ async function transitionRequest(
     internal: result.event.internal,
     createdAt: now,
   });
+  return { agreement: projectRequestRow(row, agreement.watchIds, actor) };
+}
+
+function transitionActorOf(actor: Actor) {
+  return isDesk(actor)
+    ? { kind: "desk" as const, id: actor.staffId ?? actor.email, role: actor.role }
+    : { kind: "retail" as const, id: actor.customerId };
+}
+
+async function persistTransition(
+  db: Database,
+  actor: Actor,
+  agreement: Awaited<ReturnType<typeof ownedAgreement>>,
+  input: Parameters<typeof applyTransition>[1],
+  now: Date,
+  extra: Partial<typeof liveAgreements.$inferInsert> = {},
+) {
+  const result = applyTransition(
+    { ...agreement, version: agreement.version ?? 1 },
+    input,
+    { now: now.toISOString(), today: deskToday(now), actor: transitionActorOf(actor) },
+  ) as TransitionOutcome;
+  if (!result.ok) throw new Error(result.error);
+  const next = result.agreement;
+  const [row] = await db.update(liveAgreements).set({
+    status: next.status,
+    version: next.version,
+    amountCents: dollarsToCents(next.amount) ?? agreement.amountCents,
+    closeReason: next.closeReason ?? null,
+    lastActionAt: result.event.fromStatus !== result.event.toStatus ? now : undefined,
+    executedOn: next.status === "executed" ? (next.executedOn ?? deskToday(now)) : null,
+    signedOn: next.status === "collector_signed" || next.status === "executed"
+      ? (agreement.signedAt ?? deskToday(now))
+      : agreement.signedAt ?? null,
+    updatedAt: now,
+    ...extra,
+  }).where(and(
+    eq(liveAgreements.id, agreement.id),
+    eq(liveAgreements.status, agreement.status),
+    eq(liveAgreements.version, agreement.version ?? 1),
+  )).returning();
+  if (!row) throw new Error("AGREEMENT_STATE_CONFLICT");
+  if (next.status === "closed") {
+    await db.update(liveAgreementMembers)
+      .set({ status: "released" })
+      .where(and(
+        eq(liveAgreementMembers.agreementId, agreement.id),
+        eq(liveAgreementMembers.status, "reserved"),
+      ));
+  }
+  await recordAgreementEvent(db, {
+    agreementId: agreement.id,
+    actorKind: result.event.actorKind as "retail" | "desk" | "system",
+    actorId: result.event.actorId,
+    action: result.event.action,
+    fromStatus: result.event.fromStatus,
+    toStatus: result.event.toStatus,
+    amountCents: dollarsToCents(result.event.amount),
+    version: result.event.version,
+    note: result.event.note,
+    internal: result.event.internal,
+    createdAt: now,
+  });
+  return { result, row };
+}
+
+async function bindSignature(
+  db: Database,
+  input: {
+    agreementId: string;
+    version: number;
+    party: "collector" | "mac";
+    signerId: string;
+    typedName: string;
+    documentId: string;
+    snapshotHash: string;
+    clientAddress?: string;
+  },
+) {
+  await db.insert(agreementSignatures).values({
+    id: randomUUID(),
+    agreementId: input.agreementId,
+    version: input.version,
+    party: input.party,
+    signerId: input.signerId,
+    typedName: input.typedName,
+    documentId: input.documentId,
+    snapshotHash: input.snapshotHash,
+    clientAddress: input.clientAddress ?? null,
+    book: "live",
+  });
+}
+
+async function signCollectorRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+  context: OperationContext,
+): Promise<RequestSubmitResult> {
+  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  const agreement = await ownedAgreement(db, actor, String(operation.id));
+  if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+    throw new Error("AGREEMENT_STATE_CONFLICT");
+  }
+  const proposal = await recoverCurrentStageDocument(
+    db,
+    agreement.id,
+    agreement.version ?? 1,
+    "proposal",
+    context.documentStore,
+    context.env,
+  );
+  if (proposal.snapshotHash !== operation.snapshotHash) throw new Error("DOCUMENT_STALE");
+  const now = new Date();
+  const persisted = await persistTransition(db, actor, agreement, {
+    action: "signCollector",
+    note: String(operation.note ?? ""),
+  }, now, {
+    delivery: operation.delivery ? String(operation.delivery) : undefined,
+  });
+  await bindSignature(db, {
+    agreementId: agreement.id,
+    version: persisted.row.version,
+    party: "collector",
+    signerId: actor.customerId,
+    typedName: String(operation.typedName),
+    documentId: proposal.id,
+    snapshotHash: proposal.snapshotHash,
+    clientAddress: context.clientAddress,
+  });
+  const document = await insertStageDocumentRow(db, persisted.row, "collector_signed", actor, context.env);
+  return {
+    agreement: projectRequestRow(persisted.row, agreement.watchIds, actor),
+    afterCommit: [() => renderStageDocument(context.rootDb, document.id, context.documentStore, context.env)],
+  };
+}
+
+async function recordDeliveryRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+): Promise<RequestTransitionResult> {
+  requireDesk(actor);
+  const agreement = await ownedAgreement(db, actor, String(operation.id));
+  if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+    throw new Error("AGREEMENT_STATE_CONFLICT");
+  }
+  const now = new Date();
+  const persisted = await persistTransition(db, actor, agreement, {
+    action: "recordDelivery",
+    note: String(operation.note ?? ""),
+  }, now, { deliveredOn: deskToday(now) });
+  return { agreement: projectRequestRow(persisted.row, agreement.watchIds, actor) };
+}
+
+async function inspectRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+  context: OperationContext,
+): Promise<RequestSubmitResult> {
+  if (!canInspect(actor) || !isDesk(actor)) throw new Error("ROLE_FORBIDDEN");
+  if (!actor.staffId) throw new Error("SESSION_INVALID");
+  const agreement = await ownedAgreement(db, actor, String(operation.id));
+  if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+    throw new Error("AGREEMENT_STATE_CONFLICT");
+  }
+  const pieces = operation.pieces as Array<{
+    timepieceId: string;
+    decision: "confirm" | "refuse" | "drop";
+    inspectedValueCents?: number;
+  }>;
+  const reserved = await db.select().from(liveAgreementMembers).where(and(
+    eq(liveAgreementMembers.agreementId, agreement.id),
+    eq(liveAgreementMembers.status, "reserved"),
+  ));
+  const reservedIds = new Set(reserved.map((row) => row.timepieceId));
+  if (
+    reserved.length !== pieces.length ||
+    pieces.some((piece) => !reservedIds.has(piece.timepieceId))
+  ) {
+    throw new Error("INSPECTION_INCOMPLETE");
+  }
+  const now = new Date();
+  if (operation.outcome === "decline") {
+    const persisted = await persistTransition(db, actor, agreement, {
+      action: "declineAtInspection",
+      note: String(operation.note ?? ""),
+    }, now);
+    await db.update(liveAgreementMembers)
+      .set({ status: "released" })
+      .where(and(
+        eq(liveAgreementMembers.agreementId, agreement.id),
+        eq(liveAgreementMembers.status, "reserved"),
+      ));
+    return { agreement: projectRequestRow(persisted.row, [], actor), afterCommit: [] };
+  }
+
+  const kept: string[] = [];
+  const inspectedCaps: Record<string, number> = {};
+  let dropped = false;
+  const scale = agreement.scale as { purchaseShare?: number } | undefined;
+  const share = Number(scale?.purchaseShare ?? 0.6);
+  for (const piece of pieces) {
+    if (piece.decision === "confirm") {
+      if (piece.inspectedValueCents == null) throw new Error("INSPECTED_VALUE_REQUIRED");
+      await finalizeAcceptedAttempt(db, {
+        timepieceId: piece.timepieceId,
+        agreementId: agreement.id,
+        staffId: actor.staffId,
+        inspectedValueCents: piece.inspectedValueCents,
+        now,
+      });
+      const dollars = centsToDollars(piece.inspectedValueCents);
+      inspectedCaps[piece.timepieceId] = maxPurchaseAmount(dollars, dollars, share);
+      kept.push(piece.timepieceId);
+    } else if (piece.decision === "refuse") {
+      await reverseAcceptedAttempt(db, { timepieceId: piece.timepieceId, now });
+      await db.update(liveAgreementMembers)
+        .set({ status: "released" })
+        .where(and(
+          eq(liveAgreementMembers.agreementId, agreement.id),
+          eq(liveAgreementMembers.timepieceId, piece.timepieceId),
+        ));
+      dropped = true;
+    } else {
+      await db.update(liveAgreementMembers)
+        .set({ status: "released" })
+        .where(and(
+          eq(liveAgreementMembers.agreementId, agreement.id),
+          eq(liveAgreementMembers.timepieceId, piece.timepieceId),
+        ));
+      dropped = true;
+    }
+  }
+  const maximum = Object.values(inspectedCaps).reduce((sum, cap) => sum + cap, 0);
+  const signedAmount = agreement.amount;
+  if (!kept.length) {
+    const persisted = await persistTransition(db, actor, agreement, {
+      action: "declineAtInspection",
+      note: String(operation.note ?? ""),
+    }, now);
+    return { agreement: projectRequestRow(persisted.row, [], actor), afterCommit: [] };
+  }
+  const needsReturn = dropped || signedAmount > maximum;
+  if (!needsReturn) {
+    await recordAgreementEvent(db, {
+      agreementId: agreement.id,
+      actorKind: "desk",
+      actorId: actor.staffId,
+      action: "inspect",
+      fromStatus: agreement.status,
+      toStatus: "inspecting",
+      amountCents: agreement.amountCents,
+      version: agreement.version ?? 1,
+      note: String(operation.note ?? ""),
+      createdAt: now,
+    });
+    const [row] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, agreement.id));
+    return { agreement: projectRequestRow(row, kept, actor), afterCommit: [] };
+  }
+  const nextAmount = Math.min(signedAmount, maximum);
+  const persisted = await persistTransition(db, actor, agreement, {
+    action: "amend",
+    amount: nextAmount,
+    watchIds: kept,
+    note: String(operation.note ?? ""),
+  }, now, { pieceCaps: inspectedCaps });
+  for (const member of reserved) {
+    if (!kept.includes(member.timepieceId)) {
+      await db.update(liveAgreementMembers)
+        .set({ status: "released" })
+        .where(eq(liveAgreementMembers.id, member.id));
+    }
+  }
+  const document = await insertStageDocumentRow(db, persisted.row, "proposal", actor, context.env);
+  return {
+    agreement: projectRequestRow(persisted.row, kept, actor),
+    afterCommit: [() => renderStageDocument(context.rootDb, document.id, context.documentStore, context.env)],
+  };
+}
+
+async function executeMacRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+  context: OperationContext,
+): Promise<RequestSubmitResult> {
+  if (!canInspect(actor) || !isDesk(actor)) throw new Error("ROLE_FORBIDDEN");
+  if (!actor.staffId) throw new Error("SESSION_INVALID");
+  const agreement = await ownedAgreement(db, actor, String(operation.id));
+  if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+    throw new Error("AGREEMENT_STATE_CONFLICT");
+  }
+  const [collectorSignature] = await db.select().from(agreementSignatures).where(and(
+    eq(agreementSignatures.agreementId, agreement.id),
+    eq(agreementSignatures.version, agreement.version ?? 1),
+    eq(agreementSignatures.party, "collector"),
+  )).limit(1);
+  if (!collectorSignature) throw new Error("SIGNATURE_STALE");
+  const [signatureDocument] = await db.select().from(agreementDocuments).where(
+    eq(agreementDocuments.id, collectorSignature.documentId),
+  ).limit(1);
+  if (
+    !signatureDocument ||
+    signatureDocument.liveAgreementId !== agreement.id ||
+    signatureDocument.version !== (agreement.version ?? 1) ||
+    signatureDocument.stage !== "proposal"
+  ) {
+    throw new Error("SIGNATURE_STALE");
+  }
+  const signed = await recoverCurrentStageDocument(
+    db,
+    agreement.id,
+    agreement.version ?? 1,
+    "collector_signed",
+    context.documentStore,
+    context.env,
+  );
+  if (signed.snapshotHash !== operation.snapshotHash) throw new Error("DOCUMENT_STALE");
+  const reserved = await db.select().from(liveAgreementMembers).where(and(
+    eq(liveAgreementMembers.agreementId, agreement.id),
+    eq(liveAgreementMembers.status, "reserved"),
+  ));
+  if (!reserved.length) throw new Error("INSPECTION_INCOMPLETE");
+  for (const member of reserved) {
+    const [attempt] = await db.select({ finalizedAt: appraisalAttempts.finalizedAt })
+      .from(appraisalAttempts)
+      .where(and(
+        eq(appraisalAttempts.timepieceId, member.timepieceId),
+        eq(appraisalAttempts.finalizedAgreementId, agreement.id),
+      ))
+      .limit(1);
+    if (!attempt?.finalizedAt) throw new Error("INSPECTION_INCOMPLETE");
+  }
+  const now = new Date();
+  const persisted = await persistTransition(db, actor, agreement, {
+    action: "executeMac",
+    note: String(operation.note ?? ""),
+  }, now, { paymentReference: String(operation.paymentReference) });
+  await db.update(liveAgreementMembers)
+    .set({ status: "live" })
+    .where(and(
+      eq(liveAgreementMembers.agreementId, agreement.id),
+      eq(liveAgreementMembers.status, "reserved"),
+    ));
+  await bindSignature(db, {
+    agreementId: agreement.id,
+    version: persisted.row.version,
+    party: "mac",
+    signerId: actor.staffId,
+    typedName: String(operation.typedName),
+    documentId: signed.id,
+    snapshotHash: signed.snapshotHash,
+    clientAddress: context.clientAddress,
+  });
+  const document = await insertStageDocumentRow(db, persisted.row, "executed", actor, context.env);
+  return {
+    agreement: projectRequestRow(persisted.row, reserved.map((row) => row.timepieceId), actor),
+    afterCommit: [() => renderStageDocument(context.rootDb, document.id, context.documentStore, context.env)],
+  };
+}
+
+async function recordReturnRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+): Promise<RequestTransitionResult> {
+  requireDesk(actor);
+  const agreement = await ownedAgreement(db, actor, String(operation.id));
+  if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+    throw new Error("AGREEMENT_STATE_CONFLICT");
+  }
+  if (agreement.status !== "closed") throw new Error("AGREEMENT_STATE_CONFLICT");
+  if (!agreement.deliveredOn) throw new Error("RETURN_NOT_APPLICABLE");
+  const now = new Date();
+  await recordAgreementEvent(db, {
+    agreementId: agreement.id,
+    actorKind: "desk",
+    actorId: isDesk(actor) ? actor.staffId ?? actor.email : actor.email,
+    action: "recordReturn",
+    fromStatus: "closed",
+    toStatus: "closed",
+    amountCents: agreement.amountCents,
+    version: agreement.version ?? 1,
+    note: String(operation.note ?? ""),
+    createdAt: now,
+  });
+  const [row] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, agreement.id));
   return { agreement: projectRequestRow(row, agreement.watchIds, actor) };
 }

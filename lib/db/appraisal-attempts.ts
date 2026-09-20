@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import {
   canEditAppraisal,
   isDeskRole,
@@ -601,4 +601,89 @@ export async function reopenAppraisalAttempt(
     .set({ status: "reviewing", updatedAt: new Date() })
     .where(eq(timepieces.id, piece.id));
   return { attemptId: attempt.id };
+}
+
+/**
+ * Inspection confirm (KTD14, KTD29). The remote Accept stays; this writes the
+ * seen dollar and freezes the attempt to this request. Decisions-used is
+ * untouched.
+ */
+export async function finalizeAcceptedAttempt(
+  db: Database,
+  input: {
+    timepieceId: string;
+    agreementId: string;
+    staffId: string;
+    inspectedValueCents: number;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  const [attempt] = await db
+    .select()
+    .from(appraisalAttempts)
+    .where(
+      and(
+        eq(appraisalAttempts.timepieceId, input.timepieceId),
+        eq(appraisalAttempts.status, "accepted"),
+        isNull(appraisalAttempts.finalizedAt),
+      ),
+    )
+    .orderBy(desc(appraisalAttempts.attemptNo))
+    .for("update")
+    .limit(1);
+  if (!attempt) throw new Error("INSPECTION_INCOMPLETE");
+  const [updated] = await db
+    .update(appraisalAttempts)
+    .set({
+      finalizedAt: now,
+      finalizedByStaffId: input.staffId,
+      finalizedAgreementId: input.agreementId,
+      inspectedValueCents: input.inspectedValueCents,
+      updatedAt: now,
+    })
+    .where(eq(appraisalAttempts.id, attempt.id))
+    .returning();
+  return updated;
+}
+
+/**
+ * Inspection refuse (KTD14). The Accept becomes a refusal on the same
+ * attempt, so a decision slot is not consumed. Piece projections stay.
+ */
+export async function reverseAcceptedAttempt(
+  db: Database,
+  input: { timepieceId: string; now?: Date },
+) {
+  const now = input.now ?? new Date();
+  const [attempt] = await db
+    .select()
+    .from(appraisalAttempts)
+    .where(
+      and(
+        eq(appraisalAttempts.timepieceId, input.timepieceId),
+        eq(appraisalAttempts.status, "accepted"),
+        isNull(appraisalAttempts.finalizedAt),
+      ),
+    )
+    .orderBy(desc(appraisalAttempts.attemptNo))
+    .for("update")
+    .limit(1);
+  if (!attempt) throw new Error("INSPECTION_INCOMPLETE");
+  const [updated] = await db
+    .update(appraisalAttempts)
+    .set({
+      status: "refused",
+      valueCents: null,
+      rangeLowCents: null,
+      rangeHighCents: null,
+      inspectedValueCents: null,
+      finalizedAt: null,
+      finalizedByStaffId: null,
+      finalizedAgreementId: null,
+      updatedAt: now,
+    })
+    .where(eq(appraisalAttempts.id, attempt.id))
+    .returning();
+  return updated;
 }

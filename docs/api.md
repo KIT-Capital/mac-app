@@ -182,8 +182,18 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   note; five attempts per customer per day including refusals, else `THROTTLED`), `request.deskReturn`
   (any desk role, `decision: confirm | decline` — never an amount),
   `request.decline` and `request.withdraw` (retail owner; withdraw is five
-  attempts per customer per day including refusals, else `THROTTLED`), and
-  `request.flagCustomerSuccess` (desk, internal). Every transition carries
+  attempts per customer per day including refusals, else `THROTTLED`),
+  `request.flagCustomerSuccess` (desk, internal), `request.signCollector`
+  (retail owner, from `returned`: typed name, the displayed `snapshotHash`,
+  optional delivery; a failed proposal is recovered on the sign call itself),
+  `request.recordDelivery` (any desk, from `collector_signed`),
+  `request.inspect` (appraiser or super admin: per-piece confirm / refuse /
+  drop plus inspected cents, or decline), `request.executeMac` (appraiser or
+  super admin, from `inspecting`: typed name, the collector-signed
+  `snapshotHash`, payment reference, and the R16 checklist), and
+  `request.recordReturn` (any desk, on a closed request that was delivered).
+  Legacy `agreement.signCollector` and `agreement.markSigned` no longer exist.
+  Every transition carries
   `expectedStatus` and `expectedVersion`; a stale row is `AGREEMENT_STATE_CONFLICT`
   and a foreign id is `AGREEMENT_NOT_FOUND`. A request left in "Your turn" past
   the response window closes as expired on the next touch and the touch is
@@ -196,7 +206,8 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   evidence. At most three completed decisions are allowed; Return consumes none.
   Only the deciding appraiser or a super admin reopens/re-decides. Admins read
   appraisal rows but cannot write them. Other Desk roles continue to control
-  applicable status, repo ends, marking signed, and renewal.
+  applicable status, repo ends, and renewal. MAC execute is the only path
+  that puts a request on the book.
 - Desk-data actions are `settings.update`, `catalog.upsert`, `catalog.remove`,
   `shell.upsert`, and `shell.remove`. Catalog writes and appraisal fields require
   appraiser or super admin; `requiredPhotoKinds` requires super admin; the
@@ -207,8 +218,10 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   changes and re-check the staff row in that transaction. Replacing the open
   shell atomically assigns the prior shell under a database lock; changing or
   removing the sole open shell without a replacement is refused.
-- Collector signature records the seller-side contract action only. It does not
-  record desk payment, cash movement, or a book end.
+- Collector signature on a request binds to the proposal document the owner
+  saw. MAC's signature binds to the collector-signed document and runs only
+  after every remaining piece is finalized, the checklist is complete, and a
+  payment reference is present. Neither signature records cash movement.
 - Successful mutations return a durable `{ mode: "live", acknowledged: true }`
   after commit. The client then performs a separate authoritative `GET`; mutation
   responses do not couple commit success to a second read. An accepted appraisal

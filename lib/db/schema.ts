@@ -800,6 +800,8 @@ export const appraisalAttempts = pgTable(
     finalizedAt: timestamp("finalized_at", { withTimezone: true }),
     finalizedByStaffId: text("finalized_by_staff_id").references(() => staffAccounts.id),
     finalizedAgreementId: text("finalized_agreement_id").references(() => liveAgreements.id),
+    /** Wholesale dollars recorded when the piece is seen (KTD29). */
+    inspectedValueCents: integer("inspected_value_cents"),
     reopenedCount: integer("reopened_count").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -814,6 +816,10 @@ export const appraisalAttempts = pgTable(
       sql`${table.decisionNo} is null or ${table.decisionNo} between 1 and 3`,
     ),
     check("appraisal_attempts_reopened_count_check", sql`${table.reopenedCount} >= 0`),
+    check(
+      "appraisal_attempts_inspected_value_cents_check",
+      sql`${table.inspectedValueCents} is null or ${table.inspectedValueCents} >= 0`,
+    ),
     check("appraisal_attempts_note_check", sql`length(${table.note}) <= 256`),
     check(
       "appraisal_attempts_response_note_check",

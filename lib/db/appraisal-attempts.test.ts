@@ -3,8 +3,13 @@ import { after, before, describe, it } from "node:test";
 import { and, eq, sql } from "drizzle-orm";
 import { memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
 import { hashStaffPassword } from "../staff-password.mjs";
+import { completedAppraisalDecisions } from "../contract/repo-book.mjs";
 import { createDb, type Database } from "./client";
 import { readLiveBookState } from "./live-book-adapter";
+import {
+  finalizeAcceptedAttempt,
+  reverseAcceptedAttempt,
+} from "./appraisal-attempts";
 import { executeLiveBookOperation } from "./live-book-mutations";
 import {
   confirmPhotoUpload,
@@ -1069,5 +1074,73 @@ describe("appraisal attempts repository", { skip }, () => {
       .where(eq(appraisalAttempts.id, ids[2]));
     assert.equal(attempt.decisionNo, 3);
     assert.equal(attempt.status, "refused");
+  });
+
+  it("finalizes an Accept with an inspected value and reverses it without spending a decision", async () => {
+    const fixture = await piece("inspect");
+    const attemptId = `attempt-inspect-${suffix}`;
+    const agreementId = `repo-inspect-${suffix}`;
+    await db.insert(appraisalAttempts).values({
+      id: attemptId,
+      timepieceId: fixture.piece.id,
+      customerId: fixture.customer.id,
+      attemptNo: 1,
+      decisionNo: 1,
+      status: "accepted",
+      snapshot: { fields: {}, note: "" },
+      decidedByStaffId: appraiserA.staffId,
+      decidedAt: new Date(),
+      valueCents: 11_000_000,
+      rangeLowCents: 10_000_000,
+      rangeHighCents: 12_000_000,
+    });
+    await db.insert(liveAgreements).values({
+      id: agreementId,
+      customerId: fixture.customer.id,
+      amountCents: 3_000_000,
+      termMonths: 12,
+      delivery: "",
+      ownerName: fixture.customer.name,
+      email: fixture.customer.email,
+      status: "inspecting",
+      createdOn: "2026-09-20",
+    });
+    const before = completedAppraisalDecisions(
+      await db.select().from(appraisalAttempts).where(eq(appraisalAttempts.timepieceId, fixture.piece.id)),
+      fixture.piece.id,
+    );
+    const finalized = await finalizeAcceptedAttempt(db, {
+      timepieceId: fixture.piece.id,
+      agreementId,
+      staffId: appraiserA.staffId!,
+      inspectedValueCents: 4_500_000,
+    });
+    assert.equal(finalized.inspectedValueCents, 4_500_000);
+    assert.ok(finalized.finalizedAt);
+    assert.equal(finalized.finalizedAgreementId, agreementId);
+    assert.equal(finalized.decisionNo, 1);
+    await assert.rejects(
+      () => finalizeAcceptedAttempt(db, {
+        timepieceId: fixture.piece.id,
+        agreementId,
+        staffId: appraiserA.staffId!,
+        inspectedValueCents: 5_000_000,
+      }),
+      { message: "INSPECTION_INCOMPLETE" },
+    );
+    await db.update(appraisalAttempts)
+      .set({
+        finalizedAt: null,
+        finalizedByStaffId: null,
+        finalizedAgreementId: null,
+        inspectedValueCents: null,
+      })
+      .where(eq(appraisalAttempts.id, attemptId));
+    const reversed = await reverseAcceptedAttempt(db, { timepieceId: fixture.piece.id });
+    assert.equal(reversed.status, "refused");
+    assert.equal(reversed.decisionNo, 1);
+    assert.equal(reversed.valueCents, null);
+    const after = await db.select().from(appraisalAttempts).where(eq(appraisalAttempts.timepieceId, fixture.piece.id));
+    assert.equal(completedAppraisalDecisions(after, fixture.piece.id), before);
   });
 });

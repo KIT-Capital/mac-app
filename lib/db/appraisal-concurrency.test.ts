@@ -49,6 +49,7 @@ describe("appraisal decision concurrency", { skip }, () => {
         "decided_by_staff_id" text, "decided_at" timestamptz, "value_cents" integer,
         "range_low_cents" integer, "range_high_cents" integer, "finalized_at" timestamptz,
         "finalized_by_staff_id" text, "finalized_agreement_id" text,
+        "inspected_value_cents" integer,
         "reopened_count" integer not null default 0, "updated_at" timestamptz not null default now()
       );
       create unique index "appraisal_attempts_timepiece_decision_uidx"
