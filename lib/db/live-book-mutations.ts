@@ -5,8 +5,9 @@ import {
   bookLabel,
   isLiveBookLabel,
   validateRecordedEndKind,
-  validateSaleAmountRaise,
+  validateSaleAmountLower,
 } from "@/lib/contract/repo-book.mjs";
+import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import {
   agreementScaleFromDesk,
@@ -111,11 +112,20 @@ async function ownedAgreement(db: Database, actor: Actor, id: string) {
     db.select().from(liveAgreementMembers).where(eq(liveAgreementMembers.agreementId, id)),
     db.select().from(liveAgreementEnds).where(eq(liveAgreementEnds.agreementId, id)),
   ]);
+  // The stored row still carries the legacy status, and the legacy guards below
+  // read it directly, so only the derived execution date is added here — that is
+  // all the book label needs until U5's migration persists these columns.
+  const mapped = legacyAgreementToRequest({
+    status: agreement.status,
+    createdAt: agreement.createdOn,
+    signedAt: agreement.signedOn ?? undefined,
+  });
   return {
     ...agreement,
     amount: agreement.amountCents / 100,
     createdAt: agreement.createdOn,
     signedAt: agreement.signedOn ?? undefined,
+    executedOn: mapped.executedOn,
     watchIds: members.map((row) => row.timepieceId),
     bookEnd: ends[0]
       ? { kind: ends[0].kind, date: ends[0].endedOn, amount: ends[0].amountCents / 100 }
@@ -1001,6 +1011,9 @@ async function executeLiveBookOperationCore(
         delivery: planned.successor.delivery,
         ownerName: planned.successor.ownerName,
         email: agreement.email,
+        // Stays the legacy shape until U5's migration adds `executed_on`; the
+        // adapter maps it through `legacyAgreementToRequest` on the way out, so
+        // the successor still reads as executed from its close date (KTD21).
         status: "pending_signature",
         agreementCode: String(operation.agreementCode),
         createdOn: String(operation.closeDate),
@@ -1049,7 +1062,7 @@ async function executeLiveBookOperationCore(
     requireMutableAgreement(agreement);
     if (!isLiveBookLabel(bookLabel(agreement))) throw new Error("NOT_LIVE");
     const amount = Number(operation.amount);
-    const checked = validateSaleAmountRaise(agreement.amount, amount);
+    const checked = validateSaleAmountLower(agreement.amount, amount);
     if (!checked.ok) throw new Error(checked.error);
     const pieces = await db.select().from(timepieces).where(inArray(timepieces.id, agreement.watchIds));
     const share = Number((agreement.scale as { purchaseShare?: number } | null)?.purchaseShare ?? 0.6);

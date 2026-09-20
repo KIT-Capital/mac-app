@@ -111,7 +111,7 @@ test.describe("collector app", () => {
 
   test("a new tab always starts at splash, then Sign In recovers Hale's pieces", async ({ context, page }) => {
     await signInHale(page);
-    const stored = await page.evaluate(() => localStorage.getItem("mac-app-state-v3"));
+    const stored = await page.evaluate(() => localStorage.getItem("mac-app-state-v4"));
     expect(stored).toBeTruthy();
     expect(JSON.parse(stored as string).user).toBeNull();
     const fresh = await context.newPage();
@@ -531,9 +531,13 @@ test.describe("collector app", () => {
     await page.getByText("I confirm that I am at least 18 years old").click();
     await page.getByRole("button", { name: "Send Application" }).click();
     await expect(page.getByRole("heading", { name: "Repurchase Agreement", exact: true })).toBeVisible();
+    // A repo is on the book from the moment it exists, and stays there through
+    // signing — its label never blinks out.
+    await expect(page.getByText(/Book:\s*open/i)).toBeVisible();
     await page.getByRole("button", { name: "Review Terms" }).click();
     await page.getByRole("button", { name: "Sign Repurchase Agreement" }).click();
     await expect(page.getByRole("button", { name: "Executed & Verified" })).toBeVisible();
+    await expect(page.getByText(/Book:\s*open/i)).toBeVisible();
   });
 
   test("first live application uses term-specific server purchase caps without disclosing terms", async ({ page }) => {

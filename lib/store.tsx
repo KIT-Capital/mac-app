@@ -25,6 +25,7 @@ import {
   applyAppraisalSubmit,
   browserPhotoMutationError,
 } from "@/lib/appraisal-attempt-apply.mjs";
+import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { agreementScaleFromDesk } from "@/lib/contract/repo-scale.mjs";
 import { nextId } from "@/lib/ids";
@@ -49,15 +50,15 @@ import {
   applyAgreementEnd,
   bookLabel,
   clearAgreementEnd as stripAgreementEnd,
-  conflictingLiveWatchIds,
+  conflictingHeldWatchIds,
   isEligibleLiveAddWatch,
   isLiveBookLabel,
   isUnderReview,
-  liveWatchIds,
+  heldWatchIds,
   LIVE_WATCH_CONFLICT,
-  utcToday,
+  deskToday,
   validateRecordedEndKind,
-  validateSaleAmountRaise,
+  validateSaleAmountLower,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
 import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
@@ -84,7 +85,8 @@ import type {
   UserPreferences,
 } from "@/lib/types";
 
-const STORAGE_KEY = "mac-app-state-v3";
+const STORAGE_KEY = "mac-app-state-v4";
+const LEGACY_STORAGE_KEYS = ["mac-app-state-v3", "mac-app-state-v2", "mac-app-state-v1"];
 const LIVE_PREVIEW_KEY = "mac-app-live-previews-v1";
 
 export type StoreMode = "unknown" | "browser" | "live" | "unavailable";
@@ -206,17 +208,43 @@ type BookState = Pick<
   | "applicationPurchaseShares"
 >;
 
+/**
+ * A book saved before the request model carried `draft | pending_signature |
+ * signed` and no execution date. Upgrade it once, through the same mapping the
+ * migration and the Desk import use, so a device that has been away keeps its
+ * repos and reads the same labels as the server (KTD21).
+ */
+function upgradeStoredAgreement(agreement: Agreement): Agreement {
+  if (agreement?.executedOn || agreement?.status === "closed") return agreement;
+  const mapped = legacyAgreementToRequest(agreement);
+  // Only a row the mapping actually converted gets its bookkeeping rewritten;
+  // a row already on the new shape keeps its own clock.
+  if (!mapped.event) return agreement;
+  const upgraded: Agreement = {
+    ...agreement,
+    status: mapped.status,
+    version: mapped.version,
+    lastActionAt: mapped.lastActionAt,
+  };
+  if (mapped.executedOn) upgraded.executedOn = mapped.executedOn;
+  if (mapped.closeReason) upgraded.closeReason = mapped.closeReason;
+  if (mapped.signedAt) upgraded.signedAt = mapped.signedAt;
+  return upgraded;
+}
+
 function readPersistedState(): AppState {
   const sessionUser = readSessionUser(browserSessionStorage());
   try {
     const raw =
       localStorage.getItem(STORAGE_KEY) ??
-      localStorage.getItem("mac-app-state-v2") ??
-      localStorage.getItem("mac-app-state-v1");
+      LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean) ??
+      null;
     if (raw) {
       const parsed = JSON.parse(raw) as AppState;
       const timepieces = Array.isArray(parsed.timepieces) ? parsed.timepieces : [];
-      const agreements = Array.isArray(parsed.agreements) ? parsed.agreements : [];
+      const agreements = (Array.isArray(parsed.agreements) ? parsed.agreements : []).map(
+        upgradeStoredAgreement,
+      );
       const appraisalAttempts = Array.isArray(parsed.appraisalAttempts)
         ? parsed.appraisalAttempts
         : [];
@@ -1019,7 +1047,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (isUnderReview(state.appraisalAttempts, id)) {
             return { ok: false, error: "REVIEW_LOCKED" };
           }
-          if (liveWatchIds(state.agreements).has(id)) {
+          if (heldWatchIds(state.agreements).has(id)) {
             return { ok: false, error: "PIECE_HELD" };
           }
         }
@@ -1068,7 +1096,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         isUnderReview(state.appraisalAttempts, id)
           ? { ok: false, error: "REVIEW_LOCKED" }
           : state.appraisalAttempts.some((attempt) => attempt.timepieceId === id) ||
-              liveWatchIds(state.agreements).has(id)
+              heldWatchIds(state.agreements).has(id)
             ? { ok: false, error: "TIMEPIECE_REFERENCED" }
             : updateStore((prev) => ({
           ...prev,
@@ -1080,17 +1108,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }), { operation: { action: "timepiece.remove", id }, deferLive: true }),
       createAgreement: async (input) => {
         const current = refreshStoreFromDisk();
-        const conflicts = conflictingLiveWatchIds(input.watchIds, current.agreements);
+        const conflicts = conflictingHeldWatchIds(input.watchIds, current.agreements);
         if (conflicts.length > 0) {
           throw new Error(LIVE_WATCH_CONFLICT);
         }
         const openShell = current.shells.find((shell) => shell.status === "open");
+        const createdAt = deskToday();
         const agreement: Agreement = {
           ...input,
           id: nextId("agr"),
           agreementCode: `MAC-${nextId("r").slice(-6).toUpperCase()}`,
-          createdAt: new Date().toISOString().slice(0, 10),
-          status: "pending_signature",
+          createdAt,
+          // The legacy create path writes the KTD21 shape directly, so a new
+          // repo is on the book and holding its pieces from the moment it
+          // exists — not only after the next read.
+          status: "executed",
+          executedOn: createdAt,
+          version: 1,
+          lastActionAt: new Date().toISOString(),
           scale: input.scale ?? agreementScaleFromDesk(current.settings, openShell, input.termMonths),
         };
         const acknowledgement = await updateStore((prev) => {
@@ -1131,7 +1166,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...prev,
           agreements: prev.agreements.map((a) =>
             a.id === id
-              ? { ...a, status: "signed", signedAt: new Date().toISOString().slice(0, 10) }
+              ? {
+                  ...a,
+                  // Signing records the signature; the repo keeps the execution
+                  // date it already had, so its book label never blinks out.
+                  status: "executed" as const,
+                  signedAt: deskToday(),
+                  executedOn: a.executedOn ?? a.createdAt,
+                  lastActionAt: new Date().toISOString(),
+                }
               : a
           ),
         }), {
@@ -1147,12 +1190,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const currentState = refreshStoreFromDisk();
         const current = currentState.agreements.find((a) => a.id === id);
         if (!current) return { ok: false, error: "NOT_FOUND" };
-        const result = applyAgreementEnd(current, end, utcToday());
+        const result = applyAgreementEnd(current, end, deskToday());
         if (!result.ok) return { ok: false, error: result.error };
         const others = currentState.agreements.filter((a) => a.id !== id);
         if (
           isLiveBookLabel(bookLabel(result.agreement)) &&
-          conflictingLiveWatchIds(result.agreement.watchIds, others).length > 0
+          conflictingHeldWatchIds(result.agreement.watchIds, others).length > 0
         ) {
           return { ok: false, error: LIVE_WATCH_CONFLICT };
         }
@@ -1169,7 +1212,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!agreement) return { ok: false, error: "NOT_FOUND" };
         const openShell = current.shells.find((shell) => shell.status === "open");
         const successorScale = agreementScaleFromDesk(current.settings, openShell, 12);
-        const planned = planRenewal(agreement, closeDate, utcToday(), successorScale);
+        const planned = planRenewal(agreement, closeDate, deskToday(), successorScale);
         if (!planned.ok) return { ok: false, error: planned.error };
         const successor: Agreement = {
           id: nextId("agr"),
@@ -1180,8 +1223,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           delivery: planned.successor.delivery,
           ownerName: planned.successor.ownerName,
           email: planned.successor.email,
-          status: "pending_signature",
+          // The pieces never left MAC, so a successor opens executed (KTD21).
+          status: planned.successor.status,
           createdAt: planned.successor.createdAt,
+          executedOn: planned.successor.executedOn,
+          version: 1,
+          lastActionAt: new Date().toISOString(),
           scale: successorScale,
         };
         const acknowledgement = await updateStore((prev) => ({
@@ -1218,9 +1265,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
           return { ok: false, error: "NOT_LIVE" };
         }
+        // Both books refuse to reshape a signed or ended repo (AGREEMENT_IMMUTABLE).
+        if (agreement.signedAt || agreement.bookEnd) {
+          return { ok: false, error: "AGREEMENT_IMMUTABLE" };
+        }
         const extras = watchIds.filter((watchId) => !agreement.watchIds.includes(watchId));
         const others = current.agreements.filter((item) => item.id !== id);
-        if (conflictingLiveWatchIds(extras, others).length > 0) {
+        if (conflictingHeldWatchIds(extras, others).length > 0) {
           return { ok: false, error: LIVE_WATCH_CONFLICT };
         }
         const eligible = extras.every((watchId) => {
@@ -1244,7 +1295,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!agreement || !isLiveBookLabel(bookLabel(agreement))) {
           return { ok: false, error: "NOT_LIVE" };
         }
-        const raised = validateSaleAmountRaise(agreement.amount, amount);
+        // Both books refuse to reshape a signed or ended repo (AGREEMENT_IMMUTABLE).
+        if (agreement.signedAt || agreement.bookEnd) {
+          return { ok: false, error: "AGREEMENT_IMMUTABLE" };
+        }
+        const raised = validateSaleAmountLower(agreement.amount, amount);
         if (!raised.ok) return raised;
         const openShell = current.shells.find((shell) => shell.status === "open");
         const share = openShell?.ltv || current.settings.maxLtv;
@@ -1266,7 +1321,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const agreement = current.agreements.find((item) => item.id === id);
         if (!agreement?.bookEnd) return false;
         const others = current.agreements.filter((item) => item.id !== id);
-        if (conflictingLiveWatchIds(agreement.watchIds, others).length > 0) {
+        if (conflictingHeldWatchIds(agreement.watchIds, others).length > 0) {
           return false;
         }
         const acknowledgement = await updateStore((prev) => ({
@@ -1473,8 +1528,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       resetDemo: () => {
         localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem("mac-app-state-v2");
-        localStorage.removeItem("mac-app-state-v1");
+        for (const key of LEGACY_STORAGE_KEYS) localStorage.removeItem(key);
         localStorage.removeItem(LIVE_PREVIEW_KEY);
         writeSessionUser(browserSessionStorage(), null);
         updateStore(

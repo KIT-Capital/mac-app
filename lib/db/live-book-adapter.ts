@@ -1,4 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
+import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
 import { ownerKey } from "@/lib/owners";
@@ -9,6 +10,7 @@ import type {
   Agreement,
   AgreementEnd,
   AgreementShell,
+  AgreementStatus,
   AppraisalAttempt,
   AppraisalAttemptPhoto,
   ApplicationPurchaseShares,
@@ -200,6 +202,31 @@ function shells(rows: Row[]): AgreementShell[] {
   }));
 }
 
+const AGREEMENT_STATUSES: readonly AgreementStatus[] = [
+  "submitted",
+  "returned",
+  "collector_signed",
+  "inspecting",
+  "executed",
+  "closed",
+  "draft",
+  "pending_signature",
+  "signed",
+];
+
+/**
+ * Carry a stored status through as-is. Collapsing an unrecognised value to a
+ * legacy one would let the legacy mapping turn it into an executed, live repo:
+ * a malformed import would silently become an active repo holding pieces.
+ * An unknown value stays itself, so it has no book label and holds nothing
+ * until someone looks at it. Only a missing value takes the legacy default.
+ */
+function agreementStatus(value: unknown): AgreementStatus {
+  if (AGREEMENT_STATUSES.includes(value as AgreementStatus)) return value as AgreementStatus;
+  const text = typeof value === "string" ? value.trim() : "";
+  return text ? (text as AgreementStatus) : "pending_signature";
+}
+
 function profile(row: Row): Profile {
   return {
     name: text(row, "name", text(row, "email")),
@@ -374,13 +401,29 @@ export function mapLiveBookRows(
       delivery: text(row, "delivery"),
       ownerName: text(row, "ownerName"),
       email: ownerKey(text(row, "email")),
-      status: row.status === "draft" || row.status === "signed" ? row.status : "pending_signature",
+      status: agreementStatus(row.status),
       createdAt: text(row, "createdOn"),
     };
     const signedAt = optionalText(row, "signedOn");
     const agreementCode = optionalText(row, "agreementCode");
     if (signedAt) agreement.signedAt = signedAt;
     if (agreementCode) agreement.agreementCode = agreementCode;
+    // Live rows still carry the legacy shape until U5's migration lands the
+    // request columns. Map them on the way out through the one mapping the
+    // migration will bake in, so a book label reads the same in both books.
+    // `updated_at` feeds last_action_at exactly as the backfill will (KTD21).
+    const mapped = legacyAgreementToRequest({
+      ...agreement,
+      updatedAt: iso(row.updatedAt) ?? undefined,
+    });
+    if (mapped.event) {
+      agreement.status = mapped.status;
+      agreement.version = mapped.version;
+      agreement.lastActionAt = mapped.lastActionAt;
+      if (mapped.executedOn) agreement.executedOn = mapped.executedOn;
+      if (mapped.closeReason) agreement.closeReason = mapped.closeReason;
+      if (mapped.signedAt) agreement.signedAt = mapped.signedAt;
+    }
     if (row.scale && typeof row.scale === "object") agreement.scale = row.scale as Agreement["scale"];
     const end = ends.get(agreement.id);
     if (end) agreement.bookEnd = {

@@ -15,7 +15,7 @@ import {
   WITH_MAC_PHRASE,
   shotPhrase,
 } from "@/lib/appraisal-words";
-import { appraisalView, liveWatchIds, missingEvidenceKinds } from "@/lib/contract/repo-book.mjs";
+import { appraisalView, heldWatchIds, missingEvidenceKinds } from "@/lib/contract/repo-book.mjs";
 import { nextId } from "@/lib/ids";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
@@ -49,7 +49,7 @@ export default function WatchDetailPage() {
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const watch = timepieces.find((w) => w.id === params.id);
-  const onLiveRepo = watch ? liveWatchIds(agreements).has(watch.id) : false;
+  const onLiveRepo = watch ? heldWatchIds(agreements).has(watch.id) : false;
 
   if (!watch) {
     return (
