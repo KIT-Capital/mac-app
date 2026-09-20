@@ -38,7 +38,7 @@ export function OfferSchedule({
       data-testid="offer-schedule"
       className="rounded-xl border border-mac-line bg-mac-card p-3"
     >
-      <p className="text-[10px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
+      <p className="text-[10px] font-bold tracking-[0.16em] text-mac-champagne uppercase">
         This offer
       </p>
       <p className="mt-1 text-[13px] text-mac-muted">

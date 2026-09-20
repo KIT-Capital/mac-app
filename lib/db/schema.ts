@@ -212,6 +212,7 @@ export const deskSettings = pgTable(
       .array()
       .notNull()
       .default(sql`'{"front","back","left","right","clasp"}'::text[]`),
+    brandPreset: text("brand_preset").notNull().default("mac"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -220,6 +221,7 @@ export const deskSettings = pgTable(
       "desk_settings_required_photo_kinds_check",
       sql`${table.requiredPhotoKinds} @> '{"front","back","left","right","clasp"}'::text[]`,
     ),
+    check("desk_settings_brand_preset_check", sql`${table.brandPreset} in ('mac', 'mbf')`),
     check("desk_settings_singleton_check", sql`${table.id} = 'default'`),
     check(
       "desk_settings_min_sale_check",

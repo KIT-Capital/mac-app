@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { BrandRoot } from "@/components/brand-root";
 import { CollectorShell } from "@/components/collector-shell";
 import { DeskShell } from "@/components/desk-shell";
 import { UnavailablePage } from "@/components/unavailable-page";
@@ -53,7 +54,11 @@ export function AppFrame({ children }: { children: ReactNode }) {
   // The server said a live prerequisite is missing: one page for every route,
   // no route children mount, so no page-level fetch fires.
   if (unavailable) {
-    return <UnavailablePage />;
+    return (
+      <BrandRoot>
+        <UnavailablePage />
+      </BrandRoot>
+    );
   }
 
   const body = (
@@ -69,8 +74,16 @@ export function AppFrame({ children }: { children: ReactNode }) {
   );
 
   if (isAdmin && pathname !== "/admin/password") {
-    return <DeskShell>{body}</DeskShell>;
+    return (
+      <BrandRoot>
+        <DeskShell>{body}</DeskShell>
+      </BrandRoot>
+    );
   }
 
-  return <CollectorShell>{body}</CollectorShell>;
+  return (
+    <BrandRoot>
+      <CollectorShell>{body}</CollectorShell>
+    </BrandRoot>
+  );
 }

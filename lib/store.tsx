@@ -1735,6 +1735,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
           patch = { ...patch, requiredPhotoKinds: next };
         }
+        if (patch.brandPreset !== undefined) {
+          const next = patch.brandPreset === "mbf" ? "mbf" : patch.brandPreset === "mac" ? "mac" : null;
+          if (!next) {
+            return Promise.resolve({ ok: false, error: "SETTINGS_UPDATE_INVALID" } as OperationAck);
+          }
+          if (next !== state.settings.brandPreset && !isSuperAdmin(state.user)) {
+            return Promise.resolve({ ok: false, error: "ROLE_FORBIDDEN" } as OperationAck);
+          }
+          patch = { ...patch, brandPreset: next };
+        }
         const serverPatch = Object.fromEntries(
           SERVER_SETTING_KEYS
             .filter((key) => patch[key] !== undefined)

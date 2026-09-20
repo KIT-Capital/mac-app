@@ -65,7 +65,7 @@ export function CollectorShell({ children }: { children: ReactNode }) {
         <div className="flex min-h-dvh flex-col items-center justify-center bg-[#0b0f16] px-4 py-5">
           <p className="mb-3 text-[10px] tracking-[0.16em] text-white/40 uppercase">
             Phone preview ·{" "}
-            <button type="button" className="text-[#FCB040] uppercase" onClick={exitPhonePreview}>
+            <button type="button" className="text-mac-gold uppercase" onClick={exitPhonePreview}>
               Show full screen
             </button>
           </p>

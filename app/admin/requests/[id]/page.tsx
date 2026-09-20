@@ -179,7 +179,7 @@ export default function DeskRequestPage() {
     return (
       <AdminChrome title="Request">
         <p className="text-sm text-white/60">That request is not on the desk.</p>
-        <Link href="/admin/agreements" className="mt-3 inline-block text-[#FCB040]">
+        <Link href="/admin/agreements" className="mt-3 inline-block text-mac-gold">
           Back to queue
         </Link>
       </AdminChrome>
@@ -256,7 +256,7 @@ export default function DeskRequestPage() {
   return (
     <AdminChrome title="Request">
       <p className="mb-4">
-        <Link href="/admin/agreements" className="text-[12px] tracking-[0.14em] text-[#FCB040] uppercase">
+        <Link href="/admin/agreements" className="text-[12px] tracking-[0.14em] text-mac-gold uppercase">
           Back to queue
         </Link>
       </p>
@@ -328,7 +328,7 @@ export default function DeskRequestPage() {
             className="min-h-[72px] w-full bg-transparent py-1 text-[15px] text-white outline-none"
           />
         </Field>
-        {warning ? <p className="text-[13px] text-[#FCB040]">{warning}</p> : null}
+        {warning ? <p className="text-[13px] text-mac-gold">{warning}</p> : null}
         {allowed.includes("deskReturn") ? (
           <div className="flex flex-wrap gap-3">
             <PillButton
@@ -376,7 +376,7 @@ export default function DeskRequestPage() {
       {agreement.status === "inspecting" ? (
         <section className="mb-6 space-y-3 rounded-2xl border border-white/10 bg-[#161B24] p-4">
           <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">Inspection</h3>
-          {!inspector ? <p className="text-[13px] text-[#FCB040]">{APPRAISER_REQUIRED}</p> : null}
+          {!inspector ? <p className="text-[13px] text-mac-gold">{APPRAISER_REQUIRED}</p> : null}
           <p className="text-[13px] text-white/70">
             Recomputed maximum {money(preview.maximum)} against signed {money(agreement.amount)}.
             {preview.kind === "execute"

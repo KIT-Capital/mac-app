@@ -47,7 +47,7 @@ export default function SettingsPage() {
       <ScreenHeader title="Account Settings" backHref="/profile" />
       <form onSubmit={onSave} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
         <div>
-          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
             Appearance
           </p>
           <AppearanceToggle />
@@ -56,7 +56,7 @@ export default function SettingsPage() {
           </p>
         </div>
         <div>
-          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
             Portrait
           </p>
           <label className="flex cursor-pointer items-center gap-4">

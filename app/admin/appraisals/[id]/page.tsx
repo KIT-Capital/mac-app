@@ -191,7 +191,7 @@ function DecisionPanel({
             </div>
           </div>
           {rangeWarning ? (
-            <p className="text-[12px] text-[#FCB040]">
+            <p className="text-[12px] text-mac-gold">
               {money(numericValue)} is {rangeWarning} the advisory range. You can still save it.
             </p>
           ) : null}
@@ -203,7 +203,7 @@ function DecisionPanel({
           type="button"
           disabled={!readyToDecide}
           onClick={() => void decide()}
-          className="rounded-xl bg-[#FCB040] px-4 py-2 text-[12px] font-bold tracking-[0.14em] text-[#0A0D14] uppercase disabled:opacity-40"
+          className="rounded-xl bg-mac-gold px-4 py-2 text-[12px] font-bold tracking-[0.14em] text-[#0A0D14] uppercase disabled:opacity-40"
         >
           Decide
         </button>
@@ -255,7 +255,7 @@ export default function AppraisalReviewPage() {
       <AdminChrome title="Appraisal review">
         <h1 className="text-lg font-semibold text-white">Appraisal review</h1>
         <p className="mt-3 text-sm text-white/60">This submission is not on the book.</p>
-        <Link href="/admin/assets" className="mt-4 inline-block text-[#FCB040]">
+        <Link href="/admin/assets" className="mt-4 inline-block text-mac-gold">
           Back to client assets
         </Link>
       </AdminChrome>
@@ -299,7 +299,7 @@ export default function AppraisalReviewPage() {
             {piece.brand} {piece.model} · {piece.ownerEmail || "—"} · attempt #{attempt.attemptNo}
           </p>
         </div>
-        <span className="rounded-full border border-white/15 px-3 py-1 text-[11px] tracking-[0.14em] text-[#FCB040] uppercase">
+        <span className="rounded-full border border-white/15 px-3 py-1 text-[11px] tracking-[0.14em] text-mac-gold uppercase">
           {APPRAISAL_WORDS[view.word]}
           {view.decisionsUsed ? ` · ${view.decisionsUsed}/3` : ""}
         </span>
@@ -429,7 +429,7 @@ export default function AppraisalReviewPage() {
         </section>
       </div>
 
-      <Link href="/admin/assets" className="mt-6 inline-block text-[#FCB040]">
+      <Link href="/admin/assets" className="mt-6 inline-block text-mac-gold">
         Back to client assets
       </Link>
     </AdminChrome>

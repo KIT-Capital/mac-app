@@ -60,7 +60,7 @@ export default function AdminAssetsPage() {
               <Link
                 key={attempt.id}
                 href={`/admin/appraisals/${attempt.id}`}
-                className="text-[#FCB040]"
+                className="text-mac-gold"
               >
                 Review
               </Link>,
@@ -84,7 +84,7 @@ export default function AdminAssetsPage() {
             `${APPRAISAL_WORDS[view.word]}${view.decisionsUsed ? ` · ${view.decisionsUsed}/3` : ""}`,
             moneyRange(w.valueLow, w.valueHigh),
             latest ? (
-              <Link key={w.id} href={`/admin/appraisals/${latest.id}`} className="text-[#FCB040]">
+              <Link key={w.id} href={`/admin/appraisals/${latest.id}`} className="text-mac-gold">
                 Review
               </Link>
             ) : (

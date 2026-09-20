@@ -48,7 +48,7 @@ export default function ContactPage() {
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
         {/* Desk Introduction */}
         <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
-          <span className="text-[10px] font-bold tracking-[0.16em] text-[#FCB040] uppercase">
+          <span className="text-[10px] font-bold tracking-[0.16em] text-mac-gold uppercase">
             Private Horology Partners
           </span>
           <h2 className="mt-1 text-[18px] font-semibold text-mac-fg">Private desk</h2>
@@ -61,25 +61,25 @@ export default function ContactPage() {
           <div className="mt-4 space-y-2.5 border-t border-mac-line pt-3 text-[13px]">
             <a
               href={`tel:${settings.phone}`}
-              className="flex items-center gap-3 text-mac-muted transition hover:text-[#FCB040]"
+              className="flex items-center gap-3 text-mac-muted transition hover:text-mac-gold"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-[#FCB040]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-mac-gold">
                 <Phone className="h-3.5 w-3.5" />
               </span>
               <span>{settings.phone}</span>
             </a>
             <a
               href={`mailto:${settings.financingEmail}`}
-              className="flex items-center gap-3 text-mac-muted transition hover:text-[#FCB040]"
+              className="flex items-center gap-3 text-mac-muted transition hover:text-mac-gold"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-[#FCB040]">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-mac-gold">
                 <Mail className="h-3.5 w-3.5" />
               </span>
               <span>{settings.financingEmail}</span>
             </a>
             {hasApplication(user, agreements) ? (
               <div className="flex items-center gap-3 text-mac-muted">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-[#FCB040]">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-mac-gold">
                   <MapPin className="h-3.5 w-3.5" />
                 </span>
                 <span>{settings.vaultLocation} (By appointment only)</span>
@@ -90,7 +90,7 @@ export default function ContactPage() {
 
         {/* Contact Form */}
         <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
-          <h3 className="text-[13px] font-bold tracking-[0.14em] text-[#E8D5C0] uppercase">
+          <h3 className="text-[13px] font-bold tracking-[0.14em] text-mac-champagne uppercase">
             Send Encrypted Inquiry
           </h3>
 
@@ -102,7 +102,7 @@ export default function ContactPage() {
                 A managing partner will review your collection requirements and respond privately within two hours.
               </p>
               {preview ? (
-                <p className="text-[11px] text-[#FCB040]">
+                <p className="text-[11px] text-mac-gold">
                   Preview only — add a Resend API key to deliver the email.
                 </p>
               ) : null}

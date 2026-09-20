@@ -61,7 +61,7 @@ export function RequestSignSheet({
           type="checkbox"
           checked={attested}
           onChange={(event) => onAttestedChange(event.target.checked)}
-          className="h-4 w-4 accent-[#0E2A44]"
+          className="h-4 w-4 accent-mac-navy"
         />
         I have read this agreement and I am signing it
       </label>
@@ -71,7 +71,7 @@ export function RequestSignSheet({
       </PillButton>
       <button
         type="button"
-        className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+        className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
         onClick={onCancel}
       >
         Cancel

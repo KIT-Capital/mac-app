@@ -413,7 +413,7 @@ export default function AgreementDetailPage() {
       <div className="flex-1 overflow-y-auto px-5 py-5 text-[13px] leading-relaxed text-mac-muted">
         {request ? (
           <div className="mb-4 rounded-xl border border-mac-line bg-mac-card p-3">
-            <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">{word}</span>
+            <span className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">{word}</span>
             <p className="text-[12px] text-mac-muted">Request #{agreement.agreementCode || agreement.id}</p>
             <p className="mt-2 text-[13px] text-mac-fg">{retailRequestLine({ ...agreement, events: visibleEvents })}</p>
             {agreement.delivery ? (
@@ -453,7 +453,7 @@ export default function AgreementDetailPage() {
             {canStartAgain ? (
               <Link
                 href={startAgainHref(agreement)}
-                className="mt-3 inline-block text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                className="mt-3 inline-block text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
               >
                 Start again
               </Link>
@@ -464,7 +464,7 @@ export default function AgreementDetailPage() {
                   <button
                     type="button"
                     disabled={requestBusy}
-                    className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase disabled:opacity-40"
+                    className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase disabled:opacity-40"
                     onClick={() => void onRequestExit("decline")}
                   >
                     Decline
@@ -474,7 +474,7 @@ export default function AgreementDetailPage() {
                   <button
                     type="button"
                     disabled={requestBusy}
-                    className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase disabled:opacity-40"
+                    className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase disabled:opacity-40"
                     onClick={() => void onRequestExit("withdraw")}
                   >
                     Withdraw
@@ -487,13 +487,13 @@ export default function AgreementDetailPage() {
         ) : (
           <div className="mb-4 flex items-center justify-between rounded-xl border border-mac-line bg-mac-card p-3">
             <div>
-              <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Book: {bookLabel(agreement)}</span>
+              <span className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Book: {bookLabel(agreement)}</span>
               <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
             </div>
             {!agreement.signedAt ? (
               <button
                 onClick={() => setStarted(true)}
-                className="rounded-lg bg-[#FCB040] px-4 py-2 text-[11px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm"
+                className="rounded-lg bg-mac-gold px-4 py-2 text-[11px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm"
               >
                 {started ? "Ready to Sign" : "Review Terms"}
               </button>
@@ -518,7 +518,7 @@ export default function AgreementDetailPage() {
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
             Repurchase agreement
           </h2>
-          <p className="text-center text-[12px] font-semibold text-[#0E2A44]">
+          <p className="text-center text-[12px] font-semibold text-mac-navy">
             {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
           </p>
           {snapshot.ok && snapshot.value ? (
@@ -640,7 +640,7 @@ export default function AgreementDetailPage() {
         </article>
         {bookMode === "live" && documents.length ? (
           <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
-            <h3 className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Stored document</h3>
+            <h3 className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Stored document</h3>
             <p className="mt-1 text-[12px] text-mac-muted">
               {counselLabelForStage(documents.find((row) => row.status === "stored")?.stage
                 ?? documents[0]?.stage)}
@@ -656,14 +656,14 @@ export default function AgreementDetailPage() {
                     <span className="flex gap-3">
                       <button
                         type="button"
-                        className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                        className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
                         onClick={() => void openStoredDocument(row.id, false)}
                       >
                         View
                       </button>
                       <button
                         type="button"
-                        className="hidden md:inline text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                        className="hidden md:inline text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
                         onClick={() => void openStoredDocument(row.id, true)}
                       >
                         Download
@@ -677,7 +677,7 @@ export default function AgreementDetailPage() {
               <div className="mt-3 space-y-2">
                 <button
                   type="button"
-                  className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                  className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
                   disabled={mailBusy}
                   onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "self")}
                 >
@@ -703,7 +703,7 @@ export default function AgreementDetailPage() {
                 </label>
                 <button
                   type="button"
-                  className="text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                  className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
                   disabled={mailBusy}
                   onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "other")}
                 >

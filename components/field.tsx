@@ -14,11 +14,11 @@ export function Field({
   return (
     <label
       className={cn(
-        "block rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50",
+        "block rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50",
         className,
       )}
     >
-      <span className="block text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+      <span className="block text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
         {label}
       </span>
       <div className="mt-1">{children}</div>
@@ -87,11 +87,11 @@ export function PillButton({
   variant?: "champagne" | "white" | "navy" | "ghost" | "gold";
 }) {
   const styles = {
-    champagne: "bg-[#E8D5C0] text-[#0A0D14] hover:bg-[#faebd7]",
+    champagne: "bg-mac-champagne text-[#0A0D14] hover:bg-[#faebd7]",
     white: "bg-white text-[#0A0D14] hover:bg-white/90",
-    navy: "bg-[#0E2A44] text-white border border-[#FCB040]/50 hover:bg-[#133758]",
+    navy: "bg-mac-navy text-white border border-mac-gold/50 hover:bg-[#133758]",
     ghost: "bg-transparent text-mac-fg border border-mac-line hover:bg-mac-card",
-    gold: "bg-[#FCB040] text-[#0A0D14] hover:bg-[#ffbe59]",
+    gold: "bg-mac-gold text-[#0A0D14] hover:bg-[#ffbe59]",
   }[variant];
 
   return (

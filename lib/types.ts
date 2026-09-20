@@ -340,6 +340,7 @@ export type AppSettings = {
   closeBusinessDays: number;
   vaultLocation: string;
   requiredPhotoKinds: PhotoKind[];
+  brandPreset: "mac" | "mbf";
   ageMinimum: number;
   allowVideo: boolean;
   appearance: Appearance;

@@ -160,6 +160,7 @@ function settings(rows: Row[]): AppSettings {
     requiredPhotoKinds: normalizeRequiredPhotoKinds(
       row.requiredPhotoKinds as string[] | undefined,
     ) as PhotoKind[],
+    brandPreset: row.brandPreset === "mbf" ? "mbf" : "mac",
   };
 }
 

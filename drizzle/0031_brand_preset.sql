@@ -1,0 +1,2 @@
+ALTER TABLE "desk_settings" ADD COLUMN "brand_preset" text DEFAULT 'mac' NOT NULL;--> statement-breakpoint
+ALTER TABLE "desk_settings" ADD CONSTRAINT "desk_settings_brand_preset_check" CHECK ("desk_settings"."brand_preset" in ('mac', 'mbf'));

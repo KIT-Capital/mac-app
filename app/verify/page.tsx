@@ -36,7 +36,7 @@ export default async function VerifyPage({
             </p>
             <Link
               href="/login"
-              className="mac-tap mt-8 flex h-12 items-center justify-center bg-[#0E2A44] text-sm font-bold tracking-[0.12em] text-white uppercase"
+              className="mac-tap mt-8 flex h-12 items-center justify-center bg-mac-navy text-sm font-bold tracking-[0.12em] text-white uppercase"
             >
               Request a new link
             </Link>
@@ -51,7 +51,7 @@ export default async function VerifyPage({
               <input type="hidden" name="token" value={token} />
               <button
                 type="submit"
-                className="mac-tap flex h-12 w-full items-center justify-center bg-[#0E2A44] text-sm font-bold tracking-[0.12em] text-white uppercase"
+                className="mac-tap flex h-12 w-full items-center justify-center bg-mac-navy text-sm font-bold tracking-[0.12em] text-white uppercase"
               >
                 Confirm sign-in
               </button>

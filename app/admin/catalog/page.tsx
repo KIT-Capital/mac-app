@@ -56,7 +56,7 @@ export default function AdminCatalogPage() {
         collector asset is created.
       </p>
       {!canEdit ? (
-        <p className="mb-4 text-sm text-[#E8D5C0]" data-testid="catalog-read-only">
+        <p className="mb-4 text-sm text-mac-champagne" data-testid="catalog-read-only">
           {APPRAISER_REQUIRED_COPY} Admins can read every reference.
         </p>
       ) : null}
@@ -102,7 +102,7 @@ export default function AdminCatalogPage() {
           c.reference,
           `${money(c.typicalLow)} – ${money(c.typicalHigh)}`,
           c.financeable ? "Yes" : "No",
-          <div key={c.id} className="flex gap-3 text-[#FCB040]">
+          <div key={c.id} className="flex gap-3 text-mac-gold">
             {canEdit ? (
               <>
                 <button type="button" onClick={() => setDraft(c)}>Edit</button>

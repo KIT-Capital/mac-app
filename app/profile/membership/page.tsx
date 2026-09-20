@@ -30,8 +30,8 @@ export default function MembershipPage() {
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Membership" backHref="/profile" />
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-        <div className="rounded-2xl border border-[#FCB040]/30 bg-gradient-to-br from-[#161B24] to-[#0E2A44]/40 p-5 shadow-sm">
-          <p className="text-[10px] font-bold tracking-[0.22em] text-[#FCB040] uppercase">
+        <div className="rounded-2xl border border-mac-gold/30 bg-gradient-to-br from-[#161B24] to-mac-navy/40 p-5 shadow-sm">
+          <p className="text-[10px] font-bold tracking-[0.22em] text-mac-gold uppercase">
             Certified Horology Revaluations
           </p>
           <h2 className="mt-2 text-[26px] font-bold leading-tight text-mac-fg">
@@ -45,7 +45,7 @@ export default function MembershipPage() {
         </div>
 
         <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
-          <h3 className="text-[11px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase pb-2 border-b border-mac-line">
+          <h3 className="text-[11px] font-bold tracking-[0.16em] text-mac-champagne uppercase pb-2 border-b border-mac-line">
             Member Privileges
           </h3>
           <ul className="mt-3 space-y-3 text-[13px] text-mac-muted">
@@ -58,7 +58,7 @@ export default function MembershipPage() {
                 : "Custody details after you send an application",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2.5">
-                <span className="text-[#FCB040] text-sm">✦</span>
+                <span className="text-mac-gold text-sm">✦</span>
                 <span>{item}</span>
               </li>
             ))}

@@ -13,9 +13,9 @@ export default function AdminOverviewPage() {
   const maxBar = Math.max(appraised.length, reviewing.length, timepieces.length - appraised.length - reviewing.length, 1);
 
   const bars = [
-    { label: "Appraised", n: appraised.length, color: "#0E2A44" },
-    { label: "Reviewing", n: reviewing.length, color: "#FCB040" },
-    { label: "Draft", n: timepieces.length - appraised.length - reviewing.length, color: "#E8D5C0" },
+    { label: "Appraised", n: appraised.length, color: "var(--brand-primary)" },
+    { label: "Reviewing", n: reviewing.length, color: "var(--brand-accent)" },
+    { label: "Draft", n: timepieces.length - appraised.length - reviewing.length, color: "var(--brand-soft)" },
   ];
 
   return (

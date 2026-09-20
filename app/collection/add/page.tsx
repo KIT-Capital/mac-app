@@ -483,7 +483,7 @@ function AddFormEditor() {
                       {bookMode === "live" && slotStates[i] === "failed" && piecePersisted ? (
                         <button
                           type="button"
-                          className="mt-1 text-[11px] text-[#FCB040] underline underline-offset-4"
+                          className="mt-1 text-[11px] text-mac-gold underline underline-offset-4"
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -512,7 +512,7 @@ function AddFormEditor() {
                   type="checkbox"
                   checked={hasBox}
                   onChange={(e) => setHasBox(e.target.checked)}
-                  className="mt-0.5 accent-[#0E2A44]"
+                  className="mt-0.5 accent-mac-navy"
                 />
                 I have the box
               </label>
@@ -521,7 +521,7 @@ function AddFormEditor() {
                   type="checkbox"
                   checked={hasPapers}
                   onChange={(e) => setHasPapers(e.target.checked)}
-                  className="mt-0.5 accent-[#0E2A44]"
+                  className="mt-0.5 accent-mac-navy"
                 />
                 I have the original documentation
               </label>
@@ -679,7 +679,7 @@ function AddFormEditor() {
                   type="radio"
                   checked={band === "strap"}
                   onChange={() => setBand("strap")}
-                  className="accent-[#0E2A44]"
+                  className="accent-mac-navy"
                 />
                 Strap
               </label>
@@ -688,7 +688,7 @@ function AddFormEditor() {
                   type="radio"
                   checked={band === "bracelet"}
                   onChange={() => setBand("bracelet")}
-                  className="accent-[#0E2A44]"
+                  className="accent-mac-navy"
                 />
                 Metal Bracelet
               </label>

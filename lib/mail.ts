@@ -14,7 +14,7 @@ import {
   composeCollectorDeclineNotice,
   composeRequestNotices,
 } from "@/lib/request-notice-mail.mjs";
-import { DEFAULT_SETTINGS } from "@/lib/theme";
+import { DEFAULT_SETTINGS, brandFromSettings } from "@/lib/theme";
 import { allowMailRequest as allowKeyedMailRequest } from "@/lib/mail-rate.mjs";
 
 export type { MailKind, MailRequest, OutboxItem };
@@ -368,13 +368,14 @@ function letter({
   rows?: [string, string][];
   body?: string;
 }): ComposedMail {
+  const brand = brandFromSettings({});
   const safeHeading = escapeHtml(heading);
   const safeIntro = escapeHtml(intro);
   const safeBody = body ? escapeHtml(body).replaceAll("\n", "<br />") : "";
   const rowHtml = (rows ?? [])
     .map(
       ([label, value]) =>
-        `<tr><td style="padding:6px 0;color:#E8D5C0;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;width:140px">${escapeHtml(label)}</td><td style="padding:6px 0;color:#ffffff;font-size:14px">${escapeHtml(value)}</td></tr>`,
+        `<tr><td style="padding:6px 0;color:${brand.palette.soft};font-size:11px;letter-spacing:0.14em;text-transform:uppercase;width:140px">${escapeHtml(label)}</td><td style="padding:6px 0;color:#ffffff;font-size:14px">${escapeHtml(value)}</td></tr>`,
     )
     .join("");
 
@@ -386,8 +387,8 @@ function letter({
         <td align="center">
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#161B24;border:1px solid #2a3140">
             <tr>
-              <td style="background:#0E2A44;padding:22px 28px">
-                <p style="margin:0;color:#FCB040;letter-spacing:0.22em;font-size:11px;font-weight:700">MECHANICAL ART CAPITAL</p>
+              <td style="background:${brand.palette.primary};padding:22px 28px">
+                <p style="margin:0;color:${brand.palette.accent};letter-spacing:0.22em;font-size:11px;font-weight:700">${escapeHtml(brand.companyName.toUpperCase())}</p>
               </td>
             </tr>
             <tr>
@@ -400,7 +401,7 @@ function letter({
             </tr>
             <tr>
               <td style="padding:16px 28px 22px;border-top:1px solid #2a3140;color:#8b93a3;font-size:12px;line-height:1.5">
-                Mechanical Art Capital · ${escapeHtml(DEFAULT_SETTINGS.phone)} · ${escapeHtml(DEFAULT_SETTINGS.financingEmail)}
+                ${escapeHtml(brand.companyName)} · ${escapeHtml(DEFAULT_SETTINGS.phone)} · ${escapeHtml(DEFAULT_SETTINGS.financingEmail)}
               </td>
             </tr>
           </table>
@@ -411,7 +412,7 @@ function letter({
 </html>`;
 
   const textRows = (rows ?? []).map(([label, value]) => `${label}: ${value}`).join("\n");
-  const text = [heading, "", intro, textRows, body ? `\n${body}` : "", "", `Mechanical Art Capital · ${DEFAULT_SETTINGS.phone}`]
+  const text = [heading, "", intro, textRows, body ? `\n${body}` : "", "", `${brand.companyName} · ${DEFAULT_SETTINGS.phone}`]
     .filter(Boolean)
     .join("\n");
 

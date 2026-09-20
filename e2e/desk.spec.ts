@@ -559,6 +559,8 @@ test.describe("desk", () => {
     });
     await page.goto("/admin/config");
     await expect(page.getByLabel("Custody location")).toHaveValue("Server Vault A");
+    await expect(page.getByRole("radio", { name: "Mechanical Art Capital" })).toBeDisabled();
+    await expect(page.getByRole("radio", { name: "MB&F" })).toBeDisabled();
     await expect(page.getByLabel("Company name")).toHaveCount(0);
     await expect(page.getByLabel("Min purchase")).toHaveCount(0);
     await page.getByLabel("Custody location").fill("Locally Edited Vault");

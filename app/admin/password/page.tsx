@@ -81,7 +81,7 @@ export default function StaffPasswordPage() {
           <button
             type="submit"
             disabled={busy}
-            className="mac-tap flex h-12 w-full items-center justify-center bg-[#0E2A44] text-sm font-bold tracking-[0.12em] text-white uppercase disabled:opacity-40"
+            className="mac-tap flex h-12 w-full items-center justify-center bg-mac-navy text-sm font-bold tracking-[0.12em] text-white uppercase disabled:opacity-40"
           >
             {busy ? "Saving…" : "Save new password"}
           </button>
@@ -104,7 +104,7 @@ function PasswordField({
 }) {
   return (
     <label htmlFor={id} className="block rounded-xl border border-mac-line bg-mac-card p-3">
-      <span className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+      <span className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
         {label}
       </span>
       <input

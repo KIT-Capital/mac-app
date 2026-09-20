@@ -34,7 +34,7 @@ export function SideNav() {
                 active && "bg-white/5 text-white",
               )}
             >
-              <Icon className={cn("h-4 w-4", active && "text-[#FCB040]")} strokeWidth={1.5} />
+              <Icon className={cn("h-4 w-4", active && "text-mac-gold")} strokeWidth={1.5} />
               {item.label}
             </Link>
           );

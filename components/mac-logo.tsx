@@ -1,21 +1,20 @@
+"use client";
+
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-
-/**
- * Official Logo-FF (Final Logo 2 Gold) as the Illustrator vector.
- * Light: black gear, gray arc, gold jeweled pinions, MECHANICAL ART CAPITAL.
- * Dark: black ink is solid white — no plate, no outline invert.
- */
-const WORDMARK = "/brand/logo-ff.svg";
-const WORDMARK_ON_DARK = "/brand/logo-ff-on-dark.svg";
-const MARK = "/brand/logo-ff-mark.png";
-const MARK_ON_DARK = "/brand/logo-ff-mark-on-dark.png";
+import { useStore } from "@/lib/store";
+import { brandFromSettings } from "@/lib/theme";
 
 const LOCKUP_WIDTH = {
   hero: "w-[min(304px,78%)]",
   default: "w-[260px]",
   compact: "w-[168px]",
 } as const;
+
+function useBrand() {
+  const { settings } = useStore();
+  return brandFromSettings(settings);
+}
 
 export function MacWordmark({
   className,
@@ -24,10 +23,11 @@ export function MacWordmark({
   className?: string;
   onDark?: boolean;
 }) {
+  const brand = useBrand();
   return (
     <Image
-      src={onDark ? WORDMARK_ON_DARK : WORDMARK}
-      alt="Mechanical Art Capital"
+      src={onDark ? brand.wordmarkOnDark : brand.wordmark}
+      alt={brand.companyName}
       width={1200}
       height={730}
       unoptimized
@@ -44,10 +44,11 @@ export function MacLogoMark({
   className?: string;
   onDark?: boolean;
 }) {
+  const brand = useBrand();
   return (
     <Image
-      src={onDark ? MARK_ON_DARK : MARK}
-      alt="Mechanical Art Capital"
+      src={onDark ? brand.markOnDark : brand.mark}
+      alt={brand.companyName}
       width={722}
       height={697}
       unoptimized

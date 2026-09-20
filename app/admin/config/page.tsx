@@ -6,7 +6,7 @@ import { AdminChrome } from "@/components/admin-chrome";
 import { Field, PillButton } from "@/components/field";
 import { settingsToTerms } from "@/lib/contract/repo-scale.mjs";
 import { isSuperAdmin } from "@/lib/roles.mjs";
-import { SERVER_SETTING_KEYS } from "@/lib/theme";
+import { BRAND_PRESETS, SERVER_SETTING_KEYS } from "@/lib/theme";
 import { useStore } from "@/lib/store";
 import {
   DEFAULT_REQUIRED_PHOTO_KINDS,
@@ -180,6 +180,46 @@ export default function AdminConfigPage() {
         </div>
         <fieldset className="space-y-3 border-t border-white/10 pt-5">
           <legend className="text-[11px] tracking-[0.16em] text-white/50 uppercase">
+            Branding
+          </legend>
+          <p className="max-w-2xl text-sm text-white/55">
+            {isSuperAdmin(user)
+              ? "A preset sets the company name, mark, and palette together. MB&F colors are sampled until official assets arrive."
+              : "Only a super admin can change the brand preset."}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Object.values(BRAND_PRESETS).map((preset) => {
+              const selected = form.brandPreset === preset.id;
+              return (
+                <label
+                  key={preset.id}
+                  className={`flex flex-col gap-2 border p-3 ${
+                    selected ? "border-mac-gold" : "border-white/20"
+                  } ${isSuperAdmin(user) ? "cursor-pointer" : "cursor-default opacity-80"}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="brandPreset"
+                      value={preset.id}
+                      checked={selected}
+                      disabled={!isSuperAdmin(user)}
+                      onChange={() => updateField("brandPreset", preset.id)}
+                    />
+                    <span className="text-sm text-white">{preset.companyName}</span>
+                  </span>
+                  <span className="flex h-8 gap-1">
+                    <span className="flex-1" style={{ background: preset.palette.primary }} />
+                    <span className="flex-1" style={{ background: preset.palette.accent }} />
+                    <span className="flex-1" style={{ background: preset.palette.soft }} />
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+        <fieldset className="space-y-3 border-t border-white/10 pt-5">
+          <legend className="text-[11px] tracking-[0.16em] text-white/50 uppercase">
             Required photographs
           </legend>
           <p className="max-w-2xl text-sm text-white/55">
@@ -220,7 +260,7 @@ export default function AdminConfigPage() {
           </div>
         </fieldset>
         {result === "saved" ? (
-          <p className="text-sm text-[#FCB040]">
+          <p className="text-sm text-mac-gold">
             {bookMode === "live"
               ? "Pricing and custody settings saved on the MAC server."
               : "Configuration saved to this device."}

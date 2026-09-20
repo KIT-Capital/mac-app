@@ -16,7 +16,7 @@ export function AppearanceToggle({ className }: { className?: string }) {
         className={cn(
           "mac-tap flex h-11 items-center justify-center gap-2 rounded-xl border text-[11px] font-bold tracking-[0.14em] uppercase",
           !light
-            ? "border-[#FCB040] bg-[#0E2A44] text-white"
+            ? "border-mac-gold bg-mac-navy text-white"
             : "border-mac-line bg-mac-card text-mac-muted",
         )}
       >
@@ -29,7 +29,7 @@ export function AppearanceToggle({ className }: { className?: string }) {
         className={cn(
           "mac-tap flex h-11 items-center justify-center gap-2 rounded-xl border text-[11px] font-bold tracking-[0.14em] uppercase",
           light
-            ? "border-[#FCB040] bg-[#0E2A44] text-white"
+            ? "border-mac-gold bg-mac-navy text-white"
             : "border-mac-line bg-mac-card text-mac-muted",
         )}
       >
