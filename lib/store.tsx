@@ -28,7 +28,7 @@ import {
 import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
 import { agreementScaleFromDesk, applicationPurchaseShare } from "@/lib/contract/repo-scale.mjs";
-import { applyTransition } from "@/lib/contract/request-transitions.mjs";
+import { applyTransition, hasRecordReturn } from "@/lib/contract/request-transitions.mjs";
 import { nextId } from "@/lib/ids";
 import {
   mergeLocalDataPreviews,
@@ -1554,6 +1554,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!row) return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
         if (row.status !== "closed") return Promise.resolve({ ok: false, error: "AGREEMENT_STATE_CONFLICT" });
         if (!row.deliveredOn) return Promise.resolve({ ok: false, error: "RETURN_NOT_APPLICABLE" });
+        if (hasRecordReturn(row)) return Promise.resolve({ ok: false, error: "AGREEMENT_STATE_CONFLICT" });
         const createdAt = new Date().toISOString();
         return updateStore((prev) => ({
           ...prev,

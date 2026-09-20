@@ -673,7 +673,11 @@ test.describe("desk", () => {
     await page.getByRole("button", { name: "Record delivery" }).click();
     await page.getByText("Urwerk UR-111", { exact: true }).locator("..").getByRole("radio", { name: "Drop" }).check();
     await page.getByText("Urwerk UR-100V", { exact: true }).locator("..").getByLabel("Inspected value").fill("120000");
+    await page.getByText("Urwerk UR-100V", { exact: true }).locator("..").getByRole("checkbox", { name: "Serial match" }).check();
+    await page.getByText("Urwerk UR-100V", { exact: true }).locator("..").getByRole("checkbox", { name: "Condition match" }).check();
     await page.getByText("Urwerk UR-105", { exact: true }).locator("..").getByLabel("Inspected value").fill("120000");
+    await page.getByText("Urwerk UR-105", { exact: true }).locator("..").getByRole("checkbox", { name: "Serial match" }).check();
+    await page.getByText("Urwerk UR-105", { exact: true }).locator("..").getByRole("checkbox", { name: "Condition match" }).check();
     await expect(page.getByText(/return to the collector at \$144,000/i)).toBeVisible();
     await page.getByRole("button", { name: "Record inspection" }).click();
     await expect(page.getByText(/Version 2/i)).toBeVisible();

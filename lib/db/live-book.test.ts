@@ -1955,6 +1955,15 @@ describe("repo requests", { skip }, () => {
     }, deskOptions) as RequestTransitionResult;
     assert.equal(recorded.agreement.status, "closed");
     assert.ok((await eventsOf(id)).some((event) => event.action === "recordReturn"));
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "request.recordReturn",
+        id,
+        expectedStatus: closed.status,
+        expectedVersion: closed.version ?? 1,
+      }, deskOptions),
+      { message: "AGREEMENT_STATE_CONFLICT" },
+    );
 
     const neverDelivered = `request-return-never-${suffix}`;
     await flush(await submit(owner, neverDelivered, [(await acceptedPiece(owner)).id], 30_000));

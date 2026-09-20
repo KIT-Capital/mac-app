@@ -69,6 +69,7 @@ import {
   staffAccounts,
   timepieces,
   agreementDocuments,
+  agreementEvents,
   agreementSignatures,
 } from "./schema";
 
@@ -1868,6 +1869,11 @@ async function recordReturnRequest(
   }
   if (agreement.status !== "closed") throw new Error("AGREEMENT_STATE_CONFLICT");
   if (!agreement.deliveredOn) throw new Error("RETURN_NOT_APPLICABLE");
+  const alreadyReturned = await db.select({ id: agreementEvents.id }).from(agreementEvents).where(and(
+    eq(agreementEvents.agreementId, agreement.id),
+    eq(agreementEvents.action, "recordReturn"),
+  )).limit(1);
+  if (alreadyReturned.length) throw new Error("AGREEMENT_STATE_CONFLICT");
   const now = new Date();
   await recordAgreementEvent(db, {
     agreementId: agreement.id,

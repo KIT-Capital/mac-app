@@ -5,10 +5,12 @@ export type RetailThreadEvent = {
   toStatus?: string;
   createdAt: string;
   note?: string;
+  internal?: boolean;
 };
 
 export function RequestThread({ events }: { events: RetailThreadEvent[] }) {
   const rows = events
+    .filter((event) => !event.internal)
     .map((event) => ({ event, line: retailEventLine(event) }))
     .filter((row) => row.line);
   if (!rows.length) return null;

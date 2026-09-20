@@ -98,6 +98,19 @@ function dollarsToCents(raw: string) {
   return Math.round(dollars * 100);
 }
 
+function attemptForThisInspection(
+  attempts: { timepieceId: string; status: string; finalizedAt?: string; finalizedAgreementId?: string; inspectedValueCents?: number }[],
+  timepieceId: string,
+  agreementId: string,
+) {
+  return attempts.find((attempt) => (
+    attempt.timepieceId === timepieceId
+    && attempt.status === "accepted"
+    && Boolean(attempt.finalizedAt)
+    && attempt.finalizedAgreementId === agreementId
+  ));
+}
+
 export default function DeskRequestPage() {
   const params = useParams<{ id: string }>();
   const {
@@ -179,16 +192,12 @@ export default function DeskRequestPage() {
   });
   const preview = inspectPreview(agreement, inspectPieces);
   const remainingFinalized = watches.every((watch) =>
-    appraisalAttempts.some((attempt) => (
-      attempt.timepieceId === watch.id && attempt.status === "accepted" && Boolean(attempt.finalizedAt)
-    )),
+    Boolean(attemptForThisInspection(appraisalAttempts, watch.id, agreement.id)),
   );
   const signedFits = inspectPreview(
     agreement,
     watches.map((watch) => {
-      const attempt = appraisalAttempts.find((item) => (
-        item.timepieceId === watch.id && item.status === "accepted" && item.finalizedAt
-      ));
+      const attempt = attemptForThisInspection(appraisalAttempts, watch.id, agreement.id);
       return attempt?.inspectedValueCents != null
         ? { timepieceId: watch.id, decision: "confirm" as const, inspectedValueCents: attempt.inspectedValueCents }
         : { timepieceId: watch.id, decision: "drop" as const };
@@ -371,6 +380,20 @@ export default function DeskRequestPage() {
                 setError("Enter an inspected value for each confirmed piece.");
                 return;
               }
+              if (watches.some((watch) => {
+                const draft = pieces[watch.id];
+                const decision = draft?.decision ?? "confirm";
+                return decision === "confirm" && (!draft?.serialMatch || !draft?.conditionMatch);
+              })) {
+                setError("Mark serial match and condition match on each confirmed piece.");
+                return;
+              }
+              const pieceNotes = watches.map((watch) => {
+                const draft = pieces[watch.id] ?? { decision: "confirm" as const, serialMatch: false, conditionMatch: false };
+                const label = `${watch.brand} ${watch.model}`;
+                if (draft.decision !== "confirm") return `${label}: ${draft.decision}`;
+                return `${label}: confirm; serial match; condition match`;
+              });
               void run("Inspection", () => inspectRequest(agreement.id, {
                 outcome: preview.kind === "decline" ? "decline" : "proceed",
                 pieces: inspectPieces.map((piece) => ({
@@ -378,7 +401,7 @@ export default function DeskRequestPage() {
                   decision: piece.decision,
                   ...(piece.decision === "confirm" ? { inspectedValueCents: piece.inspectedValueCents } : {}),
                 })),
-                note,
+                note: [note.trim(), ...pieceNotes].filter(Boolean).join("\n"),
               }));
             }}
           >
