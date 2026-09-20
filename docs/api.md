@@ -40,7 +40,9 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - Live mode requires exactly one valid desk or collector session. Unauthenticated
   is **401** before any ID lookup. Collector reads are scoped by `customer_id`;
   a foreign ID returns the same `DOCUMENT_NOT_FOUND` body as a missing ID.
-- `GET` lists documents (`liveAgreementId`, optional desk `customerId`).
+- `GET` lists documents (`liveAgreementId`, optional desk `customerId`). When
+  `liveAgreementId` is set, the same response includes the retail-visible
+  `events` thread (desk-internal rows stay hidden from a collector).
 - `POST` `{ action: "build", liveAgreementId }` freezes the stored live repo and
   conditionally writes the PDF. Extra contract fields are **400**.
 - `POST` `{ action: "url", documentId }` verifies checksum and bytes, then returns

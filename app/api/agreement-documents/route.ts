@@ -5,6 +5,7 @@ import {
   mintAgreementDocumentUrl,
   sendAgreementDocument,
 } from "@/lib/db/agreement-documents";
+import { listAgreementEvents } from "@/lib/db/request-events";
 import { previewClientIp } from "@/lib/contract/pdf-request-policy.mjs";
 import { allowMailRequest } from "@/lib/mail-rate.mjs";
 import { getDb } from "@/lib/db/client";
@@ -65,10 +66,30 @@ export async function GET(request: Request) {
       : await listAgreementDocumentSends(getDb(), context.actor, {
         liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
       });
+    const liveAgreementId = url.searchParams.get("liveAgreementId");
+    let events: Array<{
+      action: string;
+      toStatus: string;
+      createdAt: string;
+      note: string;
+    }> = [];
+    if (liveAgreementId) {
+      try {
+        events = (await listAgreementEvents(getDb(), context.actor, liveAgreementId)).map((row) => ({
+          action: row.action,
+          toStatus: row.toStatus,
+          createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+          note: row.note,
+        }));
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "AGREEMENT_NOT_FOUND") throw error;
+      }
+    }
     return json({
       mode: "live",
       documents: documents.map((row) => publicDocument(row as Record<string, unknown>)),
       sends,
+      events,
     });
   } catch (error) {
     const failure = liveBookErrorResponse(error);

@@ -1,16 +1,27 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
+import { INTAKE_DELIVERY, RequestSignSheet } from "@/components/request-sign-sheet";
+import { RequestThread, type RetailThreadEvent } from "@/components/request-thread";
 import { WatchPhoto } from "@/components/watch-photo";
 import { COMPANY, hasApplication, money } from "@/lib/catalog";
 import { bookLabel, isRequestExpired } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
 import { PENDING_COUNSEL_LABEL, buildAgreementSnapshot } from "@/lib/contract/repo-agreement-snapshot.mjs";
-import { isRequestRow, retailRequestWord } from "@/lib/contract/request-transitions.mjs";
+import {
+  isRequestRow,
+  nextAllowedActions,
+  releasedWatchIds,
+  retailRequestLine,
+  retailRequestWord,
+  startAgainHref,
+} from "@/lib/contract/request-transitions.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
+import { hashSnapshot } from "@/lib/snapshot-hash";
 import { useStore } from "@/lib/store";
 
 type ListedDocument = {
@@ -19,18 +30,42 @@ type ListedDocument = {
   status: string;
   checksum?: string | null;
   templateVersion?: string;
+  snapshotHash?: string;
 };
 
-/** The one line a retail user reads under each of the four words (R29). */
-function requestLine(word: ReturnType<typeof retailRequestWord>) {
-  switch (word) {
-    case "Your turn":
-      return "MAC confirmed your request. Signing arrives with the next update.";
-    case "Closed":
-      return "This request is closed.";
-    default:
-      return "MAC is reviewing your request.";
+type LoadedDocuments = {
+  mode: "browser" | "live" | "unavailable";
+  documents: ListedDocument[];
+  events: RetailThreadEvent[];
+};
+
+async function fetchAgreementDocuments(agreementId: string): Promise<LoadedDocuments> {
+  const response = await fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreementId)}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  const body = (await response.json().catch(() => null)) as {
+    mode?: string;
+    error?: string;
+    documents?: ListedDocument[];
+    events?: RetailThreadEvent[];
+  } | null;
+  if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+    window.location.replace("/admin/password");
+    return { mode: "browser", documents: [], events: [] };
   }
+  if (body?.mode === "live") {
+    return {
+      mode: "live",
+      documents: Array.isArray(body.documents) ? body.documents : [],
+      events: Array.isArray(body.events) ? body.events : [],
+    };
+  }
+  if (body?.mode === "unavailable") {
+    // A missing live prerequisite is not browser mode: no preview mint, no stored list.
+    return { mode: "unavailable", documents: [], events: [] };
+  }
+  return { mode: "browser", documents: [], events: [] };
 }
 
 function moneyExact(amount: number) {
@@ -44,7 +79,7 @@ function moneyExact(amount: number) {
 
 export default function AgreementDetailPage() {
   const params = useParams<{ id: string }>();
-  const { signAgreement, withdrawRequest, declineRequest, user, settings } = useStore();
+  const { signAgreement, signCollectorRequest, withdrawRequest, declineRequest, user, settings } = useStore();
   const { agreements, timepieces } = useOwnedAssets();
   const agreement = agreements.find((a) => a.id === params.id);
   const watches = timepieces.filter((w) => agreement?.watchIds.includes(w.id));
@@ -55,6 +90,12 @@ export default function AgreementDetailPage() {
   const [requestBusy, setRequestBusy] = useState(false);
   const [bookMode, setBookMode] = useState<"browser" | "live" | "unavailable">("browser");
   const [documents, setDocuments] = useState<ListedDocument[]>([]);
+  const [threadEvents, setThreadEvents] = useState<RetailThreadEvent[]>([]);
+  const [signing, setSigning] = useState(false);
+  const [typedName, setTypedName] = useState("");
+  const [attested, setAttested] = useState(false);
+  const [delivery, setDelivery] = useState(INTAKE_DELIVERY);
+  const [signError, setSignError] = useState("");
   const [docError, setDocError] = useState("");
   const [mailBusy, setMailBusy] = useState(false);
   const [mailNote, setMailNote] = useState("");
@@ -99,35 +140,28 @@ export default function AgreementDetailPage() {
       })
     : { ok: false, errors: ["AGREEMENT_NOT_FOUND"], value: null };
 
+  function applyDocuments(loaded: LoadedDocuments) {
+    setBookMode(loaded.mode);
+    setDocuments(loaded.documents);
+    if (loaded.mode === "live") setThreadEvents(loaded.events);
+  }
+
+  async function loadDocuments(): Promise<LoadedDocuments> {
+    if (!agreement) return { mode: "browser", documents: [], events: [] };
+    const loaded = await fetchAgreementDocuments(agreement.id);
+    applyDocuments(loaded);
+    return loaded;
+  }
+
   useEffect(() => {
     if (!agreement) return;
     let cancelled = false;
-    fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreement.id)}`, {
-      credentials: "include",
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => null)) as {
-          mode?: string;
-          error?: string;
-          documents?: ListedDocument[];
-        } | null;
+    fetchAgreementDocuments(agreement.id)
+      .then((loaded) => {
         if (cancelled) return;
-        if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
-          window.location.replace("/admin/password");
-          return;
-        }
-        if (body?.mode === "live") {
-          setBookMode("live");
-          setDocuments(Array.isArray(body.documents) ? body.documents : []);
-        } else if (body?.mode === "unavailable") {
-          // A missing live prerequisite is not browser mode: no preview mint, no stored list.
-          setBookMode("unavailable");
-          setDocuments([]);
-        } else {
-          setBookMode("browser");
-          setDocuments([]);
-        }
+        setBookMode(loaded.mode);
+        setDocuments(loaded.documents);
+        if (loaded.mode === "live") setThreadEvents(loaded.events);
       })
       .catch(() => {
         if (!cancelled) {
@@ -295,11 +329,19 @@ export default function AgreementDetailPage() {
   }
   const request = isRequestRow(agreement);
   const word = retailRequestWord(agreement);
-  // Before inspection nothing moves the amount or the pieces (KTD8): the
-  // owner's only exits are to withdraw, or to decline a confirmed request.
   const expired = isRequestExpired(agreement);
-  const canWithdraw = request && !expired && (agreement.status === "submitted" || agreement.status === "returned");
-  const canDecline = request && !expired && agreement.status === "returned";
+  const allowed = nextAllowedActions(agreement, { kind: "retail" });
+  const canSign = request && !expired && allowed.includes("signCollector");
+  const canWithdraw = request && !expired && allowed.includes("withdraw");
+  const canDecline = request && !expired && allowed.includes("decline");
+  const canStartAgain = request && word === "Closed";
+  const signTitle = (agreement.version ?? 1) > 1
+    ? "Accept the inspected amount and sign"
+    : "Sign";
+  const released = releasedWatchIds(agreement)
+    .map((id) => timepieces.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const visibleEvents = threadEvents.length ? threadEvents : (agreement.events ?? []);
 
   async function onRequestExit(kind: "withdraw" | "decline") {
     if (!agreement || requestBusy) return;
@@ -312,6 +354,57 @@ export default function AgreementDetailPage() {
     if (!result.ok) setRequestError("That could not be recorded. Refresh and try again.");
   }
 
+  async function onSign() {
+    if (!agreement || requestBusy) return;
+    if (!attested || !typedName.trim()) {
+      setSignError("Type your name and confirm you are signing.");
+      return;
+    }
+    setRequestBusy(true);
+    setSignError("");
+    let loaded: { mode: "browser" | "live" | "unavailable"; documents: ListedDocument[] };
+    try {
+      loaded = await loadDocuments();
+    } catch {
+      setRequestBusy(false);
+      setSignError("This agreement is still preparing. Try again in a moment.");
+      return;
+    }
+    const listed = loaded.documents;
+    const current = listed.find((row) => row.version === (agreement.version ?? 1) && row.snapshotHash)
+      ?? listed.find((row) => row.snapshotHash);
+    const serverHash = current?.snapshotHash && /^[0-9a-f]{64}$/i.test(current.snapshotHash)
+      ? current.snapshotHash
+      : "";
+    // Live signing binds to the stored proposal hash. A client-built hash
+    // cannot match those frozen fields, so wait rather than send a stale one.
+    if (loaded.mode === "live" && !serverHash) {
+      setRequestBusy(false);
+      setSignError("This agreement is still preparing. Try again in a moment.");
+      return;
+    }
+    const snapshotHash = serverHash || await hashSnapshot(snapshot.ok ? snapshot.value : {
+      id: agreement.id,
+      version: agreement.version ?? 1,
+      amount: agreement.amount,
+    });
+    const result = await signCollectorRequest(agreement.id, {
+      typedName: typedName.trim(),
+      snapshotHash,
+      delivery,
+    });
+    setRequestBusy(false);
+    if (!result.ok) {
+      setSignError(
+        result.error === "DOCUMENT_STALE" || result.error === "DOCUMENT_NOT_READY"
+          ? "This agreement is still preparing. Try again in a moment."
+          : "That could not be signed. Refresh and try again.",
+      );
+      return;
+    }
+    setSigning(false);
+  }
+
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Repurchase Agreement" backHref="/agreements" />
@@ -320,7 +413,49 @@ export default function AgreementDetailPage() {
           <div className="mb-4 rounded-xl border border-mac-line bg-mac-card p-3">
             <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">{word}</span>
             <p className="text-[12px] text-mac-muted">Request #{agreement.agreementCode || agreement.id}</p>
-            <p className="mt-2 text-[13px] text-mac-fg">{requestLine(word)}</p>
+            <p className="mt-2 text-[13px] text-mac-fg">{retailRequestLine({ ...agreement, events: visibleEvents })}</p>
+            {agreement.delivery ? (
+              <p className="mt-1 text-[12px] text-mac-muted">{agreement.delivery}</p>
+            ) : null}
+            {canSign && !signing ? (
+              <div className="mt-3">
+                <PillButton
+                  variant="gold"
+                  onClick={() => {
+                    setTypedName(user?.name || "");
+                    setDelivery(INTAKE_DELIVERY);
+                    setAttested(false);
+                    setSignError("");
+                    setSigning(true);
+                  }}
+                >
+                  {signTitle}
+                </PillButton>
+              </div>
+            ) : null}
+            {signing ? (
+              <RequestSignSheet
+                title={signTitle}
+                typedName={typedName}
+                onTypedNameChange={setTypedName}
+                attested={attested}
+                onAttestedChange={setAttested}
+                delivery={delivery}
+                onDeliveryChange={setDelivery}
+                busy={requestBusy}
+                error={signError}
+                onSubmit={() => void onSign()}
+                onCancel={() => setSigning(false)}
+              />
+            ) : null}
+            {canStartAgain ? (
+              <Link
+                href={startAgainHref(agreement)}
+                className="mt-3 inline-block text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+              >
+                Start again
+              </Link>
+            ) : null}
             {canWithdraw || canDecline ? (
               <div className="mt-3 flex gap-4">
                 {canDecline ? (
@@ -363,6 +498,19 @@ export default function AgreementDetailPage() {
             ) : null}
           </div>
         )}
+
+        {released.length ? (
+          <ul className="mb-4 space-y-2">
+            {released.map((watch) => (
+              <li key={watch.id} className="rounded-xl border border-mac-line bg-mac-card p-3 text-[13px] text-mac-fg">
+                {watch.brand} {watch.model}
+                <span className="mt-1 block text-[12px] text-mac-muted">Released from request</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {request ? <RequestThread events={visibleEvents} /> : null}
 
         <article className="space-y-4 rounded-2xl bg-white p-5 text-[#1a1a1a] shadow-md font-sans">
           <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">

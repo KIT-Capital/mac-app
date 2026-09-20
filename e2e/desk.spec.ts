@@ -355,9 +355,8 @@ test.describe("desk", () => {
     await appraiseNewHalePiece(page);
     await signInHale(page);
     await page.goto("/repurchase");
-    await page.getByText("I confirm that I am at least 18 years old").click();
     await page.getByRole("button", { name: "Apply", exact: true }).click();
-    await expect(page.getByText("With MAC", { exact: true })).toBeVisible();
+    await expect(page.getByText("With MAC", { exact: true }).first()).toBeVisible();
     await signOutFromMenu(page);
 
     await signInDesk(page);
@@ -380,10 +379,21 @@ test.describe("desk", () => {
     const card = page.getByRole("link").filter({ hasText: "Your turn" });
     await expect(card).toHaveCount(1);
     await card.click();
-    await expect(page.getByText(/MAC confirmed your request/i)).toBeVisible();
+    await expect(page.getByText(/MAC confirmed your request/i).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Decline" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ask for less" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Sign Repurchase Agreement" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Sign", exact: true }).click();
+    await page.getByLabel("Typed name").fill("Jonathan Hale");
+    await page.getByText("I have read this agreement and I am signing it").click();
+    await expect(page.getByLabel("Delivery method")).toHaveValue("Desk arranges intake");
+    await page.getByRole("button", { name: "Sign", exact: true }).click();
+    await expect(page.getByText("Awaiting inspection.")).toBeVisible();
+    await expect(page.getByText("You signed.")).toBeVisible();
+    await expect(page.getByText("Desk arranges intake").first()).toBeVisible();
+    await expect(page.getByText(/\b(submitted|returned|inspecting|collector_signed)\b/i)).toHaveCount(0);
   });
 
   test("desk records bought back and the collector chip matches", async ({ page }) => {

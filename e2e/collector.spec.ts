@@ -533,17 +533,22 @@ test.describe("collector app", () => {
     await page.getByRole("checkbox", { name: "Urwerk UR-220" }).uncheck();
     await expect(page.getByText("Enter Amount Up to $60,000")).toBeVisible();
     await expect(page.getByLabel(/Enter Amount/)).toHaveValue("60,000");
-    await page.getByText("I confirm that I am at least 18 years old").click();
+    await expect(page.getByLabel("Anything MAC should know?")).toBeVisible();
+    await expect(page.getByTestId("offer-schedule").getByRole("row")).toHaveCount(13);
     await page.getByRole("button", { name: "Apply", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Repurchase Agreement", exact: true })).toBeVisible();
-    await expect(page.getByText("With MAC", { exact: true })).toBeVisible();
+    await expect(page.getByText("With MAC", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/MAC is reviewing your request/i)).toBeVisible();
+    await expect(page.getByText("You sent this request.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Review Terms" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Sign Repurchase Agreement" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Ask for less" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
     // Internal states and loan-adjacent words never reach a collector (R29).
     await expect(page.getByText(/originated|submitted|advance|principal|borrower/i)).toHaveCount(0);
+    await expect(page.getByText(/\b(inspecting|collector_signed)\b/i)).toHaveCount(0);
     await page.goto("/agreements");
+    await expect(page.getByRole("heading", { name: "With MAC", exact: true })).toBeVisible();
     const request = page.getByRole("link").filter({ hasText: "With MAC" });
     await expect(request).toHaveCount(1);
     await expect(request.getByText("$60,000")).toBeVisible();
@@ -700,6 +705,253 @@ test.describe("collector app", () => {
     await page.getByRole("button", { name: "Create Account" }).click();
     await page.goto("/agreements");
     await expect(page.getByText("No sale-and-repurchase agreements on file yet.")).toBeVisible();
+  });
+
+  test("offer schedule follows the ticked pieces and the typed amount", async ({ page }) => {
+    const email = "offer.schedule@example.com";
+    const piece = (id: string, model: string) => ({
+      id,
+      ownerEmail: email,
+      brand: "Urwerk",
+      model,
+      images: [],
+      status: "appraised",
+      evaluatedAt: new Date().toISOString().slice(0, 10),
+      valueLow: 100_000,
+      valueHigh: 120_000,
+      financeable: true,
+      condition: "Excellent",
+      boxPapers: "Box and papers",
+      caseMetal: "Steel",
+      caseType: "Round",
+      caseDiameter: "41mm",
+      dialColor: "Black",
+      buckle: "Folding clasp",
+      band: "bracelet",
+      bandMaterial: "Steel",
+      complication: "Date",
+    });
+    await page.route("**/api/live-book", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          viewer: { role: "collector", email, customerId: "cust-offer" },
+          book: {
+            timepieces: [
+              piece("piece-a", "UR-100"),
+              piece("piece-b", "UR-105"),
+              piece("piece-c", "UR-110"),
+              piece("piece-d", "UR-210"),
+            ],
+            agreements: [],
+            users: [],
+            photos: [],
+            appraisalAttempts: [],
+            appraisalAttemptPhotos: [],
+            profiles: {
+              [email]: {
+                name: "Offer Reader",
+                email,
+                phone: "",
+                member: false,
+                avatar: "",
+                role: "collector",
+                onboardingComplete: true,
+                applicationSubmitted: false,
+                preferences: {},
+              },
+            },
+            catalog: [],
+            shells: [],
+            settings: { maxLtv: 0.6, typicalTerm: 12, vaultLocation: "" },
+            applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.6 },
+          },
+        }),
+      });
+    });
+    await page.goto("/repurchase");
+    await expect(page.getByText("Enter Amount Up to $240,000")).toBeVisible();
+    await page.getByRole("checkbox", { name: "Urwerk UR-210" }).uncheck();
+    await expect(page.getByText("Enter Amount Up to $180,000")).toBeVisible();
+    await expect(page.getByTestId("offer-schedule").getByRole("row")).toHaveCount(13);
+    const firstPrice = await page.getByTestId("offer-schedule").getByRole("row").nth(1).textContent();
+    await page.getByLabel(/Enter Amount/).fill("90000");
+    await expect(page.getByTestId("offer-schedule").getByRole("row")).toHaveCount(13);
+    const halfPrice = await page.getByTestId("offer-schedule").getByRole("row").nth(1).textContent();
+    expect(halfPrice).not.toEqual(firstPrice);
+    await expect(page.getByText(/\b(loan|lender|interest|debt|financing|vesting|paid off|originated|advance|principal|balance|collateral|borrower)\b/i)).toHaveCount(0);
+  });
+
+  test("expired accepted pieces stay off the picker and say send again", async ({ page }) => {
+    const email = "expired.card@example.com";
+    const today = new Date();
+    const stale = new Date(today);
+    stale.setUTCDate(today.getUTCDate() - 8);
+    await page.route("**/api/live-book", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          viewer: { role: "collector", email, customerId: "cust-expired" },
+          book: {
+            timepieces: [{
+              id: "piece-stale",
+              ownerEmail: email,
+              brand: "Urwerk",
+              model: "UR-Expired",
+              images: [],
+              status: "appraised",
+              evaluatedAt: stale.toISOString().slice(0, 10),
+              valueLow: 100_000,
+              valueHigh: 120_000,
+              financeable: true,
+              condition: "Excellent",
+              boxPapers: "Box and papers",
+              caseMetal: "Steel",
+              caseType: "Round",
+              caseDiameter: "41mm",
+              dialColor: "Black",
+              buckle: "Folding clasp",
+              band: "bracelet",
+              bandMaterial: "Steel",
+              complication: "Date",
+            }],
+            agreements: [],
+            users: [],
+            photos: [],
+            appraisalAttempts: [],
+            appraisalAttemptPhotos: [],
+            profiles: {
+              [email]: {
+                name: "Expired Reader",
+                email,
+                phone: "",
+                member: false,
+                avatar: "",
+                role: "collector",
+                onboardingComplete: true,
+                applicationSubmitted: false,
+                preferences: {},
+              },
+            },
+            catalog: [],
+            shells: [],
+            settings: { maxLtv: 0.6, typicalTerm: 12, vaultLocation: "" },
+            applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.6 },
+          },
+        }),
+      });
+    });
+    await page.goto("/repurchase");
+    await expect(page.getByRole("checkbox", { name: "Urwerk UR-Expired" })).toHaveCount(0);
+    await expect(page.getByText("Appraisal expired — send again")).toBeVisible();
+    await page.goto("/collection");
+    await expect(page.getByText("Appraisal expired — send again")).toBeVisible();
+    await page.getByText("UR-Expired").click();
+    await expect(page.getByText("Appraisal expired — send again")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Apply to Sell/i })).toHaveCount(0);
+  });
+
+  test("closed request offers Start again with the same pieces", async ({ page }) => {
+    await appraiseNewHalePiece(page, "UR-111");
+    await signInHale(page);
+    await page.goto("/repurchase");
+    await page.getByRole("button", { name: "Apply", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
+    await page.getByRole("button", { name: "Withdraw" }).click();
+    await expect(page.getByText("This request is closed.")).toBeVisible();
+    await page.getByRole("link", { name: "Start again" }).click();
+    await expect(page.getByRole("heading", { name: "Sale & Repurchase" })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Urwerk UR-111" })).toBeChecked();
+    await expect(page.getByText(/\b(submitted|returned|inspecting|collector_signed)\b/i)).toHaveCount(0);
+  });
+
+  test("inspected return asks the collector to accept the new amount", async ({ page }) => {
+    const email = "inspected.return@example.com";
+    await page.route("**/api/live-book", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          mode: "live",
+          viewer: { role: "collector", email, customerId: "cust-r43" },
+          book: {
+            timepieces: [{
+              id: "piece-r43",
+              ownerEmail: email,
+              brand: "Urwerk",
+              model: "UR-R43",
+              images: [],
+              status: "appraised",
+              evaluatedAt: new Date().toISOString().slice(0, 10),
+              valueLow: 100_000,
+              valueHigh: 120_000,
+              financeable: true,
+              condition: "Excellent",
+              boxPapers: "Box and papers",
+              caseMetal: "Steel",
+              caseType: "Round",
+              caseDiameter: "41mm",
+              dialColor: "Black",
+              buckle: "Folding clasp",
+              band: "bracelet",
+              bandMaterial: "Steel",
+              complication: "Date",
+            }],
+            agreements: [{
+              id: "agr-r43",
+              agreementCode: "MAC-R43",
+              watchIds: ["piece-r43"],
+              amount: 27000,
+              termMonths: 12,
+              delivery: "Desk arranges intake",
+              ownerName: "Inspected Reader",
+              email,
+              status: "returned",
+              version: 2,
+              createdAt: new Date().toISOString().slice(0, 10),
+              lastActionAt: new Date().toISOString(),
+              pieceCaps: { "piece-r43": 27000, "piece-dropped": 30000 },
+            }],
+            users: [],
+            photos: [],
+            appraisalAttempts: [],
+            appraisalAttemptPhotos: [],
+            profiles: {
+              [email]: {
+                name: "Inspected Reader",
+                email,
+                phone: "",
+                member: false,
+                avatar: "",
+                role: "collector",
+                onboardingComplete: true,
+                applicationSubmitted: true,
+                preferences: {},
+              },
+            },
+            catalog: [],
+            shells: [],
+            settings: { maxLtv: 0.6, typicalTerm: 12, vaultLocation: "" },
+            applicationPurchaseShares: { 3: 0.55, 6: 0.55, 8: 0.55, 9: 0.45, 12: 0.6 },
+          },
+        }),
+      });
+    });
+    await page.goto("/agreements/agr-r43");
+    await expect(page.getByText("Your turn", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("MAC inspected the pieces. Sign the new amount.")).toBeVisible();
+    await expect(page.getByText("$27,000")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Accept the inspected amount and sign" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ask for less" })).toHaveCount(0);
+    await expect(page.getByLabel(/Enter Amount/)).toHaveCount(0);
   });
 
   test("legacy financing routes open repurchase", async ({ page }) => {

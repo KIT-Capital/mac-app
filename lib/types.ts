@@ -220,6 +220,17 @@ export type Agreement = {
   /** Per-piece caps frozen at Apply so a later appraisal never reprices it. */
   pieceCaps?: Record<string, number>;
   signatures?: AgreementSignature[];
+  /** Browser-book thread; live mode loads the same shape from the documents GET. */
+  events?: RequestEvent[];
+};
+
+export type RequestEvent = {
+  action: string;
+  toStatus?: string;
+  createdAt: string;
+  amount?: number;
+  version?: number;
+  note?: string;
 };
 
 export type AgreementSignature = {
