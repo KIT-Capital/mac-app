@@ -4,7 +4,7 @@
 
 Key **names** only. Values belong in Doppler or Railway variables. See `.env.example`. Never print values.
 
-`APP_ENV` selects the Neon mapping. `NODE_ENV` must not select the database. Guard: `lib/env/database-mapping.mjs`. Audit: `docs/plans/2026-09-15-neon-railway-env-separation.md`.
+`APP_ENV` selects the Neon mapping. `NODE_ENV` must not select the database. Guard: `lib/env/database-mapping.mjs`. Audit: `docs/plans/2026-09-15-neon-railway-env-separation.md`. Vocabulary: `CONCEPTS.md`. Isolation tests must not rewrite `APP_ENV` to `development` against a `ci` URL — `docs/solutions/test-failures/ci-app-env-mutation-breaks-neon-mapping.md`.
 
 ## Verified topology
 
@@ -86,7 +86,7 @@ Sentry code is installed but project creation remains an owner gate. Once approv
 | `DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH` | First live admin | Owner go-live gate | Serialized output of `npm run desk:hash-password`; never plaintext; remove after first password rotation |
 | `MAC_LIVE_BOOK` | Live-book mode | Implemented, default off | Only `1`, `true`, or `on`. Off is browser mode for development and Playwright. May be on in development, staging, ci (isolation tests), and production; **production requires it** and exits with `PRODUCTION_REQUIRES_LIVE_BOOK` otherwise. GitHub Actions `database` leaves it off |
 | `COLLECTOR_SESSION_SECRET` | Collector verification and session HMAC | Required when live book is on | No committed or runtime fallback |
-| `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin outside development; development may use HTTP localhost. Missing is `COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED`, malformed is `..._INVALID` |
+| `COLLECTOR_MAGIC_LINK_ORIGIN` | Collector verification links | Required when live book is on | Fixed absolute HTTPS origin outside fixture environments; development and ci may use HTTP localhost. Missing is `COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED`, malformed is `..._INVALID` |
 | `MAC_INTERNAL_EMAIL` | Internal MAC recipients | Implemented | Temporary prototype default `ricardo.cidale@norfolkgroup.io`; routes info/finance/financing recipients only |
 | `RESEND_API_KEY` | `/api/mail` + collector access mail | Implemented; required when live book is on | Preview remains available for ordinary mail, never for identity verification |
 | `RESEND_FROM_EMAIL` | Outbound From | Implemented | `info@mechartcap.com`; internal recipient routing does not change From |
@@ -122,7 +122,7 @@ Sentry code is installed but project creation remains an owner gate. Once approv
 | Exit | `APP_ENV=production` with `MAC_LIVE_BOOK` off (`PRODUCTION_REQUIRES_LIVE_BOOK`), or the database mapping fails | The process exits before serving. Railway restarts it; nothing is served |
 | Unavailable | Staging or production with the flag on and any of `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, `RESEND_API_KEY`, `DESK_SESSION_SECRET`, the R2 names, or `DATABASE_URL` missing | The process stays up. Every live route answers `503 { mode: "unavailable", error }` and the app renders one unavailable page in place of every route |
 
-Development is not governed: flag off is browser mode; flag on with a missing prerequisite behaves as before (`503` with the code, store mode `unknown`). Staging with the flag off is browser mode.
+Fixture environments (development and ci) are not governed: flag off is browser mode; flag on with a missing prerequisite does not trip live-unavailability. Staging with the flag off is browser mode.
 
 ## Health check
 

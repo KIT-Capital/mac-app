@@ -46,7 +46,7 @@
       "sensitivity": "client-safe"
     },
     "AGENTS.md": {
-      "sha256": "f9f5a4c59da6724c1680332a4949826a4f295d37f2139c10dcec1bbd5017aeae",
+      "sha256": "90bcf595c7e3316c54912a32d937ac680e913e5ea141f7342cca06f4dbfb7498",
       "sensitivity": "client-safe"
     },
     "docs/SYSTEM-GOVERNANCE-RULE.md": {
@@ -70,11 +70,11 @@
       "sensitivity": "client-safe"
     },
     "docs/config-and-env-map.md": {
-      "sha256": "0c38a09f28ae535bccfd717fcecbb03584c9dfac32f5e78c34ae4eeb007d2138",
+      "sha256": "d79141b8b929556ab1a7536d9bbc1a9eee7975359f8727d03e7be1acbf1556f8",
       "sensitivity": "client-safe"
     },
     "docs/design-system.md": {
-      "sha256": "7a3063bb816fdb6ae85ff49af2f008d85445fb7386913fc6de32f66e1f202720",
+      "sha256": "a054239fe51542d9db0aadf136caeac54a7be4b71fb582a1ce6e7fadb8eb8a09",
       "sensitivity": "client-safe"
     },
     "docs/harness.md": {

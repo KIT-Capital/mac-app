@@ -1,5 +1,7 @@
 # Design reference
 
+**Tier: CONTRACT**
+
 The collector screens follow **Mechanical Art Capital App Screen Designs**, prepared by Limus Design on 14 November 2022. Brand lockup is official **Logo-FF** from Final Logo 2 Gold (`Logo-FF.ai`) — the Illustrator vector, not a JPEG invert. Black gear, gray arc, three gold pinions with colored jewels, MECHANICAL ART CAPITAL. On dark screens the black ink is a **solid white** gear + MECHANICAL ART; gray CAPITAL, the arc, and the jewels stay. Do not sit the lockup on a white plate, and never substitute an MB&F mark.
 
 That deck is the source of truth for information architecture, field order, and the dark / light pair on every surface. It is not a license to describe MAC as a lender.

@@ -103,7 +103,7 @@ Staff on another machine cannot see the vault because the live book is one brows
 - Catalog, shells, and settings on the server.
 - Reviewed tRPC/MCP adapters.
 - R2 originals for new uploads.
-- First `docs/solutions/` entry via `/ce-compound`.
+- First `docs/solutions/` entry via `/ce-compound` — landed 2026-09-20 (`test-failures/ci-app-env-mutation-breaks-neon-mapping.md`).
 
 ### Success Criteria
 

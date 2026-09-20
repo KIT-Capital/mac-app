@@ -83,7 +83,7 @@ Staff cannot see where a repo stands after the sale. Today an agreement is only 
 
 ### Institutional Learnings
 
-- `docs/solutions/` is empty. Binding constraints live in CONTRACT docs and `AGENTS.md`.
+- `docs/solutions/` now has learnings (first entry: `test-failures/ci-app-env-mutation-breaks-neon-mapping.md`). Binding constraints still live in CONTRACT docs and `AGENTS.md`.
 - `docs/decisions/0001-preserve-mac-stack.md` — keep Next.js and the browser store.
 - `docs/decisions/0002-neon-mac-app-project.md` — do not treat `localStorage` as migrated.
 - Owner brief 2026-09-16: this app is operations/analytics; QuickBooks and a third party hold official books and inventory.
