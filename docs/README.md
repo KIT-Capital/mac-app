@@ -16,6 +16,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | UI, styling, components, brand | `design-system.md` · `design-reference.md` |
 | Hosting, Railway, DNS, mail domain | `hosting.md` · `config-and-env-map.md` |
 | API routes or client store | `api.md` · `architecture.md` |
+| React `useEffect` fetch helpers, quality lint `set-state-in-effect` | `solutions/build-errors/extracted-async-helper-set-state-in-effect.md` |
 | Auth, sessions, desk cookie | `security.md` · `architecture.md` |
 | Repo desk, repurchase, appraisal language | `business-logic.md` · `workflows.md` · `design-reference.md` |
 | Users, timepiece lock, repo active/inactive, buyback vs liquidated | `workflows.md` · `business-logic.md` · `decisions/0003-repo-lifecycle-language.md` |
