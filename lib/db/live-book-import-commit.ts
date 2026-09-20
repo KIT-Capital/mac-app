@@ -8,6 +8,7 @@ import {
 } from "./staff-accounts";
 import { asDeskActor, type Actor } from "./records";
 import { assertIsolation, isDeskActor } from "./isolation.mjs";
+import { isFixtureAppEnv } from "../env/live-book-flag.mjs";
 import { canEditAppraisal, isDeskRole } from "../roles.mjs";
 import {
   customers,
@@ -48,7 +49,7 @@ export async function commitLiveBookImport(
         role: desk.role,
       })
       : null;
-    if (!auditActor && (options.env ?? process.env).APP_ENV?.trim() !== "development") {
+    if (!auditActor && !isFixtureAppEnv((options.env ?? process.env).APP_ENV?.trim())) {
       throw new Error("SESSION_INVALID");
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mac-live-book-import'))`);
@@ -307,7 +308,7 @@ export async function commitLivePreview(
         role: desk.role,
       })
       : null;
-    if (!auditActor && (options.env ?? process.env).APP_ENV?.trim() !== "development") {
+    if (!auditActor && !isFixtureAppEnv((options.env ?? process.env).APP_ENV?.trim())) {
       throw new Error("SESSION_INVALID");
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('mac-live-book-import'))`);

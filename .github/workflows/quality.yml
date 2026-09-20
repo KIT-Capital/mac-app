@@ -31,20 +31,37 @@ jobs:
 
   database:
     runs-on: ubuntu-latest
-    env:
-      APP_ENV: ci
-      NEON_BRANCH: ci
-      DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
-      DATABASE_URL_UNPOOLED: ${{ secrets.CI_DATABASE_URL_UNPOOLED }}
+    concurrency:
+      group: mac-app-ci-database
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24.13.0"
           cache: npm
 
       - run: npm ci
-      - run: node tools/harness/assert-ci-database.mjs
-      - run: npm run db:migrate:ci
-      - run: npm run test:db:run
+
+      - name: Assert CI database mapping
+        env:
+          APP_ENV: ci
+          NEON_BRANCH: ci
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ secrets.CI_DATABASE_URL_UNPOOLED }}
+        run: node tools/harness/assert-ci-database.mjs
+
+      - name: Migrate CI database
+        env:
+          APP_ENV: ci
+          NEON_BRANCH: ci
+          DATABASE_URL_UNPOOLED: ${{ secrets.CI_DATABASE_URL_UNPOOLED }}
+        run: npm run db:migrate:ci
+
+      - name: Run database isolation tests
+        env:
+          APP_ENV: ci
+          NEON_BRANCH: ci
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+        run: npm run test:db:run

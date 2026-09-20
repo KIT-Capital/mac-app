@@ -493,7 +493,6 @@ describe("staff accounts repository", { skip }, () => {
       DESK_SESSION_KEYS: process.env.DESK_SESSION_KEYS,
     };
     Object.assign(process.env, {
-      APP_ENV: "development",
       MAC_LIVE_BOOK: "1",
       DESK_SESSION_KEYS: `k1:${secret}`,
     });
