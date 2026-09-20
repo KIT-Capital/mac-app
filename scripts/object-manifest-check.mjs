@@ -64,7 +64,7 @@ export function evaluateManifestAccess(env, options = {}) {
   const touchesProduction = appEnv === "production" || exactProductionEndpoint;
   if (touchesProduction && !options.allowProductionRead) {
     errors.push("PRODUCTION_READ_NOT_ALLOWED");
-  } else if (urlAppEnv === "development" || urlAppEnv === "staging") {
+  } else if (urlAppEnv === "development" || urlAppEnv === "staging" || urlAppEnv === "ci") {
     errors.push("RESTORE_PREVIEW_REQUIRED");
   } else if (!skipPreviewIdentity && parsed.present && !parsed.parseError) {
     collectPreviewIdentityErrors(env, parsed, errors);

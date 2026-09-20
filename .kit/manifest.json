@@ -1,7 +1,7 @@
 {
   "kitRepo": "Norfolk-Group/norfolk-kit",
   "kitSha": "bf25a84ca761379ecfc8656793fec1f377f4b28a",
-  "equippedAt": "2026-09-15",
+  "equippedAt": "2026-09-20",
   "org": "KIT-Capital",
   "payloadClass": "client",
   "files": {
@@ -17,6 +17,10 @@
       "sha256": "43ae29413ebc6bc563554e195e800c7a02e5c5f31f2b465f0427b5edbcb24e1a",
       "sensitivity": "client-safe"
     },
+    ".env.example": {
+      "sha256": "b52e0d2e6e244f6349d3f86c590c29cf6e44b443bdadbeb7426e383ff66e6d7c",
+      "sensitivity": "client-safe"
+    },
     ".gitattributes": {
       "sha256": "9266d0091e80af3c2eb21250888b452694241f2caa43490dd61a2712a1ef0cbe",
       "sensitivity": "client-safe"
@@ -26,7 +30,7 @@
       "sensitivity": "client-safe"
     },
     ".github/workflows/quality.yml": {
-      "sha256": "c9e4b99728c53a062f9e505dee147314b8bebea3076e6d98c27037da9fc99ac7",
+      "sha256": "10c30f6c36665c45205e238f5bdacf5f738fba2b7f28f89a3c99adabd490b0cf",
       "sensitivity": "client-safe"
     },
     ".kit/markers.json": {
@@ -42,7 +46,7 @@
       "sensitivity": "client-safe"
     },
     "AGENTS.md": {
-      "sha256": "a12d30ed635c1c08dc125ef28f600c838804c273d41f8ac1545947464b577dfc",
+      "sha256": "f9f5a4c59da6724c1680332a4949826a4f295d37f2139c10dcec1bbd5017aeae",
       "sensitivity": "client-safe"
     },
     "docs/SYSTEM-GOVERNANCE-RULE.md": {
@@ -54,27 +58,27 @@
       "sensitivity": "client-safe"
     },
     "docs/api.md": {
-      "sha256": "610aba5b6f5287216a0d86851df1e3eb6f76ca804991fb4f752749c652f04151",
+      "sha256": "11a05985d1ace346fc9f16176dc8ab99e79c1099afd10fbdd32d28291d1a8afa",
       "sensitivity": "client-safe"
     },
     "docs/architecture.md": {
-      "sha256": "6fc1878f77750fa14a209ad7b22efdf5437705adaf6afcc81357c9ca3ea30f02",
+      "sha256": "f71c690105d7d6dc594bf59f12b9dae70160a6467b630849e3d268e94ae4df35",
       "sensitivity": "client-safe"
     },
     "docs/business-logic.md": {
-      "sha256": "757aed61f8ce15ff1a8fad4c91b2180f7056341b67d58fcad17088806521c674",
+      "sha256": "4433ce1bb964059cae8d67ce65896929d227af660a2144cab58f819edc97cd8b",
       "sensitivity": "client-safe"
     },
     "docs/config-and-env-map.md": {
-      "sha256": "5433c74f4ee90a63f448c8b7472afa9607beb130400d04a583b9f3cc46221a48",
+      "sha256": "0c38a09f28ae535bccfd717fcecbb03584c9dfac32f5e78c34ae4eeb007d2138",
       "sensitivity": "client-safe"
     },
     "docs/design-system.md": {
-      "sha256": "c540c0a4d6f0817d70740491accbf279bb0a7a4d57acd5c94504240770b7c996",
+      "sha256": "7a3063bb816fdb6ae85ff49af2f008d85445fb7386913fc6de32f66e1f202720",
       "sensitivity": "client-safe"
     },
     "docs/harness.md": {
-      "sha256": "e2df5f5d2aee8511a9e7d2fa9335b1290833b379e877abc9c5c6903fa7e3b71d",
+      "sha256": "9ce66849d333ac8720a1111af9407b96cff3f5c0051ecd446db76d62a6a1539e",
       "sensitivity": "client-safe"
     },
     "docs/product-os-adoption.md": {
@@ -82,7 +86,7 @@
       "sensitivity": "client-safe"
     },
     "docs/security.md": {
-      "sha256": "8a851eeca80b49fbf512db4017c9f44615997675ce2f96cf06f7fdab17fbf4ca",
+      "sha256": "b137aa78c998c2b4e7f7506224bf6eb3c3f8525a90bf4c364e3fd2e1afb6d5c6",
       "sensitivity": "client-safe"
     },
     "docs/setup/codespaces-kit-access.md": {
@@ -109,16 +113,24 @@
       "sha256": "ca8037cbd83296c2ccee3ac0d20e684f6dd22412d4635ce97bdd29038eccb770",
       "sensitivity": "client-safe"
     },
+    "tools/harness/assert-ci-database.mjs": {
+      "sha256": "b40b23591897df6cfc567714fc91e0b2552cce1fda637263889d293c1260b7c4",
+      "sensitivity": "client-safe"
+    },
+    "tools/harness/assert-ci-database.test.mjs": {
+      "sha256": "995d27efb364de29b29e9bcc3be1bd4c2d1a2d9629c25700424380164e0eb4c6",
+      "sensitivity": "client-safe"
+    },
     "tools/harness/check.mjs": {
       "sha256": "305b2395e7ec80f0ea0921822a9ae7a9def1d7869a88f992e68a6537e666f3ae",
       "sensitivity": "client-safe"
     },
     "tools/harness/drizzle-migrate.mjs": {
-      "sha256": "ec263f8ea4a77193d2fb30efe6331edec0695736d31c65b60f95afd2503da6f1",
+      "sha256": "c7dc02364d37f93b3c5ad86551bca9d7304d77b3697c60b0bd26c4e502abd8c2",
       "sensitivity": "client-safe"
     },
     "tools/harness/drizzle-migrate.test.mjs": {
-      "sha256": "a7ab51e4f112fa35cb9cb6965de537c3b0ae13cf57f5a473b4c33a720f8d43d2",
+      "sha256": "1a279bf187768bb6a4a16051604c3e90e3ef600160e916e0e8dfde9556fb8865",
       "sensitivity": "client-safe"
     },
     "tools/harness/drizzle-ping.mjs": {

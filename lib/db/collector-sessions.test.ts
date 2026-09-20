@@ -307,7 +307,6 @@ describe("collector access rows", { skip }, () => {
     };
     Object.assign(process.env, {
       MAC_LIVE_BOOK: "1",
-      APP_ENV: "development",
       COLLECTOR_SESSION_SECRET: SECRET,
       COLLECTOR_MAGIC_LINK_ORIGIN: "http://localhost:43173",
       RESEND_API_KEY: "test-api-key",

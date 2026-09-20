@@ -14,6 +14,7 @@ import {
 
 const developmentUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.development}-pooler.us-east-2.aws.neon.tech/neondb`;
 const stagingUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.staging}-pooler.us-east-2.aws.neon.tech/neondb`;
+const ciUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.ci}-pooler.us-east-2.aws.neon.tech/neondb`;
 const productionUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.production}-pooler.us-east-2.aws.neon.tech/neondb`;
 const previewEndpointId = "ep-preview-drill-a5abc123";
 const previewUrl = `postgresql://u:p@${previewEndpointId}-pooler.us-east-2.aws.neon.tech/neondb`;
@@ -666,6 +667,7 @@ describe("object-manifest-check access guard", () => {
   for (const [label, url] of [
     ["development", developmentUrl],
     ["staging", stagingUrl],
+    ["ci", ciUrl],
   ]) {
     it(`refuses the known live ${label} endpoint before creating clients`, async () => {
       let created = 0;

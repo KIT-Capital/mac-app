@@ -14,7 +14,7 @@ The drill is read-only against objects: `scripts/object-manifest-check.mjs` only
 - **Do not use `DATABASE_URL` for this drill.** Doppler `dev` still supplies R2 credentials, but the checker ignores `DATABASE_URL`. An inline assignment of `DATABASE_URL` does not retarget the check, and it would also put the credential in command history.
 - **Counts and row ids only.** The report prints counts and row ids. It never prints object keys, checksums, URLs, credentials, addresses, or driver messages. Paste the report line as-is.
 - **Acceptance is a complete inventory with zero missing and zero mismatch.** Success requires `agreementRows > 0`, `photoRows > 0`, `photoRowsWithPreview > 0`, `missing: 0`, `mismatch: 0`, and `failed: 0`. Empty inventories fail with `MANIFEST_EMPTY`. Nonempty inventories that lack any required category fail with `MANIFEST_INVENTORY_INCOMPLETE`. Any missing, mismatch, failed, or refusal outcome fails the drill and exits non-zero.
-- **Known live branches are not restore previews.** The checker refuses the exact development and staging endpoints with `RESTORE_PREVIEW_REQUIRED`. It refuses production with `PRODUCTION_READ_NOT_ALLOWED` unless the separately owner-approved production override is present.
+- **Known live branches are not restore previews.** The checker refuses the exact development, staging, and ci endpoints with `RESTORE_PREVIEW_REQUIRED`. It refuses production with `PRODUCTION_READ_NOT_ALLOWED` unless the separately owner-approved production override is present.
 
 ## Steps
 
@@ -55,7 +55,7 @@ The drill is read-only against objects: `scripts/object-manifest-check.mjs` only
    The drill passes only when `agreementRows > 0`, `photoRows > 0`, `photoRowsWithPreview > 0`, `missing: 0`, `mismatch: 0`, `failed: 0`, and `outcome: "success"`. `MANIFEST_EMPTY` fails a zero-object inventory with counts retained. `MANIFEST_INVENTORY_INCOMPLETE` fails a nonempty inventory that is missing agreements, photos, or a complete original-and-preview photo row.
 
 7. **Record the finalize decision.** Either the preview branch is discarded because the drill was a rehearsal, or the owner promotes it as a real recovery. A real recovery is a separate approved action, not part of this drill.
-8. **Owner-confirmed gate — clean up the preview branch.** Success, refusal, failure, and Ctrl-C all proceed to this cleanup gate; a failed check must never leave the preview branch live. With the owner's typed approval, delete the preview branch and confirm the deletion. Never delete the `development`, `staging`, or `production` branch.
+8. **Owner-confirmed gate — clean up the preview branch.** Success, refusal, failure, and Ctrl-C all proceed to this cleanup gate; a failed check must never leave the preview branch live. With the owner's typed approval, delete the preview branch and confirm the deletion. Never delete the `development`, `staging`, `ci`, or `production` branch.
 
 ## Production refusal
 
@@ -67,7 +67,7 @@ The script refuses before it creates a database or object-store client when `APP
 
 Overriding that refusal with `--allow-production-read` is an owner-approved read of production and is not part of this drill. `db:manifest-check` never bakes the flag in.
 
-Other codes: `MANIFEST_DATABASE_URL_REQUIRED` (no preview branch URL supplied), `DATABASE_URL_UNPARSEABLE`, `RESTORE_PREVIEW_REQUIRED` (known development or staging endpoint), `MANIFEST_PROJECT_INVALID`, `MANIFEST_PARENT_BRANCH_INVALID`, `MANIFEST_BRANCH_ID_REQUIRED`, `MANIFEST_BRANCH_INVALID`, `MANIFEST_ENDPOINT_ID_REQUIRED`, `MANIFEST_ENDPOINT_MISMATCH` (preview identity missing or not bound to the URL), `MANIFEST_ARG_INVALID` (unknown flag), `MANIFEST_CLIENT_UNAVAILABLE` (client configuration unavailable), `MANIFEST_EMPTY` (no stored object entries), `MANIFEST_INVENTORY_INCOMPLETE` (missing agreements, photos, or a complete original-and-preview photo row), `MANIFEST_READ_FAILED` (database query failure or timeout), and `OBJECT_CHECK_FAILED` (object operation failure or timeout).
+Other codes: `MANIFEST_DATABASE_URL_REQUIRED` (no preview branch URL supplied), `DATABASE_URL_UNPARSEABLE`, `RESTORE_PREVIEW_REQUIRED` (known development, staging, or ci endpoint), `MANIFEST_PROJECT_INVALID`, `MANIFEST_PARENT_BRANCH_INVALID`, `MANIFEST_BRANCH_ID_REQUIRED`, `MANIFEST_BRANCH_INVALID`, `MANIFEST_ENDPOINT_ID_REQUIRED`, `MANIFEST_ENDPOINT_MISMATCH` (preview identity missing or not bound to the URL), `MANIFEST_ARG_INVALID` (unknown flag), `MANIFEST_CLIENT_UNAVAILABLE` (client configuration unavailable), `MANIFEST_EMPTY` (no stored object entries), `MANIFEST_INVENTORY_INCOMPLETE` (missing agreements, photos, or a complete original-and-preview photo row), `MANIFEST_READ_FAILED` (database query failure or timeout), and `OBJECT_CHECK_FAILED` (object operation failure or timeout).
 
 ## Drill record
 
