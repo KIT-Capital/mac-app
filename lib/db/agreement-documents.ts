@@ -424,11 +424,11 @@ export async function renderStageDocument(
       if (!(error instanceof Error) || error.message !== "OBJECT_EXISTS") throw error;
       const existing = await store.get(objectKey);
       if (sha256Hex(existing) !== checksum || existing.byteLength !== pdf.bytes.byteLength) {
-        // Another render of this same row got there first. Do not mark this
-        // row failed while a usable object (or a still-running write) exists.
+        // A matching sibling already stored this row. A mismatched object at
+        // the same key is not our PDF — fail so render-on-read can replace it.
         const [current] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, row.id)).limit(1);
         if (current && current.status !== "building") return current;
-        return current ?? row;
+        throw new Error("OBJECT_EXISTS");
       }
     }
     const [stored] = await db

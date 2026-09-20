@@ -395,6 +395,25 @@ describe("request stage documents", { skip }, () => {
     assert.equal((await listAgreementDocuments(db, owner.actor, { liveAgreementId: id }, flaky)).length, 2);
   });
 
+  it("marks a stage row failed when the existing object does not match the render", async () => {
+    const owner = await applicant("stage-mismatch");
+    const memory = memoryObjectStore();
+    const conflicting = agreementDocumentStore({
+      ...memory,
+      async putIfAbsent(key) {
+        const junk = new Uint8Array([1, 2, 3]);
+        await memory.putIfAbsent(key, junk, sha256Hex(junk));
+        throw new Error("OBJECT_EXISTS");
+      },
+    });
+    const id = `request-stage-mismatch-${suffix}`;
+    const result = await submit(owner, id, conflicting);
+    for (const job of result.afterCommit) await job();
+    const [failed] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.liveAgreementId, id));
+    assert.equal(failed.status, "failed");
+    assert.equal(failed.failureCode, "OBJECT_EXISTS");
+  });
+
   it("stops inserting failed rows after three render attempts", async () => {
     const owner = await applicant("stage-fail-cap");
     const broken = agreementDocumentStore({

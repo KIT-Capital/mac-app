@@ -548,8 +548,8 @@ export async function executeLiveBookOperation(
     documentStore: options.documentStore,
     rootDb: db,
   };
-  if (operation.action === "request.submit") {
-    await consumeSubmitThrottle(db, actor);
+  if (operation.action === "request.submit" || operation.action === "request.withdraw") {
+    await consumeRequestThrottle(db, actor, operation.action);
   }
   if (REQUEST_TRANSITIONS.has(operation.action)) {
     await closeIfExpiredBeforeMove(db, actor, String(operation.id));
@@ -1237,12 +1237,17 @@ async function executeLiveBookOperationCore(
 
 /**
  * KTD23. Count the attempt on the root connection so a later refusal inside
- * the request transaction cannot roll the hit back.
+ * the request transaction cannot roll the hit back. Submit and withdraw are
+ * two separate daily buckets.
  */
-async function consumeSubmitThrottle(db: Database, actor: Actor) {
+async function consumeRequestThrottle(
+  db: Database,
+  actor: Actor,
+  action: "request.submit" | "request.withdraw",
+) {
   if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
   const throttle = await consumeAccessRateLimit(db, {
-    scope: "request.submit",
+    scope: action,
     key: actor.customerId,
     limit: REQUEST_SUBMITS_PER_DAY,
     windowMs: DAY_MS,

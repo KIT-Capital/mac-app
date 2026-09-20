@@ -181,7 +181,8 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   and at or below the frozen per-piece caps, a delivery method, an optional
   note; five attempts per customer per day including refusals, else `THROTTLED`), `request.deskReturn`
   (any desk role, `decision: confirm | decline` — never an amount),
-  `request.decline` and `request.withdraw` (retail owner), and
+  `request.decline` and `request.withdraw` (retail owner; withdraw is five
+  attempts per customer per day including refusals, else `THROTTLED`), and
   `request.flagCustomerSuccess` (desk, internal). Every transition carries
   `expectedStatus` and `expectedVersion`; a stale row is `AGREEMENT_STATE_CONFLICT`
   and a foreign id is `AGREEMENT_NOT_FOUND`. A request left in "Your turn" past

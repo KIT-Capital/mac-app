@@ -1331,6 +1331,40 @@ describe("repo requests", { skip }, () => {
     assert.equal(again.agreement.status, "submitted");
   });
 
+  it("throttles the sixth withdraw by one collector in a day", async () => {
+    const owner = await collector("request-withdraw-throttle");
+    try {
+      for (let index = 0; index < 5; index += 1) {
+        const piece = await acceptedPiece(owner);
+        const id = `request-withdraw-throttle-${index}-${suffix}`;
+        await submit(owner, id, [piece.id], 60_000);
+        await executeLiveBookOperation(db, admin, {
+          action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+        }, deskOptions);
+        await executeLiveBookOperation(db, owner.actor, {
+          action: "request.withdraw", id, expectedStatus: "returned", expectedVersion: 1,
+        });
+      }
+      await clearAccessRateLimit(db, "request.submit", owner.customer.id);
+      const piece = await acceptedPiece(owner);
+      const id = `request-withdraw-throttle-6-${suffix}`;
+      await submit(owner, id, [piece.id], 60_000);
+      await executeLiveBookOperation(db, admin, {
+        action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+      }, deskOptions);
+      await assert.rejects(
+        () => executeLiveBookOperation(db, owner.actor, {
+          action: "request.withdraw", id, expectedStatus: "returned", expectedVersion: 1,
+        }),
+        { message: "THROTTLED" },
+      );
+      assert.equal((await agreementRow(id)).status, "returned");
+    } finally {
+      await clearAccessRateLimit(db, "request.submit", owner.customer.id);
+      await clearAccessRateLimit(db, "request.withdraw", owner.customer.id);
+    }
+  });
+
   it("lets the owner decline a returned proposal", async () => {
     const owner = await collector("request-decline");
     const piece = await acceptedPiece(owner);
