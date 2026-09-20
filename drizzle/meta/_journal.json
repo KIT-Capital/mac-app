@@ -197,6 +197,13 @@
       "when": 1789888676570,
       "tag": "0027_request_evidence_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1789889730891,
+      "tag": "0028_signed_document_freeze",
+      "breakpoints": true
     }
   ]
 }

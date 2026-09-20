@@ -26,16 +26,13 @@ function triggerSql(): string {
   return block;
 }
 
-/** 0027's hardening, verbatim, between its two sentinels. */
-function hardeningSql(): string {
-  const file = readFileSync(
-    join(process.cwd(), "drizzle", "0027_request_evidence_hardening.sql"),
-    "utf8",
-  );
-  const start = file.indexOf("-- BEGIN EVIDENCE HARDENING");
-  const end = file.indexOf("-- END EVIDENCE HARDENING");
-  assert.ok(start >= 0 && end > start, "migration 0027 must keep its hardening sentinels");
-  return file.slice(start, end).replaceAll("--> statement-breakpoint", "");
+/** A sentinel-delimited block of a shipped migration, verbatim. */
+function migrationBlock(file: string, name: string): string {
+  const text = readFileSync(join(process.cwd(), "drizzle", file), "utf8");
+  const start = text.indexOf(`-- BEGIN ${name}`);
+  const end = text.indexOf(`-- END ${name}`);
+  assert.ok(start >= 0 && end > start, `${file} must keep its ${name} sentinels`);
+  return text.slice(start, end).replaceAll("--> statement-breakpoint", "");
 }
 
 /** The driver wraps the database's refusal, so read the whole chain. */
@@ -95,7 +92,8 @@ describe("repo request database rules", { skip }, () => {
       begin;
       set local search_path to "${schema}";
       ${triggerSql()}
-      ${hardeningSql()}
+      ${migrationBlock("0027_request_evidence_hardening.sql", "EVIDENCE HARDENING")}
+      ${migrationBlock("0028_signed_document_freeze.sql", "SIGNED DOCUMENT FREEZE")}
       commit;
     `));
     // In production these resolve their tables through the default path. Here
@@ -185,20 +183,47 @@ describe("repo request database rules", { skip }, () => {
     );
   });
 
+  it("refuses to repoint a signed document at other bytes", async () => {
+    // The download path trusts these, and the signature cannot vouch for them.
+    await fails(
+      rootDb.execute(sql.raw(`
+        update "${schema}"."agreement_documents"
+        set "object_key" = 'elsewhere', "checksum" = 'other' where "id" = 'doc-v1'
+      `)),
+      /DOCUMENT_SIGNED_IMMUTABLE/,
+    );
+  });
+
   it("still lets a render finish on a document nobody has signed", async () => {
     await rootDb.execute(sql.raw(`
       update "${schema}"."agreement_documents"
       set "status" = 'stored', "object_key" = 'k', "checksum" = 'c' where "id" = 'doc-building'
     `));
-    // And a signed one may still record where its bytes landed.
-    await rootDb.execute(sql.raw(`
-      update "${schema}"."agreement_documents"
-      set "object_key" = 'moved', "checksum" = 'c2' where "id" = 'doc-v1'
-    `));
     await rootDb.execute(sql.raw(`
       update "${schema}"."agreement_documents"
       set "snapshot_hash" = 'hash-v2b' where "id" = 'doc-v2'
     `));
+  });
+
+  it("keeps every evidence rule in force under logical replication", async () => {
+    // A trigger left at its default sleeps in a replica-role session, which is
+    // the one place these rules are meant to hold.
+    const { rows } = await rootDb.execute(sql.raw(`
+      select t."tgname", t."tgenabled"
+      from pg_trigger t
+      join pg_class c on c.oid = t.tgrelid
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = '${schema}' and not t.tgisinternal
+        and t."tgname" like 'agreement_%'
+      order by t."tgname"
+    `));
+    const always = rows
+      .map((row) => row as Record<string, unknown>)
+      .filter((row) => String(row.tgname).includes("append_only") || String(row.tgname).includes("no_truncate"));
+    assert.equal(always.length, 4, "two tables, edit and truncate rules apiece");
+    for (const row of always) {
+      assert.equal(row.tgenabled, "A", `${row.tgname} must be ENABLE ALWAYS`);
+    }
   });
 
   it("refuses to empty the thread with a truncate", async () => {
@@ -298,6 +323,15 @@ describe("repo request row shapes", { skip }, () => {
     await fails(
       insertAgreement("u5-shape-bad-delivery", `,"status","delivered_on"`, `,'submitted','soon'`),
       /live_agreements_delivered_on_check/,
+    );
+    // Well-shaped days that never happened. A pattern alone would pass these.
+    await fails(
+      insertAgreement("u5-shape-month-99", `,"status","executed_on"`, `,'executed','2026-99-99'`),
+      /live_agreements_executed_on_check/,
+    );
+    await fails(
+      insertAgreement("u5-shape-feb-30", `,"status","executed_on"`, `,'executed','2026-02-30'`),
+      /live_agreements_executed_on_check/,
     );
   });
 
