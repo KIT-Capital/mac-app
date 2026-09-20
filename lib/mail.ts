@@ -10,6 +10,10 @@ import {
   type RequestMailKind,
 } from "@/lib/mail-types";
 import { routeInternalRecipients } from "@/lib/internal-mail.mjs";
+import {
+  composeCollectorDeclineNotice,
+  composeRequestNotices,
+} from "@/lib/request-notice-mail.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 import { allowMailRequest as allowKeyedMailRequest } from "@/lib/mail-rate.mjs";
 
@@ -238,10 +242,9 @@ function composeMail(request: MailRequest): ComposedMail[] {
         }),
       ];
     case "repurchase":
-    case "financing":
       return [
         letter({
-          kind: request.kind === "financing" ? "financing" : "repurchase",
+          kind: "repurchase",
           to: [desk, request.email],
           replyTo: request.email,
           subject: `Sale-and-repurchase application: ${request.watch || "timepiece"}`,
@@ -257,6 +260,40 @@ function composeMail(request: MailRequest): ComposedMail[] {
           ],
         }),
       ];
+    case "request_submitted":
+    case "request_confirmed":
+    case "request_withdrawn":
+    case "request_signed":
+    case "request_inspected":
+    case "request_expired":
+      return composeRequestNotices(request.kind, {
+        name: request.name,
+        email: request.email,
+        watch: request.watch,
+        amount: request.amount,
+        delivery: request.delivery,
+        termMonths: request.termMonths,
+        deskEmail: desk,
+      }).map((notice) => letter({ kind: request.kind, to: notice.to, replyTo: notice.replyTo, subject: notice.subject, heading: notice.heading, intro: notice.intro, rows: notice.rows, body: notice.body }));
+    case "request_declined":
+      return (
+        request.message === "collector"
+          ? composeCollectorDeclineNotice({
+            name: request.name,
+            email: request.email,
+            watch: request.watch,
+            deskEmail: desk,
+          })
+          : composeRequestNotices("request_declined", {
+            name: request.name,
+            email: request.email,
+            watch: request.watch,
+            amount: request.amount,
+            delivery: request.delivery,
+            termMonths: request.termMonths,
+            deskEmail: desk,
+          })
+      ).map((notice) => letter({ kind: request.kind, to: notice.to, replyTo: notice.replyTo, subject: notice.subject, heading: notice.heading, intro: notice.intro, rows: notice.rows, body: notice.body }));
     case "membership":
       return [
         letter({

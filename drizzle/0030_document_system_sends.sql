@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "agreement_document_sends_system_uidx" ON "agreement_document_sends" USING btree ("document_id","recipient_kind") WHERE "agreement_document_sends"."actor_kind" = 'system';--> statement-breakpoint
+ALTER TABLE "agreement_document_sends" ADD CONSTRAINT "agreement_document_sends_actor_kind_check" CHECK ("agreement_document_sends"."actor_kind" in ('retail', 'desk', 'system', 'collector'));

@@ -32,14 +32,23 @@ type ListedDocument = {
   id: string;
   version: number;
   status: string;
+  stage?: string;
   checksum?: string | null;
   snapshotHash?: string;
+};
+
+type ListedSend = {
+  documentId: string;
+  actorKind: string;
+  recipientKind: string;
+  result: string;
 };
 
 type LoadedDocuments = {
   mode: "browser" | "live" | "unavailable";
   documents: ListedDocument[];
   events: DeskThreadEvent[];
+  sends: ListedSend[];
 };
 
 type PieceDecision = "confirm" | "refuse" | "drop";
@@ -61,22 +70,24 @@ async function fetchAgreementDocuments(agreementId: string): Promise<LoadedDocum
     error?: string;
     documents?: ListedDocument[];
     events?: DeskThreadEvent[];
+    sends?: ListedSend[];
   } | null;
   if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
     window.location.replace("/admin/password");
-    return { mode: "browser", documents: [], events: [] };
+    return { mode: "browser", documents: [], events: [], sends: [] };
   }
   if (body?.mode === "live") {
     return {
       mode: "live",
       documents: Array.isArray(body.documents) ? body.documents : [],
       events: Array.isArray(body.events) ? body.events : [],
+      sends: Array.isArray(body.sends) ? body.sends : [],
     };
   }
   if (body?.mode === "unavailable") {
-    return { mode: "unavailable", documents: [], events: [] };
+    return { mode: "unavailable", documents: [], events: [], sends: [] };
   }
-  return { mode: "browser", documents: [], events: [] };
+  return { mode: "browser", documents: [], events: [], sends: [] };
 }
 
 function emptyChecklist(): Record<string, boolean> {
@@ -122,6 +133,7 @@ export default function DeskRequestPage() {
     recordDeliveryRequest,
     inspectRequest,
     executeMacRequest,
+    resendExecutedRequest,
     recordReturnRequest,
     flagRequestCustomerSuccess,
   } = useStore();
@@ -134,6 +146,7 @@ export default function DeskRequestPage() {
   const [busy, setBusy] = useState(false);
   const [bookMode, setBookMode] = useState<"browser" | "live" | "unavailable">("browser");
   const [documents, setDocuments] = useState<ListedDocument[]>([]);
+  const [sends, setSends] = useState<ListedSend[]>([]);
   const [threadEvents, setThreadEvents] = useState<DeskThreadEvent[]>([]);
   const [pieces, setPieces] = useState<Record<string, PieceDraft>>({});
   const [checklist, setChecklist] = useState(emptyChecklist);
@@ -148,6 +161,7 @@ export default function DeskRequestPage() {
         if (cancelled) return;
         setBookMode(loaded.mode);
         setDocuments(loaded.documents);
+        setSends(loaded.sends);
         if (loaded.mode === "live") setThreadEvents(loaded.events);
       })
       .catch(() => {
@@ -463,6 +477,25 @@ export default function DeskRequestPage() {
             })();
           }}
         />
+      ) : null}
+
+      {agreement.status === "executed" ? (
+        <section className="mb-6 rounded-2xl border border-white/10 bg-[#161B24] p-4">
+          <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">Executed document</h3>
+          {documents.some((row) => row.stage === "executed" && row.status === "building") ? (
+            <p className="mt-2 text-[13px] text-white/70">PDF preparing</p>
+          ) : null}
+          {sends.some((send) => send.actorKind === "system" && send.result === "failed") ? (
+            <p className="mt-2 text-[13px] text-white/70">The executed email did not go out.</p>
+          ) : null}
+          <PillButton
+            className="mt-3"
+            disabled={busy}
+            onClick={() => void run("Resend executed email", () => resendExecutedRequest(agreement.id))}
+          >
+            Resend executed email
+          </PillButton>
+        </section>
       ) : null}
 
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
