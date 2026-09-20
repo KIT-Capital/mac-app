@@ -5,7 +5,7 @@ import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
 import { isDesk, money } from "@/lib/catalog";
-import { bookLabel, utcToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
+import { bookLabel, deskToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
 import { persistableState } from "@/lib/session-persist.mjs";
 import { useStore } from "@/lib/store";
@@ -154,7 +154,7 @@ function LiveBookImportPanel() {
 function endDraftFrom(agreement: Agreement) {
   return {
     kind: agreement.bookEnd?.kind ?? "bought_back",
-    date: agreement.bookEnd?.date ?? utcToday(),
+    date: agreement.bookEnd?.date ?? deskToday(),
     amount: agreement.bookEnd ? String(agreement.bookEnd.amount) : "",
   };
 }
@@ -261,7 +261,7 @@ export default function AdminAgreementsPage() {
   const scaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function saveContractScale(agreement: Agreement, scale: ReturnType<typeof settingsToTerms>) {
-    if (agreement.status === "signed") return;
+    if (agreement.signedAt) return;
     if (scaleSaveTimer.current) clearTimeout(scaleSaveTimer.current);
     scaleSaveTimer.current = setTimeout(() => {
       updateAgreement(agreement.id, {
@@ -286,7 +286,7 @@ export default function AdminAgreementsPage() {
     e.preventDefault();
     const amount = endDraft.amount === "" ? Number.NaN : Number(endDraft.amount);
     const input: AgreementEnd = { kind: endDraft.kind, date: endDraft.date, amount };
-    const checked = validateAgreementEnd(agreement, input, utcToday());
+    const checked = validateAgreementEnd(agreement, input, deskToday());
     if (!checked.ok) {
       setEndError(END_ERRORS[checked.error] ?? "Enter a date and amount.");
       return;
@@ -301,7 +301,7 @@ export default function AdminAgreementsPage() {
   }
 
   async function onRenew(agreement: Agreement) {
-    const closeDate = endDraft.date || utcToday();
+    const closeDate = endDraft.date || deskToday();
     const result = await renewAgreement(agreement.id, closeDate);
     if (!result.ok) {
       setEndError(END_ERRORS[result.error] ?? "Renewal could not be recorded.");
@@ -387,11 +387,11 @@ export default function AdminAgreementsPage() {
           a.agreementCode || a.id,
           a.ownerName,
           money(a.amount),
-          a.status.replace("_", " "),
+          a.signedAt ? "signed" : a.status.replace("_", " "),
           bookLabel(a),
           <div key={a.id} className="flex gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
             <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
-            {a.status !== "signed" && !a.bookEnd ? (
+            {!a.signedAt && !a.bookEnd ? (
               <button type="button" onClick={() => void removeAgreement(a.id)}>Remove</button>
             ) : null}
           </div>,
@@ -502,7 +502,7 @@ export default function AdminAgreementsPage() {
           ) : null}
         </section>
       ) : null}
-      {selected && selected.status !== "signed" && !selected.bookEnd ? (
+      {selected && !selected.signedAt && !selected.bookEnd ? (
         <section className="mt-6 space-y-4 border border-white/25 bg-[#222] p-4">
           <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
             Contract terms — {selected.agreementCode || selected.id}

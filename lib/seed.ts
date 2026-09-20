@@ -139,7 +139,12 @@ export const DEMO_AGREEMENTS: Agreement[] = [
     delivery: "Desk arranges intake",
     ownerName: "Jonathan Hale",
     email: "jonathan.hale@mechartcap.com",
-    status: "pending_signature",
+    // Already on the book since 2021 with its pieces held, so the demo reads
+    // past due. KTD21 maps rows of this vintage to executed on their created day.
+    status: "executed",
     createdAt: "2021-03-14",
+    executedOn: "2021-03-14",
+    version: 1,
+    lastActionAt: "2021-03-14T00:00:00.000Z",
   },
 ];

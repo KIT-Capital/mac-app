@@ -8,7 +8,7 @@ import { LineField, NativeSelect } from "@/components/field";
 import { ScreenHeader } from "@/components/screen-header";
 import { DELIVERY_METHODS, TERMS, maxPurchaseAmount, money } from "@/lib/catalog";
 import { WatchPhoto } from "@/components/watch-photo";
-import { LIVE_WATCH_CONFLICT, liveWatchIds } from "@/lib/contract/repo-book.mjs";
+import { LIVE_WATCH_CONFLICT, heldWatchIds } from "@/lib/contract/repo-book.mjs";
 import { applicationPurchaseShare } from "@/lib/contract/repo-scale.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
@@ -26,7 +26,7 @@ export function ApplicationForm({ backHref = "/collection" }: { backHref?: strin
     applicationPurchaseShares,
   } = useStore();
   const { timepieces, agreements } = useOwnedAssets();
-  const live = liveWatchIds(book);
+  const live = heldWatchIds(book);
   const eligible = timepieces.filter(
     (w) => w.status === "appraised" && w.financeable && !live.has(w.id),
   );

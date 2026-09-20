@@ -12,7 +12,7 @@ Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-l
 |---|---|---|
 | Active repo | Book **open**, **past due**, or **in liquidation**, and signature **signed** (activated) | Pieces in it cannot join another active repo |
 | Inactive / closed / done | Book **bought back**, **liquidated**, or **renewed** | Pieces are free unless a renewal moved them to the successor |
-| Activated | Signature **signed**, MAC last (proposed gate) | Not the same as “in the book.” Unsigned rows can still appear as past due (Hale demo) |
+| Activated | Executed: the repo has an **execution date**, MAC last (proposed gate) | The book label and the term clock both start at execution; a request before execution has no book label |
 | Repossessed / bought back | Book **bought back** | Retail copy: the person **buys back the whole collection** at that month’s scheduled dollars |
 | In liquidation (process) | Book **in liquidation** | Staff-toggled. Modeled dollars never flip this |
 | Liquidated (sold off) | Book **liquidated** | Staff-toggled. End of that repo’s life |
@@ -141,7 +141,7 @@ flowchart TD
 
 Signing does not write a book end. A book end does not change the signature flag.
 
-**Shipped:** collector HTML Sign or desk Mark signed. Unsigned rows still appear in the book (Hale can read **past due**).
+**Shipped:** collector HTML Sign or desk Mark signed. A repo appears in the book only once it has an execution date, and its term clock runs from that date; rows written before the request model were mapped once to executed on the day they were created, so Hale still reads **past due**.
 
 **Proposed:** MAC signs last; desk checklist first; only appraiser or super admin signs for MAC; admin cannot. Software sign is not counsel approval. E-sign vendor still deferred.
 

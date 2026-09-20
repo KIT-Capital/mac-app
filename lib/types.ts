@@ -123,7 +123,26 @@ export type AppraisalAttemptPhoto = {
   book?: "browser";
 };
 
-export type AgreementStatus = "draft" | "pending_signature" | "signed";
+/**
+ * Request states (KTD6) plus the three legacy values, which exist only until
+ * `legacyAgreementToRequest` maps a row once.
+ */
+export type AgreementStatus =
+  | "submitted"
+  | "returned"
+  | "collector_signed"
+  | "inspecting"
+  | "executed"
+  | "closed"
+  | "draft"
+  | "pending_signature"
+  | "signed";
+
+export type RequestCloseReason =
+  | "declined_by_desk"
+  | "declined_by_collector"
+  | "withdrawn"
+  | "expired";
 
 export type BookEndKind = "bought_back" | "in_liquidation" | "liquidated" | "renewed";
 export type BookLabel =
@@ -187,6 +206,18 @@ export type Agreement = {
   agreementCode?: string;
   bookEnd?: AgreementEnd;
   scale?: RepoScaleTerms;
+  /** The day the repo went on the book. The term clock starts here (KTD7). */
+  executedOn?: string;
+  deliveredOn?: string;
+  /** Bumped whenever the amount or the pieces change (KTD6). */
+  version?: number;
+  lastActionAt?: string;
+  closeReason?: RequestCloseReason;
+  /** Desk-only flag; never serialized to a retail reader (KTD22). */
+  customerSuccess?: boolean;
+  paymentReference?: string;
+  /** Per-piece caps frozen at Apply so a later appraisal never reprices it. */
+  pieceCaps?: Record<string, number>;
 };
 
 export type UserPreferences = {

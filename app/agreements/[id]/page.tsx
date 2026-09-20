@@ -6,7 +6,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { COMPANY, hasApplication, maxPurchaseAmount, money } from "@/lib/catalog";
-import { LIVE_WATCH_CONFLICT, bookLabel, isLiveBookLabel, liveWatchIds } from "@/lib/contract/repo-book.mjs";
+import { LIVE_WATCH_CONFLICT, bookLabel, isLiveBookLabel, heldWatchIds } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
 import { PENDING_COUNSEL_LABEL, buildAgreementSnapshot } from "@/lib/contract/repo-agreement-snapshot.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
@@ -283,9 +283,11 @@ export default function AgreementDetailPage() {
   }
   const liveAgreement = agreement;
 
+  // A signed repo is frozen. Signature state now lives on `signedAt` rather
+  // than a status the request model replaced.
   const live =
     isLiveBookLabel(bookLabel(liveAgreement)) &&
-    liveAgreement.status !== "signed" &&
+    !liveAgreement.signedAt &&
     !liveAgreement.bookEnd;
   const openShell = shells.find((shell) => shell.status === "open");
   const share = openShell?.ltv || settings.maxLtv;
@@ -293,7 +295,7 @@ export default function AgreementDetailPage() {
     (sum, watch) => sum + maxPurchaseAmount(watch.valueLow, watch.valueHigh, share),
     0,
   );
-  const held = liveWatchIds(book);
+  const held = heldWatchIds(book);
   const freePieces = timepieces.filter(
     (watch) =>
       watch.status === "appraised" &&
@@ -322,8 +324,8 @@ export default function AgreementDetailPage() {
       setPieceError(
         result.error === "OVER_LTV"
           ? `The desk can purchase up to ${money(cap)} on these appraisals.`
-          : result.error === "BELOW_CURRENT"
-            ? "The sale amount can only be raised."
+          : result.error === "AMOUNT_RAISE_FORBIDDEN"
+            ? "The sale amount can only be lowered."
             : "Enter a sale amount the desk can purchase.",
       );
       return;
@@ -341,7 +343,7 @@ export default function AgreementDetailPage() {
             <span className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Book: {bookLabel(agreement)}</span>
             <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
           </div>
-          {agreement.status !== "signed" ? (
+          {!agreement.signedAt ? (
             <button
               onClick={() => setStarted(true)}
               className="rounded-lg bg-[#FCB040] px-4 py-2 text-[11px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm"
@@ -514,7 +516,7 @@ export default function AgreementDetailPage() {
               </p>
             </>
           )}
-          {agreement.status === "signed" ? (
+          {agreement.signedAt ? (
             <p className="font-semibold text-emerald-800">Signed {agreement.signedAt}</p>
           ) : null}
         </article>
@@ -621,10 +623,10 @@ export default function AgreementDetailPage() {
         </p>
         <PillButton
           variant="gold"
-          disabled={!started || agreement.status === "signed"}
+          disabled={!started || Boolean(agreement.signedAt)}
           onClick={() => signAgreement(agreement.id)}
         >
-          {agreement.status === "signed" ? "Executed & Verified" : "Sign Repurchase Agreement"}
+          {agreement.signedAt ? "Executed & Verified" : "Sign Repurchase Agreement"}
         </PillButton>
         <p className="mt-2 text-center text-[11px] text-mac-faint">
           Custody Questions: {COMPANY.phone} · {COMPANY.financingEmail}

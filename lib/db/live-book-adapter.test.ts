@@ -72,10 +72,38 @@ describe("live-book adapter mapping", () => {
       delivery: "Desk arranges intake",
       ownerName: "Jonathan Hale",
       email: "jonathan.hale@mechartcap.com",
-      status: "pending_signature",
+      // A legacy row is mapped once on the way out (KTD21): it was already on
+      // the book with live members from the day it was created.
+      status: "executed",
       createdAt: "2021-03-14",
       agreementCode: "MAC-31419",
+      version: 1,
+      lastActionAt: "2021-03-14T00:00:00.000Z",
+      executedOn: "2021-03-14",
     });
+  });
+
+  it("carries a request status through instead of reading it as an executed repo", () => {
+    const state = mapLiveBookRows({
+      customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
+      timepieces: [{ id: "piece-a", customerId: "cust-a" }],
+      agreements: [{
+        id: "req-a",
+        customerId: "cust-a",
+        amountCents: 10000,
+        termMonths: 12,
+        delivery: "",
+        ownerName: "A",
+        email: "a@example.com",
+        status: "returned",
+        createdOn: "2026-01-01",
+      }],
+      members: [{ agreementId: "req-a", timepieceId: "piece-a", status: "reserved" }],
+      ends: [],
+      previews: [],
+    });
+    assert.equal(state.agreements[0].status, "returned");
+    assert.equal(state.agreements[0].executedOn, undefined);
   });
 
   it("keeps collector reads scoped while desk reads all rows", () => {
@@ -168,7 +196,9 @@ describe("live-book adapter mapping", () => {
       }],
       previews: [],
     });
-    assert.equal(state.agreements[0].status, "signed");
+    // A signed legacy row maps to executed; the recorded end still wins the label.
+    assert.equal(state.agreements[0].status, "executed");
+    assert.equal(state.agreements[0].executedOn, "2026-01-01");
     assert.deepEqual(state.agreements[0].bookEnd, {
       kind: "renewed",
       date: "2026-09-17",
