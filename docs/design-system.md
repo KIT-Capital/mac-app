@@ -37,8 +37,9 @@ Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plu
 
 ## Interaction
 
-- Enabled native `button` elements press in place: 1px down, 0.98 scale, slight dim. Disabled buttons stay still. Links and `[role="button"]` do not get this treatment. Reduced-motion users get the same pressed state with no transition.
+- Enabled native `button` elements share one global press: 1px down, 0.98 scale, slight dim. Disabled buttons stay still. Links and `[role="button"]` do not get this treatment. Reduced-motion users get the same pressed state with no transition.
 - Collector tap targets use `.mac-tap` (44×44).
+- A few existing native buttons also set Tailwind `active:scale-*` (full-width submits at 0.99, social icon buttons at 0.95). Do not add new local press treatments.
 
 ## Tenant overlay (proposed)
 
@@ -54,4 +55,4 @@ Keep slide layouts. Rewrite loan words. MAC buys; the collector may buy back. No
 - Linking the desk from collector nav.
 - Showing vault location or buyback scale on collector screens before an application is sent.
 - New reusable patterns that are not added here.
-- Ripples, press JavaScript, sound, vibration, or a second press treatment besides the global native-button state.
+- Ripples, press JavaScript, sound, vibration, or a new local press treatment.
