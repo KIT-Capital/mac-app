@@ -711,9 +711,19 @@ export async function listAgreementDocumentSends(
     .orderBy(desc(agreementDocumentSends.createdAt));
 }
 
+type ExecutedSendEmail = (message: {
+  from: string;
+  to: string[];
+  replyTo: string;
+  subject: string;
+  html: string;
+  text: string;
+  tags: { name: string; value: string }[];
+}, options?: { idempotencyKey?: string }) => Promise<{ data: { id?: string } | null; error: unknown }>;
+
 type ExecutedSendOptions = {
   env?: NodeJS.ProcessEnv;
-  sendEmail?: (message: Record<string, unknown>) => Promise<{ data: { id?: string } | null; error: unknown }>;
+  sendEmail?: ExecutedSendEmail;
   deskEmail?: string;
   requirePending?: boolean;
 };
@@ -738,9 +748,25 @@ export async function sendExecutedDocumentEmails(
     { recipientKind: "desk", recipientEmail: options.deskEmail ?? DEFAULT_SETTINGS.financingEmail },
   ];
   const results = [];
+  let pending = 0;
   for (const recipient of recipients) {
+    const [existing] = await db
+      .select()
+      .from(agreementDocumentSends)
+      .where(and(
+        eq(agreementDocumentSends.documentId, row.id),
+        eq(agreementDocumentSends.recipientKind, recipient.recipientKind),
+        eq(agreementDocumentSends.actorKind, "system"),
+      ))
+      .limit(1);
+    if (existing?.result === "accepted") {
+      results.push(existing);
+      continue;
+    }
+    pending += 1;
     results.push(await sendSystemExecutedOnce(db, row, agreement, store, recipient, options));
   }
+  if (options.requirePending && pending === 0) throw new Error("DOCUMENT_ALREADY_SENT");
   return results;
 }
 
@@ -762,7 +788,6 @@ async function sendSystemExecutedOnce(
     ))
     .limit(1);
   if (existing?.result === "accepted") {
-    if (options.requirePending) throw new Error("DOCUMENT_ALREADY_SENT");
     return existing;
   }
 
@@ -811,7 +836,6 @@ async function sendSystemExecutedOnce(
         ))
         .limit(1);
       if (raced?.result === "accepted") {
-        if (options.requirePending) throw new Error("DOCUMENT_ALREADY_SENT");
         return raced;
       }
       if (!raced) throw error;
@@ -840,7 +864,13 @@ async function sendSystemExecutedOnce(
   try {
     const delivered = await dispatchAgreementDocumentMail(
       { ...mail, bytes },
-      { env: options.env ?? process.env, sendEmail: options.sendEmail },
+      {
+        env: options.env ?? process.env,
+        sendEmail: options.sendEmail as ((message: Record<string, unknown>) => Promise<{
+          data: { id?: string } | null;
+          error: unknown;
+        }>) | undefined,
+      },
     );
     const [accepted] = await db
       .update(agreementDocumentSends)

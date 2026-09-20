@@ -1425,6 +1425,7 @@ async function submitRequest(
     ))
     .orderBy(liveAgreements.id);
   const seen = new Set<string>();
+  const expiredNotices: Array<() => Promise<unknown>> = [];
   for (const holder of holders) {
     if (seen.has(holder.agreementId)) continue;
     seen.add(holder.agreementId);
@@ -1434,7 +1435,7 @@ async function submitRequest(
     if (expired) {
       const closed = await closeExpiredRequest(db, holder.agreementId);
       if (closed) {
-        await noticeMail("request_expired", closed, context)();
+        expiredNotices.push(noticeMail("request_expired", closed, context));
         continue;
       }
     }
@@ -1506,7 +1507,10 @@ async function submitRequest(
   const document = await insertStageDocumentRow(db, row, "proposal", actor, context.env);
   return {
     agreement: projectRequestRow(row, watchIds, actor),
-    afterCommit: renderThen(context, document.id, [noticeMail("request_submitted", row, context)]),
+    afterCommit: chainedJobs([
+      ...expiredNotices,
+      ...renderThen(context, document.id, [noticeMail("request_submitted", row, context)]),
+    ]),
   };
 }
 
@@ -1965,7 +1969,7 @@ async function executeMacRequest(
     afterCommit: renderThen(context, document.id, [
       () => sendExecutedDocumentEmails(context.rootDb, document.id, context.documentStore, {
         env: context.env,
-        sendEmail: context.sendEmail as never,
+        sendEmail: context.sendEmail,
       }),
     ]),
   };
@@ -1993,8 +1997,10 @@ async function resendExecutedRequest(
     ))
     .limit(1);
   if (!document) throw new Error("DOCUMENT_NOT_READY");
+  const [row] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, agreement.id)).limit(1);
+  if (!row) throw new Error("AGREEMENT_NOT_FOUND");
   return {
-    agreement: projectRequestRow(agreement, agreement.watchIds, actor),
+    agreement: projectRequestRow(row, agreement.watchIds, actor),
     afterCommit: chainedJobs([
       async () => {
         const recovered = await recoverCurrentStageDocument(
@@ -2007,7 +2013,6 @@ async function resendExecutedRequest(
         );
         await sendExecutedDocumentEmails(context.rootDb, recovered.id, context.documentStore, {
           env: context.env,
-          sendEmail: context.sendEmail as never,
           requirePending: true,
         });
       },

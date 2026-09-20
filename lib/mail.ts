@@ -274,7 +274,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
         delivery: request.delivery,
         termMonths: request.termMonths,
         deskEmail: desk,
-      }).map((notice) => letter({ kind: request.kind, to: notice.to, replyTo: notice.replyTo, subject: notice.subject, heading: notice.heading, intro: notice.intro, rows: notice.rows, body: notice.body }));
+      }).map((notice) => noticeToLetter(request.kind, notice));
     case "request_declined":
       return (
         request.message === "collector"
@@ -293,7 +293,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
             termMonths: request.termMonths,
             deskEmail: desk,
           })
-      ).map((notice) => letter({ kind: request.kind, to: notice.to, replyTo: notice.replyTo, subject: notice.subject, heading: notice.heading, intro: notice.intro, rows: notice.rows, body: notice.body }));
+      ).map((notice) => noticeToLetter(request.kind, notice));
     case "membership":
       return [
         letter({
@@ -323,6 +323,30 @@ function composeMail(request: MailRequest): ComposedMail[] {
         }),
       ];
   }
+}
+
+function noticeToLetter(kind: MailKind, notice: {
+  to: string[];
+  replyTo?: string;
+  subject: string;
+  heading: string;
+  intro: string;
+  rows?: string[][];
+  body?: string;
+}) {
+  const rows = (notice.rows ?? [])
+    .filter((row) => row.length >= 2)
+    .map((row) => [String(row[0]), String(row[1])] as [string, string]);
+  return letter({
+    kind,
+    to: notice.to,
+    replyTo: notice.replyTo,
+    subject: notice.subject,
+    heading: notice.heading,
+    intro: notice.intro,
+    rows,
+    body: notice.body,
+  });
 }
 
 function letter({
