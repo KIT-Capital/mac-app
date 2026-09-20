@@ -22,7 +22,7 @@ import {
 import { parseLiveBookOperation } from "@/lib/live-book-operation.mjs";
 import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import type { Agreement } from "@/lib/types";
-import { DEFAULT_SETTINGS } from "@/lib/theme";
+import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
 import {
   type DocumentStore,
@@ -548,6 +548,9 @@ export async function executeLiveBookOperation(
     documentStore: options.documentStore,
     rootDb: db,
   };
+  if (operation.action === "request.submit") {
+    await consumeSubmitThrottle(db, actor);
+  }
   if (REQUEST_TRANSITIONS.has(operation.action)) {
     await closeIfExpiredBeforeMove(db, actor, String(operation.id));
   }
@@ -1233,8 +1236,23 @@ async function executeLiveBookOperationCore(
 }
 
 /**
- * Apply (R12, R26). Runs inside the caller's transaction, in this order:
- * throttle, id, pieces locked and owned, appraisal currency, expired holders
+ * KTD23. Count the attempt on the root connection so a later refusal inside
+ * the request transaction cannot roll the hit back.
+ */
+async function consumeSubmitThrottle(db: Database, actor: Actor) {
+  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  const throttle = await consumeAccessRateLimit(db, {
+    scope: "request.submit",
+    key: actor.customerId,
+    limit: REQUEST_SUBMITS_PER_DAY,
+    windowMs: DAY_MS,
+  });
+  if (!throttle.allowed) throw new Error("THROTTLED");
+}
+
+/**
+ * Apply (R12, R26). The daily throttle is consumed before this transaction.
+ * Inside it: id, pieces locked and owned, appraisal currency, expired holders
  * closed, caps, amount, row, members, event, and the v1 proposal row. The
  * PDF is rendered after commit by the returned job.
  */
@@ -1249,15 +1267,6 @@ async function submitRequest(
   const watchIds = [...(operation.watchIds as string[])].sort();
   const termMonths = Number(operation.termMonths);
   const amount = Number(operation.amount);
-
-  // KTD23: five Applies a day per collector; the sixth reads THROTTLED.
-  const throttle = await consumeAccessRateLimit(db, {
-    scope: "request.submit",
-    key: actor.customerId,
-    limit: REQUEST_SUBMITS_PER_DAY,
-    windowMs: DAY_MS,
-  });
-  if (!throttle.allowed) throw new Error("THROTTLED");
 
   const [existing] = await db.select({ id: liveAgreements.id })
     .from(liveAgreements)
@@ -1339,7 +1348,7 @@ async function submitRequest(
     .from(deskSettings)
     .where(eq(deskSettings.id, "default"))
     .limit(1);
-  const minimum = (setting?.minSaleAmountCents ?? 100_000) / 100;
+  const minimum = (setting?.minSaleAmountCents ?? DEFAULT_MIN_SALE_AMOUNT * 100) / 100;
   if (amount < minimum) throw new Error("AMOUNT_BELOW_MINIMUM");
   if (amount > maximum) throw new Error("AMOUNT_ABOVE_CAP");
   const amountCents = dollarsToCents(amount);
@@ -1362,7 +1371,7 @@ async function submitRequest(
     version: 1,
     lastActionAt: now,
     createdOn: deskToday(now),
-    agreementCode: operation.agreementCode ? String(operation.agreementCode) : mintAgreementCode(),
+    agreementCode: mintAgreementCode(),
     scale,
     pieceCaps,
   }).returning();
@@ -1431,7 +1440,9 @@ async function transitionRequest(
     version: next.version,
     closeReason: next.closeReason ?? null,
     customerSuccess: action === "flagCustomerSuccess" ? Boolean(operation.flag) : undefined,
-    lastActionAt: now,
+    // Internal flags keep the collector's expiry clock (KTD12).
+    lastActionAt: result.event.fromStatus !== result.event.toStatus ? now : undefined,
+    executedOn: next.status === "executed" ? (next.executedOn ?? deskToday(now)) : null,
     updatedAt: now,
   }).where(and(
     eq(liveAgreements.id, id),

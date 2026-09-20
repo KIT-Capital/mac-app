@@ -6,13 +6,12 @@ import { ScreenHeader } from "@/components/screen-header";
 import { PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { COMPANY, hasApplication, money } from "@/lib/catalog";
-import { REQUEST_STATES, bookLabel } from "@/lib/contract/repo-book.mjs";
+import { bookLabel, isRequestExpired } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
 import { PENDING_COUNSEL_LABEL, buildAgreementSnapshot } from "@/lib/contract/repo-agreement-snapshot.mjs";
-import { retailRequestWord } from "@/lib/contract/request-transitions.mjs";
+import { isRequestRow, retailRequestWord } from "@/lib/contract/request-transitions.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
-import type { Agreement } from "@/lib/types";
 
 type ListedDocument = {
   id: string;
@@ -21,14 +20,6 @@ type ListedDocument = {
   checksum?: string | null;
   templateVersion?: string;
 };
-
-/** A row that has not executed is a request; executed and legacy rows read the book. */
-function isRequestRow(agreement: Agreement) {
-  return (
-    !agreement.executedOn &&
-    (REQUEST_STATES.includes(agreement.status) || agreement.status === "closed")
-  );
-}
 
 /** The one line a retail user reads under each of the four words (R29). */
 function requestLine(word: ReturnType<typeof retailRequestWord>) {
@@ -306,8 +297,9 @@ export default function AgreementDetailPage() {
   const word = retailRequestWord(agreement);
   // Before inspection nothing moves the amount or the pieces (KTD8): the
   // owner's only exits are to withdraw, or to decline a confirmed request.
-  const canWithdraw = request && (agreement.status === "submitted" || agreement.status === "returned");
-  const canDecline = request && agreement.status === "returned";
+  const expired = isRequestExpired(agreement);
+  const canWithdraw = request && !expired && (agreement.status === "submitted" || agreement.status === "returned");
+  const canDecline = request && !expired && agreement.status === "returned";
 
   async function onRequestExit(kind: "withdraw" | "decline") {
     if (!agreement || requestBusy) return;

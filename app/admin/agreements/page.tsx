@@ -5,9 +5,9 @@ import { AdminScaleFields } from "@/components/admin-scale-fields";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { Field, NativeSelect, PillButton } from "@/components/field";
 import { isDesk, money } from "@/lib/catalog";
-import { REQUEST_STATES, bookLabel, deskToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
+import { bookLabel, deskToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
-import { retailRequestWord } from "@/lib/contract/request-transitions.mjs";
+import { isRequestRow, retailRequestWord } from "@/lib/contract/request-transitions.mjs";
 import { persistableState } from "@/lib/session-persist.mjs";
 import { useStore } from "@/lib/store";
 import type { Agreement, AgreementEnd, AgreementShell, AppState, BookEndKind } from "@/lib/types";
@@ -149,14 +149,6 @@ function LiveBookImportPanel() {
       </div>
       {report ? <p className="text-[12px] text-white/60">{report}</p> : null}
     </section>
-  );
-}
-
-/** A row that has not executed is a request; executed and legacy rows read the book. */
-function isRequestRow(agreement: Agreement) {
-  return (
-    !agreement.executedOn &&
-    (REQUEST_STATES.includes(agreement.status) || agreement.status === "closed")
   );
 }
 

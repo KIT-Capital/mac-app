@@ -54,13 +54,14 @@ import {
   conflictingHeldWatchIds,
   isAppraisalCurrent,
   isLiveBookLabel,
+  isRequestExpired,
   isUnderReview,
   heldWatchIds,
   LIVE_WATCH_CONFLICT,
   deskToday,
   validateRecordedEndKind,
 } from "@/lib/contract/repo-book.mjs";
-import { DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
+import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
 import { canEditAppraisal, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
@@ -198,8 +199,6 @@ type RequestTransitionAction = "deskReturn" | "decline" | "withdraw" | "flagCust
 type TransitionOutcome =
   | { ok: false; error: string }
   | { ok: true; agreement: Agreement; mintsStage?: string };
-/** The server falls back to $1,000 when the Desk has not set a minimum. */
-const SERVER_MIN_SALE_AMOUNT = 1_000;
 let liveWriteQueue: Promise<OperationAck> = Promise.resolve({ ok: true });
 let loadStarted = false;
 let optimisticGeneration = 0;
@@ -686,6 +685,12 @@ function updateStore(
         } else {
           await reconcileFreshLiveStore();
         }
+      } else if (
+        !result.ok &&
+        storeMode === "live" &&
+        (result.error === "REQUEST_EXPIRED" || result.error === "AGREEMENT_STATE_CONFLICT")
+      ) {
+        await reconcileFreshLiveStore();
       }
       return result;
     });
@@ -703,6 +708,19 @@ function updateStore(
     }).catch(() => undefined);
   }
   return acknowledgement;
+}
+
+function expireRequestRow(row: Agreement, now: Date): Agreement | null {
+  const result = applyTransition(
+    { ...row, version: row.version ?? 1 },
+    { action: "expire" },
+    {
+      now: now.toISOString(),
+      today: deskToday(now),
+      actor: { kind: "system", id: "system" },
+    },
+  ) as TransitionOutcome;
+  return result.ok ? result.agreement : null;
 }
 
 /**
@@ -725,6 +743,16 @@ function transitionRequest(
     return Promise.resolve({ ok: false, error: "AGREEMENT_NOT_FOUND" });
   }
   const now = new Date();
+  if (isRequestExpired(row, deskToday(now))) {
+    const expired = expireRequestRow(row, now);
+    if (expired && storeMode !== "live") {
+      return updateStore((prev) => ({
+        ...prev,
+        agreements: prev.agreements.map((item) => (item.id === id ? expired : item)),
+      })).then(() => ({ ok: false, error: "REQUEST_EXPIRED" } as OperationAck));
+    }
+    return Promise.resolve({ ok: false, error: "REQUEST_EXPIRED" });
+  }
   const expectedStatus = row.status;
   const expectedVersion = row.version ?? 1;
   const result = applyTransition(
@@ -1189,7 +1217,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // `request.submit`, so both books answer an Apply alike (R25, AE9).
         const current = getStoreSnapshot();
         const user = current.user;
-        if (!user || isDeskRole(user.role)) return { ok: false, error: "SESSION_REQUIRED" };
+        if (!user) return { ok: false, error: "SESSION_REQUIRED" };
+        if (isDeskRole(user.role)) return { ok: false, error: "COLLECTOR_REQUIRED" };
         const watchIds = [...new Set(input.watchIds)];
         if (watchIds.length === 0) return { ok: false, error: "WATCH_IDS_REQUIRED" };
         const owner = profileKey(user.email);
@@ -1197,16 +1226,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const pieces: Timepiece[] = [];
         for (const watchId of watchIds) {
           const piece = current.timepieces.find((item) => item.id === watchId);
-          if (
-            !piece ||
-            profileKey(piece.ownerEmail || "") !== owner ||
-            piece.status !== "appraised" ||
-            !piece.financeable
-          ) {
-            return { ok: false, error: "INELIGIBLE_PIECE" };
+          if (!piece || profileKey(piece.ownerEmail || "") !== owner) {
+            return { ok: false, error: "TIMEPIECE_NOT_OWNED" };
           }
           if (isUnderReview(current.appraisalAttempts, watchId)) {
             return { ok: false, error: "REVIEW_LOCKED" };
+          }
+          if (piece.status !== "appraised" || !piece.financeable) {
+            return { ok: false, error: "INELIGIBLE_PIECE" };
           }
           if (!isAppraisalCurrent(current.appraisalAttempts, watchId, today, piece)) {
             return { ok: false, error: "APPRAISAL_EXPIRED" };
@@ -1222,7 +1249,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const minimum =
           typeof current.settings.minAdvance === "number" && current.settings.minAdvance > 0
             ? current.settings.minAdvance
-            : SERVER_MIN_SALE_AMOUNT;
+            : DEFAULT_MIN_SALE_AMOUNT;
         if (input.amount < minimum) return { ok: false, error: "AMOUNT_BELOW_MINIMUM" };
         const openShell = current.shells.find((shell) => shell.status === "open");
         const share = applicationPurchaseShare(
@@ -1258,11 +1285,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           pieceCaps,
           scale: agreementScaleFromDesk(current.settings, openShell, input.termMonths),
         };
+        const now = new Date();
         const acknowledgement = await updateStore((prev) => {
           const nextUser = prev.user ? { ...prev.user, applicationSubmitted: true } : prev.user;
+          const closed = prev.agreements.map((item) => {
+            if (!isRequestExpired(item, today)) return item;
+            if (!item.watchIds.some((watchId) => watchIds.includes(watchId))) return item;
+            return expireRequestRow(item, now) ?? item;
+          });
           return {
             ...prev,
-            agreements: [agreement, ...prev.agreements],
+            agreements: [agreement, ...closed],
             user: nextUser,
             profiles: nextUser ? { ...prev.profiles, [profileKey(nextUser.email)]: nextUser } : prev.profiles,
           };

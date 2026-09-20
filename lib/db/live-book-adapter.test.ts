@@ -106,6 +106,32 @@ describe("live-book adapter mapping", () => {
     assert.equal(state.agreements[0].executedOn, undefined);
   });
 
+  it("hides customerSuccess from a collector projection (KTD22)", () => {
+    const rows = {
+      customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
+      timepieces: [{ id: "piece-a", customerId: "cust-a" }],
+      agreements: [{
+        id: "req-a",
+        customerId: "cust-a",
+        amountCents: 6000000,
+        termMonths: 12,
+        delivery: "Insured courier",
+        ownerName: "A",
+        email: "a@example.com",
+        status: "submitted",
+        createdOn: "2026-09-20",
+        customerSuccess: true,
+      }],
+      members: [{ agreementId: "req-a", timepieceId: "piece-a", status: "reserved" }],
+      ends: [],
+      previews: [],
+    };
+    const retail = mapLiveBookRows(rows, "cust-a");
+    const desk = mapLiveBookRows(rows);
+    assert.equal(Object.hasOwn(retail.agreements[0], "customerSuccess"), false);
+    assert.equal(desk.agreements[0].customerSuccess, true);
+  });
+
   it("closes an unrecognised status rather than letting it hold a piece", () => {
     const state = mapLiveBookRows({
       customers: [{ id: "cust-a", email: "a@example.com", name: "A" }],
@@ -249,6 +275,7 @@ describe("live-book adapter mapping", () => {
     });
     assert.equal(defaults.settings.maxLtv, 0.6);
     assert.equal(defaults.settings.startingRate, 0.185);
+    assert.equal(defaults.settings.minAdvance, 1_000);
     assert.deepEqual(defaults.catalog, []);
     assert.deepEqual(defaults.shells, []);
 

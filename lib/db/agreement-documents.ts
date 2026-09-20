@@ -81,10 +81,8 @@ function frozenFields(value: FrozenSnapshot) {
 
 function failureCodeOf(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
-  return {
-    failureCode: message.slice(0, 80),
-    monitorCode: /^[A-Z0-9_]{1,80}$/.test(message) ? message : fallback,
-  };
+  const monitorCode = /^[A-Z0-9_]{1,80}$/.test(message) ? message : fallback;
+  return { failureCode: monitorCode, monitorCode };
 }
 
 function appEnv(env: NodeJS.ProcessEnv) {
@@ -393,7 +391,17 @@ export async function renderStageDocument(
   store: DocumentStore | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<DocumentRow | null> {
-  const [row] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, documentId)).limit(1);
+  let row: DocumentRow | undefined;
+  try {
+    [row] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, documentId)).limit(1);
+  } catch (error) {
+    await captureOperationalErrorOnce(error, {
+      operation: "agreement_document.render",
+      errorCode: "DOCUMENT_BUILD_FAILED",
+      recordId: documentId,
+    }).catch(() => undefined);
+    return null;
+  }
   if (!row) return null;
   if (row.status !== "building") return row;
   const objectKey = row.objectKey ?? agreementObjectKey({
@@ -416,10 +424,11 @@ export async function renderStageDocument(
       if (!(error instanceof Error) || error.message !== "OBJECT_EXISTS") throw error;
       const existing = await store.get(objectKey);
       if (sha256Hex(existing) !== checksum || existing.byteLength !== pdf.bytes.byteLength) {
-        // Another render of this same row got there first; its row wins.
+        // Another render of this same row got there first. Do not mark this
+        // row failed while a usable object (or a still-running write) exists.
         const [current] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, row.id)).limit(1);
         if (current && current.status !== "building") return current;
-        throw new Error("OBJECT_EXISTS");
+        return current ?? row;
       }
     }
     const [stored] = await db
@@ -464,13 +473,22 @@ function stageKey(row: DocumentRow) {
   return `${row.liveAgreementId}\u0000${row.version}\u0000${row.stage}`;
 }
 
+/** Fresh rows for one (agreement, version, stage) after a failed render. */
+const STAGE_RENDER_REATTEMPTS = 3;
+
+function failedCountFor(rows: DocumentRow[], key: string) {
+  return rows.filter((row) => row.status === "failed" && stageKey(row) === key).length;
+}
+
 /**
  * Render on read (KTD27). A stage row still `building` is rendered now; a
  * `failed` one with no usable sibling gets a fresh `building` row for the same
  * (agreement, version, stage) — the partial unique index admits it because
- * failed rows are excluded — and that row is rendered. Legacy rows keep their
- * own reconcile path. Without a store there is nothing to render into, so the
- * rows are returned as they are rather than flipped to failed.
+ * failed rows are excluded — and that row is rendered. After three failed
+ * rows for that key, reads stop inserting and mint surfaces
+ * `DOCUMENT_UNAVAILABLE`. Legacy rows keep their own reconcile path. Without
+ * a store there is nothing to render into, so the rows are returned as they
+ * are rather than flipped to failed.
  */
 async function renderStageDocumentsOnRead(
   db: Database,
@@ -491,8 +509,10 @@ async function renderStageDocumentsOnRead(
       changed = true;
       continue;
     }
-    if (row.status !== "failed" || usable.has(stageKey(row)) || reattempted.has(stageKey(row))) continue;
-    reattempted.add(stageKey(row));
+    const key = stageKey(row);
+    if (row.status !== "failed" || usable.has(key) || reattempted.has(key)) continue;
+    if (failedCountFor(rows, key) >= STAGE_RENDER_REATTEMPTS) continue;
+    reattempted.add(key);
     const [agreement] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, row.liveAgreementId)).limit(1);
     if (!agreement) continue;
     let fresh: DocumentRow | undefined;
@@ -564,9 +584,8 @@ async function readyStageDocument(
       ),
     )
     .orderBy(desc(agreementDocuments.createdAt));
-  const rendered = await renderStageDocumentsOnRead(db, siblings, store, env);
-  if (!rendered.changed) return row;
-  const [latest] = await db
+  await renderStageDocumentsOnRead(db, siblings, store, env);
+  const latestSiblings = await db
     .select()
     .from(agreementDocuments)
     .where(
@@ -574,12 +593,15 @@ async function readyStageDocument(
         eq(agreementDocuments.liveAgreementId, row.liveAgreementId),
         eq(agreementDocuments.version, row.version),
         eq(agreementDocuments.stage, row.stage),
-        eq(agreementDocuments.status, "stored"),
       ),
     )
-    .orderBy(desc(agreementDocuments.createdAt))
-    .limit(1);
-  return latest ?? row;
+    .orderBy(desc(agreementDocuments.createdAt));
+  const stored = latestSiblings.find((sibling) => sibling.status === "stored");
+  if (stored) return stored;
+  if (failedCountFor(latestSiblings, stageKey(row)) >= STAGE_RENDER_REATTEMPTS) {
+    throw new Error("DOCUMENT_UNAVAILABLE");
+  }
+  return latestSiblings[0] ?? row;
 }
 
 export async function mintAgreementDocumentUrl(

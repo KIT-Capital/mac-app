@@ -3,15 +3,9 @@
 import Link from "next/link";
 import { ScreenHeader } from "@/components/screen-header";
 import { money } from "@/lib/catalog";
-import { REQUEST_STATES, bookLabel } from "@/lib/contract/repo-book.mjs";
-import { retailRequestWord } from "@/lib/contract/request-transitions.mjs";
+import { bookLabel } from "@/lib/contract/repo-book.mjs";
+import { isRequestRow, retailRequestWord } from "@/lib/contract/request-transitions.mjs";
 import { useOwnedAssets } from "@/lib/ownership";
-import type { Agreement } from "@/lib/types";
-
-/** A row that has not executed is a request; executed and legacy rows read the book. */
-function isRequestRow(a: Agreement) {
-  return !a.executedOn && (REQUEST_STATES.includes(a.status) || a.status === "closed");
-}
 
 export default function AgreementsPage() {
   const { agreements } = useOwnedAssets();

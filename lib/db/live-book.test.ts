@@ -1069,6 +1069,7 @@ describe("repo requests", { skip }, () => {
 
   it("refuses pieces another request holds, stale or open appraisals, and ineligible pieces", async () => {
     const owner = await collector("request-pieces");
+    try {
     const held = await acceptedPiece(owner);
     await submit(owner, `request-holder-${suffix}`, [held.id], 60_000);
     await assert.rejects(
@@ -1098,6 +1099,7 @@ describe("repo requests", { skip }, () => {
       () => submit(owner, `request-reviewing-${suffix}`, [reviewing.id], 60_000),
       { message: "REVIEW_LOCKED" },
     );
+    await clearAccessRateLimit(db, "request.submit", owner.customer.id);
 
     const unfinanceable = await acceptedPiece(owner, 0, { financeable: false });
     await assert.rejects(
@@ -1127,6 +1129,9 @@ describe("repo requests", { skip }, () => {
       () => submit(owner, `request-holder-${suffix}`, [collision.id], 60_000),
       { message: "ID_COLLISION" },
     );
+    } finally {
+      await clearAccessRateLimit(db, "request.submit", owner.customer.id);
+    }
   });
 
   it("freezes the server scale for the term at Apply and caps against it", async () => {
@@ -1182,6 +1187,34 @@ describe("repo requests", { skip }, () => {
     }
   });
 
+  it("counts a refused submit against the daily throttle", async () => {
+    const owner = await collector("request-throttle-refuse");
+    const piece = await acceptedPiece(owner);
+    try {
+      for (let index = 0; index < 5; index += 1) {
+        await assert.rejects(
+          () => submit(owner, `request-throttle-refuse-${index}-${suffix}`, [piece.id], 60_001),
+          { message: "AMOUNT_ABOVE_CAP" },
+        );
+      }
+      const id = `request-throttle-refuse-6-${suffix}`;
+      await assert.rejects(() => submit(owner, id, [piece.id], 60_000), { message: "THROTTLED" });
+      assert.equal(await agreementRow(id), undefined);
+    } finally {
+      await clearAccessRateLimit(db, "request.submit", owner.customer.id);
+    }
+  });
+
+  it("mints the agreement code and ignores a client-supplied one", async () => {
+    const owner = await collector("request-code");
+    const piece = await acceptedPiece(owner);
+    const id = `request-code-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000, { agreementCode: "CLIENT-CODE" });
+    const row = await agreementRow(id);
+    assert.match(row.agreementCode ?? "", /^MAC-[A-Z0-9]{6}$/);
+    assert.notEqual(row.agreementCode, "CLIENT-CODE");
+  });
+
   it("lets the Desk confirm once, scoped by owner and guarded by the expected row", async () => {
     const owner = await collector("request-confirm");
     const other = await collector("request-confirm-other");
@@ -1221,6 +1254,9 @@ describe("repo requests", { skip }, () => {
       { message: "AGREEMENT_NOT_FOUND" },
     );
     assert.equal((await agreementRow(id)).status, "submitted");
+    await db.update(appraisalAttempts)
+      .set({ decidedAt: new Date(Date.now() - 9 * DAY) })
+      .where(eq(appraisalAttempts.timepieceId, piece.id));
 
     const confirmed = await executeLiveBookOperation(db, admin, {
       action: "request.deskReturn", id, decision: "confirm", note: "Ready for you.", ...expected,
@@ -1385,6 +1421,7 @@ describe("repo requests", { skip }, () => {
       () => executeLiveBookOperation(db, owner.actor, { action: "request.flagCustomerSuccess", id, flag: true }),
       { message: "ROLE_FORBIDDEN" },
     );
+    const before = await agreementRow(id);
     const flagged = await executeLiveBookOperation(db, admin, {
       action: "request.flagCustomerSuccess", id, flag: true, note: "VIP handling.",
     }, deskOptions) as RequestTransitionResult;
@@ -1394,12 +1431,17 @@ describe("repo requests", { skip }, () => {
     assert.equal(row.customerSuccess, true);
     assert.equal(row.status, "submitted");
     assert.equal(row.version, 1);
+    assert.equal(row.lastActionAt.getTime(), before.lastActionAt.getTime());
     const events = await eventsOf(id);
     assert.deepEqual(events.map((event) => [event.action, event.internal]), [["submit", false], ["flagCustomerSuccess", true]]);
     assert.deepEqual((await listAgreementEvents(db, owner.actor, id)).map((event) => event.action), ["submit"]);
     assert.deepEqual((await listAgreementEvents(db, admin, id)).map((event) => event.action), ["submit", "flagCustomerSuccess"]);
     const stranger = await collector("request-success-stranger");
     await assert.rejects(() => listAgreementEvents(db, stranger.actor, id), { message: "AGREEMENT_NOT_FOUND" });
+    const retailBook = await readLiveBookState(db, owner.actor);
+    const flaggedRow = retailBook.agreements.find((item) => item.id === id);
+    assert.ok(flaggedRow);
+    assert.equal(Object.hasOwn(flaggedRow, "customerSuccess"), false);
     const audits = await db.select().from(deskAuditLog).where(and(
       eq(deskAuditLog.actorEmail, adminEmail),
       eq(deskAuditLog.action, "request.flagCustomerSuccess"),
@@ -1407,6 +1449,11 @@ describe("repo requests", { skip }, () => {
     ));
     assert.equal(audits.length, 1);
     assert.deepEqual(audits[0].detail, { flag: true, note: "VIP handling." });
+    const withdrawn = await executeLiveBookOperation(db, owner.actor, {
+      action: "request.withdraw", id, expectedStatus: "submitted", expectedVersion: 1,
+    }) as RequestTransitionResult;
+    assert.equal(withdrawn.agreement.status, "closed");
+    assert.equal((await agreementRow(id)).closeReason, "withdrawn");
   });
 
   it("freezes the scale of a request and refuses removal", async () => {
@@ -1438,6 +1485,25 @@ describe("repo requests", { skip }, () => {
       { message: "AGREEMENT_IMMUTABLE" },
     );
     assert.equal((await agreementRow(id)).status, "submitted");
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "agreement.updateScale",
+        id,
+        termMonths: 12,
+        scale: {
+          purchaseShare: 0.6,
+          setupFee: 0.01,
+          annualAdjustment: 0.185,
+          earlyRepurchaseAmount: 0.035,
+          brokerFee: 0.035,
+        },
+      }, deskOptions),
+      { message: "AGREEMENT_IMMUTABLE" },
+    );
+    assert.equal((await agreementRow(id)).status, "returned");
   });
 });
 

@@ -395,6 +395,31 @@ describe("request stage documents", { skip }, () => {
     assert.equal((await listAgreementDocuments(db, owner.actor, { liveAgreementId: id }, flaky)).length, 2);
   });
 
+  it("stops inserting failed rows after three render attempts", async () => {
+    const owner = await applicant("stage-fail-cap");
+    const broken = agreementDocumentStore({
+      ...memoryObjectStore(),
+      async putIfAbsent() {
+        throw new Error("R2_PUT_FAILED");
+      },
+    });
+    const id = `request-stage-fail-cap-${suffix}`;
+    const result = await submit(owner, id, broken);
+    for (const job of result.afterCommit) await job();
+    assert.equal((await db.select().from(agreementDocuments).where(eq(agreementDocuments.liveAgreementId, id))).length, 1);
+    await listAgreementDocuments(db, owner.actor, { liveAgreementId: id }, broken);
+    await listAgreementDocuments(db, owner.actor, { liveAgreementId: id }, broken);
+    await listAgreementDocuments(db, owner.actor, { liveAgreementId: id }, broken);
+    const rows = await db.select().from(agreementDocuments).where(eq(agreementDocuments.liveAgreementId, id));
+    assert.equal(rows.length, 3);
+    assert.ok(rows.every((row) => row.status === "failed"));
+    await assert.rejects(
+      () => mintAgreementDocumentUrl(db, owner.actor, { documentId: rows[0].id }, broken),
+      { message: "DOCUMENT_UNAVAILABLE" },
+    );
+    assert.equal((await db.select().from(agreementDocuments).where(eq(agreementDocuments.liveAgreementId, id))).length, 3);
+  });
+
   it("renders a building proposal when a URL is minted before the job ran", async () => {
     const owner = await applicant("stage-mint");
     const memory = memoryObjectStore();

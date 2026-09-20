@@ -426,7 +426,7 @@ export function mapLiveBookRows(
     // handed straight back to the mapping below as if the row had stated it.
     const lastActionAt = iso(row.lastActionAt) ?? iso(row.updatedAt);
     if (lastActionAt) agreement.lastActionAt = lastActionAt;
-    if (row.customerSuccess === true) agreement.customerSuccess = true;
+    if (!retailProjection && row.customerSuccess === true) agreement.customerSuccess = true;
     // The backfill converts every legacy row, so this only catches one written
     // by a path U6 has yet to retire. `updated_at` feeds last_action_at exactly
     // as the backfill does (KTD21).

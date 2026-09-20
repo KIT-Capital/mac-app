@@ -179,7 +179,7 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   `request.submit` (retail owner: 1–200 owned pieces whose Accept is current
   within seven days, a term, a whole-dollar amount at or above the Desk minimum
   and at or below the frozen per-piece caps, a delivery method, an optional
-  note; five per customer per day, else `THROTTLED`), `request.deskReturn`
+  note; five attempts per customer per day including refusals, else `THROTTLED`), `request.deskReturn`
   (any desk role, `decision: confirm | decline` — never an amount),
   `request.decline` and `request.withdraw` (retail owner), and
   `request.flagCustomerSuccess` (desk, internal). Every transition carries
