@@ -1,14 +1,20 @@
+import { randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { maxPurchaseAmount } from "@/lib/catalog";
 import {
+  REQUEST_STATES,
   applyAgreementEnd,
   bookLabel,
+  deskToday,
+  isAppraisalCurrent,
   isLiveBookLabel,
+  isRequestExpired,
+  isUnderReview,
   validateRecordedEndKind,
-  validateSaleAmountLower,
 } from "@/lib/contract/repo-book.mjs";
 import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
+import { applyTransition } from "@/lib/contract/request-transitions.mjs";
 import {
   agreementScaleFromDesk,
   assertScenario60Floors,
@@ -18,8 +24,15 @@ import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import type { Agreement } from "@/lib/types";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
-import { liveAgreementHasDocuments } from "./agreement-documents";
+import {
+  type DocumentStore,
+  insertStageDocumentRow,
+  liveAgreementHasDocuments,
+  renderStageDocument,
+} from "./agreement-documents";
+import { consumeAccessRateLimit } from "./collector-sessions";
 import { dollarsToCents } from "./money.mjs";
+import { closeExpiredRequest, recordAgreementEvent } from "./request-events";
 import {
   assertAppraisalPhotoChangeAllowed,
   assertRetailPieceEditable,
@@ -59,6 +72,83 @@ import { normalizeRequiredPhotoKinds } from "../timepiece-shots.mjs";
 import type { DeskRole } from "../types";
 
 type Operation = ReturnType<typeof parseLiveBookOperation>;
+type LiveAgreementRow = typeof liveAgreements.$inferSelect;
+
+/** What the caller needs after the transaction: env, the object store, and the pool to render with. */
+type OperationContext = {
+  env: NodeJS.ProcessEnv;
+  documentStore?: DocumentStore;
+  rootDb: Database;
+};
+
+/** A request row as the API returns it. `customerSuccess` is desk-only (KTD22). */
+export type RequestProjection = {
+  id: string;
+  watchIds: string[];
+  amount: number;
+  termMonths: number;
+  delivery: string;
+  ownerName: string;
+  email: string;
+  status: string;
+  createdAt: string;
+  agreementCode?: string;
+  version: number;
+  lastActionAt: string;
+  closeReason?: string;
+  executedOn?: string;
+  pieceCaps?: Record<string, number>;
+  scale?: Record<string, unknown>;
+  customerSuccess?: boolean;
+};
+
+export type RequestSubmitResult = {
+  agreement: RequestProjection;
+  /** Runs after the transaction commits, in order, as one chain. */
+  afterCommit: Array<() => Promise<unknown>>;
+};
+
+export type RequestTransitionResult = { agreement: RequestProjection };
+
+/** `applyTransition` is plain JS; this is the shape its two answers take. */
+type TransitionOutcome =
+  | { ok: false; error: string }
+  | {
+      ok: true;
+      agreement: Agreement & { closeReason?: string; version: number };
+      mintsStage?: string;
+      event: {
+        action: string;
+        actorKind: string;
+        actorId: string;
+        fromStatus: string;
+        toStatus: string;
+        amount: number;
+        version: number;
+        note: string;
+        internal: boolean;
+        createdAt: string;
+      };
+    };
+
+/** The four moves that need an expiry pre-pass before their own transaction (KTD12). */
+const REQUEST_TRANSITIONS = new Set([
+  "request.deskReturn",
+  "request.decline",
+  "request.withdraw",
+  "request.flagCustomerSuccess",
+]);
+
+const REQUEST_SUBMITS_PER_DAY = 5;
+const DAY_MS = 86_400_000;
+const AGREEMENT_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+function mintAgreementCode() {
+  const bytes = randomBytes(6);
+  let code = "MAC-";
+  for (const byte of bytes) code += AGREEMENT_CODE_ALPHABET[byte % AGREEMENT_CODE_ALPHABET.length];
+  return code;
+}
 
 function isDesk(
   actor: Actor,
@@ -149,6 +239,61 @@ function requireMutableAgreement(agreement: Agreement) {
   if (agreement.signedAt || agreement.bookEnd) {
     throw new Error("AGREEMENT_IMMUTABLE");
   }
+  // A request froze its scale at Apply and moves only through `request.*`;
+  // a closed one is history. Legacy rows keep the rule above.
+  if (REQUEST_STATES.includes(agreement.status) || agreement.status === "closed") {
+    throw new Error("AGREEMENT_IMMUTABLE");
+  }
+}
+
+function projectRequestRow(
+  row: LiveAgreementRow,
+  watchIds: string[],
+  actor: Actor,
+): RequestProjection {
+  const projection: RequestProjection = {
+    id: row.id,
+    watchIds,
+    amount: row.amountCents / 100,
+    termMonths: row.termMonths,
+    delivery: row.delivery,
+    ownerName: row.ownerName,
+    email: row.email,
+    status: row.status,
+    createdAt: row.createdOn,
+    version: row.version,
+    lastActionAt: row.lastActionAt.toISOString(),
+  };
+  if (row.agreementCode) projection.agreementCode = row.agreementCode;
+  if (row.closeReason) projection.closeReason = row.closeReason;
+  if (row.executedOn) projection.executedOn = row.executedOn;
+  if (row.pieceCaps && typeof row.pieceCaps === "object") {
+    projection.pieceCaps = row.pieceCaps as Record<string, number>;
+  }
+  if (row.scale && typeof row.scale === "object") projection.scale = row.scale as Record<string, unknown>;
+  if (isDesk(actor)) projection.customerSuccess = row.customerSuccess;
+  return projection;
+}
+
+/**
+ * KTD12. A request whose retail window ran out is closed for real before any
+ * move against it, in its own transaction, so the close stays committed even
+ * though the move is then refused. Ownership answers before state: a retail
+ * caller who does not own the row reads `AGREEMENT_NOT_FOUND`, never a state.
+ */
+async function closeIfExpiredBeforeMove(db: Database, actor: Actor, id: string) {
+  const where = !isDesk(actor)
+    ? and(eq(liveAgreements.id, id), eq(liveAgreements.customerId, actor.customerId))
+    : eq(liveAgreements.id, id);
+  const [row] = await db
+    .select({ status: liveAgreements.status, lastActionAt: liveAgreements.lastActionAt })
+    .from(liveAgreements)
+    .where(where)
+    .limit(1);
+  if (!row) throw new Error("AGREEMENT_NOT_FOUND");
+  if (!isRequestExpired({ status: row.status, lastActionAt: row.lastActionAt.toISOString() })) return;
+  const closed = await db.transaction((tx) => closeExpiredRequest(tx as unknown as Database, id));
+  if (closed) throw new Error("REQUEST_EXPIRED");
 }
 
 function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
@@ -301,6 +446,8 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "timepiece.update",
   "timepiece.deskUpdate",
   "timepiece.remove",
+  "request.deskReturn",
+  "request.flagCustomerSuccess",
   "agreement.updateScale",
   "agreement.markSigned",
   "agreement.recordEnd",
@@ -326,15 +473,17 @@ const LOCKED_APPRAISAL_ACTIONS = new Set([
   "preview.remove",
 ]);
 const LOCKED_AGREEMENT_ACTIONS = new Set([
-  "agreement.create",
+  "request.submit",
+  "request.deskReturn",
+  "request.decline",
+  "request.withdraw",
+  "request.flagCustomerSuccess",
   "agreement.updateScale",
   "agreement.signCollector",
   "agreement.markSigned",
   "agreement.recordEnd",
   "agreement.clearEnd",
   "agreement.renew",
-  "agreement.addWatches",
-  "agreement.setAmount",
   "agreement.remove",
 ]);
 
@@ -378,6 +527,12 @@ function auditDetail(
   if (operation.action === "appraisal.return") {
     return { note: String(operation.note ?? "") };
   }
+  if (operation.action === "request.deskReturn") {
+    return { decision: operation.decision, note: String(operation.note ?? "") };
+  }
+  if (operation.action === "request.flagCustomerSuccess") {
+    return { flag: operation.flag, note: String(operation.note ?? "") };
+  }
   return {};
 }
 
@@ -385,12 +540,20 @@ export async function executeLiveBookOperation(
   db: Database,
   actor: Actor,
   input: unknown,
-  options: { clientAddress?: string; env?: NodeJS.ProcessEnv } = {},
+  options: { clientAddress?: string; env?: NodeJS.ProcessEnv; documentStore?: DocumentStore } = {},
 ) {
   const operation = parseLiveBookOperation(input) as Operation & Record<string, unknown>;
+  const context: OperationContext = {
+    env: options.env ?? process.env,
+    documentStore: options.documentStore,
+    rootDb: db,
+  };
+  if (REQUEST_TRANSITIONS.has(operation.action)) {
+    await closeIfExpiredBeforeMove(db, actor, String(operation.id));
+  }
   if (
     isDesk(actor) &&
-    isLiveBookEnabled((options.env ?? process.env).MAC_LIVE_BOOK) &&
+    isLiveBookEnabled(context.env.MAC_LIVE_BOOK) &&
     AUDITED_DESK_ACTIONS.has(operation.action)
   ) {
     if (!actor.staffId) throw new Error("SESSION_INVALID");
@@ -406,6 +569,7 @@ export async function executeLiveBookOperation(
         tx as unknown as Database,
         trusted,
         operation,
+        context,
       );
       await writeDeskAudit(
         tx,
@@ -423,18 +587,23 @@ export async function executeLiveBookOperation(
     LOCKED_APPRAISAL_ACTIONS.has(operation.action)
   ) {
     return db.transaction((tx) =>
-      executeLiveBookOperationCore(tx as unknown as Database, actor, operation)
+      executeLiveBookOperationCore(tx as unknown as Database, actor, operation, context)
     );
   }
-  return executeLiveBookOperationCore(db, actor, operation);
+  return executeLiveBookOperationCore(db, actor, operation, context);
 }
 
 async function executeLiveBookOperationCore(
   db: Database,
   actor: Actor,
   operation: Operation & Record<string, unknown>,
+  context: OperationContext,
 ) {
   const action = operation.action;
+
+  if (action === "request.submit") return submitRequest(db, actor, operation, context);
+
+  if (REQUEST_TRANSITIONS.has(action)) return transitionRequest(db, actor, operation);
 
   if (action === "appraisal.submit") {
     return submitAppraisalAttempt(db, actor, {
@@ -833,69 +1002,6 @@ async function executeLiveBookOperationCore(
     return;
   }
 
-  if (action === "agreement.create") {
-    if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
-    const agreement = operation.agreement as unknown as Agreement;
-    if (!agreement.watchIds?.length) throw new Error("WATCH_IDS_REQUIRED");
-    const [existingAgreement] = await db.select({ id: liveAgreements.id })
-      .from(liveAgreements)
-      .where(eq(liveAgreements.id, agreement.id))
-      .limit(1);
-    if (existingAgreement) throw new Error("ID_COLLISION");
-    const pieces = await db.select().from(timepieces)
-      .where(inArray(timepieces.id, agreement.watchIds))
-      .orderBy(timepieces.id)
-      .for("update");
-    if (pieces.length !== new Set(agreement.watchIds).size || pieces.some((row) => row.customerId !== actor.customerId)) {
-      throw new Error("TIMEPIECE_NOT_OWNED");
-    }
-    if (pieces.some((row) => row.status !== "appraised" || !row.financeable)) {
-      throw new Error("INELIGIBLE_PIECE");
-    }
-    const [owner] = await db.select().from(customers).where(eq(customers.id, actor.customerId)).limit(1);
-    if (!owner || owner.email !== actor.email) throw new Error("COLLECTOR_NOT_FOUND");
-    const scale = await serverAgreementScale(db, agreement.termMonths);
-    const share = scale.purchaseShare;
-    const cap = pieces.reduce((sum, row) => sum + maxPurchaseAmount(
-      (row.valueLowCents ?? 0) / 100,
-      (row.valueHighCents ?? 0) / 100,
-      share,
-    ), 0);
-    if (agreement.amount > cap) throw new Error("OVER_LTV");
-    const conflicts = await db.select().from(liveAgreementMembers).where(and(
-      inArray(liveAgreementMembers.timepieceId, agreement.watchIds),
-      inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
-    ));
-    if (conflicts.length) throw new Error("LIVE_WATCH_CONFLICT");
-    const amountCents = dollarsToCents(agreement.amount);
-    if (amountCents === null) throw new Error("INVALID_DOLLAR_AMOUNT");
-    await db.transaction(async (tx) => {
-      await tx.insert(liveAgreements).values({
-        id: agreement.id,
-        customerId: actor.customerId,
-        amountCents,
-        termMonths: agreement.termMonths,
-        delivery: agreement.delivery,
-        ownerName: owner.name,
-        email: owner.email,
-        // KTD21: a repo the desk creates today is already on the book, so it
-        // records its own execution date rather than leaning on a read-time map.
-        status: "executed",
-        executedOn: agreement.createdAt,
-        agreementCode: agreement.agreementCode,
-        createdOn: agreement.createdAt,
-        scale,
-      });
-      await tx.insert(liveAgreementMembers).values(agreement.watchIds.map((timepieceId) => ({
-        id: `${agreement.id}:${timepieceId}`,
-        agreementId: agreement.id,
-        timepieceId,
-        status: "live",
-      })));
-    });
-    return;
-  }
-
   if (action === "agreement.signCollector" || action === "agreement.markSigned") {
     const agreement = await ownedAgreement(db, actor, String(operation.id));
     if (action === "agreement.markSigned") requireDesk(actor);
@@ -1046,56 +1152,6 @@ async function executeLiveBookOperationCore(
     return;
   }
 
-  if (action === "agreement.addWatches") {
-    if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
-    const agreement = await ownedAgreement(db, actor, String(operation.id));
-    requireMutableAgreement(agreement);
-    if (!isLiveBookLabel(bookLabel(agreement))) throw new Error("NOT_LIVE");
-    const watchIds = operation.watchIds as string[];
-    const pieces = await db.select().from(timepieces).where(inArray(timepieces.id, watchIds));
-    if (
-      pieces.length !== new Set(watchIds).size ||
-      pieces.some((row) => row.customerId !== actor.customerId || row.status !== "appraised" || !row.financeable)
-    ) {
-      throw new Error("INELIGIBLE_PIECE");
-    }
-    const conflicts = await db.select().from(liveAgreementMembers).where(and(
-      inArray(liveAgreementMembers.timepieceId, watchIds),
-      inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
-    ));
-    if (conflicts.length) throw new Error("LIVE_WATCH_CONFLICT");
-    await db.insert(liveAgreementMembers).values(watchIds.map((timepieceId) => ({
-      id: `${agreement.id}:${timepieceId}`,
-      agreementId: agreement.id,
-      timepieceId,
-      status: "live",
-    })));
-    return;
-  }
-
-  if (action === "agreement.setAmount") {
-    if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
-    const agreement = await ownedAgreement(db, actor, String(operation.id));
-    requireMutableAgreement(agreement);
-    if (!isLiveBookLabel(bookLabel(agreement))) throw new Error("NOT_LIVE");
-    const amount = Number(operation.amount);
-    const checked = validateSaleAmountLower(agreement.amount, amount);
-    if (!checked.ok) throw new Error(checked.error);
-    const pieces = await db.select().from(timepieces).where(inArray(timepieces.id, agreement.watchIds));
-    const share = Number((agreement.scale as { purchaseShare?: number } | null)?.purchaseShare ?? 0.6);
-    const cap = pieces.reduce((sum, row) => sum + maxPurchaseAmount(
-      (row.valueLowCents ?? 0) / 100,
-      (row.valueHighCents ?? 0) / 100,
-      share,
-    ), 0);
-    if (amount > cap) throw new Error("OVER_LTV");
-    await db.update(liveAgreements).set({
-      amountCents: dollarsToCents(amount)!,
-      updatedAt: new Date(),
-    }).where(eq(liveAgreements.id, agreement.id));
-    return;
-  }
-
   if (action === "preview.upsert") {
     const timepieceId = String(operation.timepieceId);
     await lockedOwnedPiece(db, actor, timepieceId);
@@ -1174,4 +1230,236 @@ async function executeLiveBookOperationCore(
   }
 
   throw new Error("LIVE_BOOK_ACTION_INVALID");
+}
+
+/**
+ * Apply (R12, R26). Runs inside the caller's transaction, in this order:
+ * throttle, id, pieces locked and owned, appraisal currency, expired holders
+ * closed, caps, amount, row, members, event, and the v1 proposal row. The
+ * PDF is rendered after commit by the returned job.
+ */
+async function submitRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+  context: OperationContext,
+): Promise<RequestSubmitResult> {
+  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  const id = String(operation.id);
+  const watchIds = [...(operation.watchIds as string[])].sort();
+  const termMonths = Number(operation.termMonths);
+  const amount = Number(operation.amount);
+
+  // KTD23: five Applies a day per collector; the sixth reads THROTTLED.
+  const throttle = await consumeAccessRateLimit(db, {
+    scope: "request.submit",
+    key: actor.customerId,
+    limit: REQUEST_SUBMITS_PER_DAY,
+    windowMs: DAY_MS,
+  });
+  if (!throttle.allowed) throw new Error("THROTTLED");
+
+  const [existing] = await db.select({ id: liveAgreements.id })
+    .from(liveAgreements)
+    .where(eq(liveAgreements.id, id))
+    .limit(1);
+  if (existing) throw new Error("ID_COLLISION");
+
+  const pieces = await db.select().from(timepieces)
+    .where(inArray(timepieces.id, watchIds))
+    .orderBy(timepieces.id)
+    .for("update");
+  if (pieces.length !== watchIds.length || pieces.some((row) => row.customerId !== actor.customerId)) {
+    throw new Error("TIMEPIECE_NOT_OWNED");
+  }
+
+  const attemptRows = await db.select({
+    timepieceId: appraisalAttempts.timepieceId,
+    attemptNo: appraisalAttempts.attemptNo,
+    decisionNo: appraisalAttempts.decisionNo,
+    status: appraisalAttempts.status,
+    decidedAt: appraisalAttempts.decidedAt,
+  })
+    .from(appraisalAttempts)
+    .where(inArray(appraisalAttempts.timepieceId, watchIds));
+  const attempts = attemptRows.map((row) => ({
+    ...row,
+    decidedAt: row.decidedAt?.toISOString(),
+  }));
+  const today = deskToday();
+  for (const piece of pieces) {
+    if (isUnderReview(attempts, piece.id)) throw new Error("REVIEW_LOCKED");
+    if (piece.status !== "appraised" || !piece.financeable) throw new Error("INELIGIBLE_PIECE");
+    const current = isAppraisalCurrent(attempts, piece.id, today, {
+      status: piece.status,
+      evaluatedAt: piece.evaluatedAt?.toISOString(),
+    });
+    if (!current) throw new Error("APPRAISAL_EXPIRED");
+  }
+
+  // KTD12: a holder whose retail window ran out is closed here, in this same
+  // transaction, so its pieces are free for this Apply. Anything else holding
+  // a piece is a named conflict.
+  const holders = await db.select({
+    agreementId: liveAgreements.id,
+    status: liveAgreements.status,
+    lastActionAt: liveAgreements.lastActionAt,
+  })
+    .from(liveAgreementMembers)
+    .innerJoin(liveAgreements, eq(liveAgreementMembers.agreementId, liveAgreements.id))
+    .where(and(
+      inArray(liveAgreementMembers.timepieceId, watchIds),
+      inArray(liveAgreementMembers.status, HELD_MEMBER_STATUSES),
+    ))
+    .orderBy(liveAgreements.id);
+  const seen = new Set<string>();
+  for (const holder of holders) {
+    if (seen.has(holder.agreementId)) continue;
+    seen.add(holder.agreementId);
+    const expired =
+      REQUEST_STATES.includes(holder.status) &&
+      isRequestExpired({ status: holder.status, lastActionAt: holder.lastActionAt.toISOString() }, today);
+    if (expired && await closeExpiredRequest(db, holder.agreementId)) continue;
+    throw new Error("LIVE_WATCH_CONFLICT");
+  }
+
+  const scale = await serverAgreementScale(db, termMonths);
+  const pieceCaps = Object.fromEntries(pieces.map((row) => [
+    row.id,
+    maxPurchaseAmount(
+      (row.valueLowCents ?? 0) / 100,
+      (row.valueHighCents ?? 0) / 100,
+      scale.purchaseShare,
+    ),
+  ]));
+  const maximum = Object.values(pieceCaps).reduce((sum, cap) => sum + cap, 0);
+
+  if (!Number.isInteger(amount)) throw new Error("AMOUNT_WHOLE_DOLLARS");
+  const [setting] = await db.select({ minSaleAmountCents: deskSettings.minSaleAmountCents })
+    .from(deskSettings)
+    .where(eq(deskSettings.id, "default"))
+    .limit(1);
+  const minimum = (setting?.minSaleAmountCents ?? 100_000) / 100;
+  if (amount < minimum) throw new Error("AMOUNT_BELOW_MINIMUM");
+  if (amount > maximum) throw new Error("AMOUNT_ABOVE_CAP");
+  const amountCents = dollarsToCents(amount);
+  if (amountCents === null) throw new Error("INVALID_DOLLAR_AMOUNT");
+
+  const [owner] = await db.select().from(customers).where(eq(customers.id, actor.customerId)).limit(1);
+  if (!owner || owner.email !== actor.email) throw new Error("COLLECTOR_NOT_FOUND");
+
+  const now = new Date();
+  const note = String(operation.note ?? "");
+  const [row] = await db.insert(liveAgreements).values({
+    id,
+    customerId: actor.customerId,
+    amountCents,
+    termMonths,
+    delivery: String(operation.delivery),
+    ownerName: owner.name,
+    email: owner.email,
+    status: "submitted",
+    version: 1,
+    lastActionAt: now,
+    createdOn: deskToday(now),
+    agreementCode: operation.agreementCode ? String(operation.agreementCode) : mintAgreementCode(),
+    scale,
+    pieceCaps,
+  }).returning();
+  await db.insert(liveAgreementMembers).values(watchIds.map((timepieceId) => ({
+    id: `${id}:${timepieceId}`,
+    agreementId: id,
+    timepieceId,
+    status: "reserved",
+  })));
+  await recordAgreementEvent(db, {
+    agreementId: id,
+    actorKind: "retail",
+    actorId: actor.customerId,
+    action: "submit",
+    fromStatus: null,
+    toStatus: "submitted",
+    amountCents,
+    version: 1,
+    note,
+    internal: false,
+    createdAt: now,
+  });
+  const document = await insertStageDocumentRow(db, row, "proposal", actor, context.env);
+  const { rootDb, documentStore, env } = context;
+  return {
+    agreement: projectRequestRow(row, watchIds, actor),
+    afterCommit: [() => renderStageDocument(rootDb, document.id, documentStore, env)],
+  };
+}
+
+/**
+ * One request move through the shared table (R25). The caller has already
+ * closed the row if it expired; here the row is locked, the caller's expected
+ * status and version are checked, and the transition's answer is persisted.
+ */
+async function transitionRequest(
+  db: Database,
+  actor: Actor,
+  operation: Operation & Record<string, unknown>,
+): Promise<RequestTransitionResult> {
+  const id = String(operation.id);
+  const action = operation.action.slice("request.".length);
+  const agreement = await ownedAgreement(db, actor, id);
+  if (action !== "flagCustomerSuccess") {
+    if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
+      throw new Error("AGREEMENT_STATE_CONFLICT");
+    }
+  }
+  const now = new Date();
+  const transitionActor = isDesk(actor)
+    ? { kind: "desk", id: actor.staffId ?? actor.email, role: actor.role }
+    : { kind: "retail", id: actor.customerId };
+  const result = applyTransition(
+    { ...agreement, version: agreement.version ?? 1 },
+    {
+      action,
+      decision: operation.decision as string | undefined,
+      note: String(operation.note ?? ""),
+    },
+    { now: now.toISOString(), today: deskToday(now), actor: transitionActor },
+  ) as TransitionOutcome;
+  if (!result.ok) throw new Error(result.error);
+  const next = result.agreement;
+  const [row] = await db.update(liveAgreements).set({
+    status: next.status,
+    version: next.version,
+    closeReason: next.closeReason ?? null,
+    customerSuccess: action === "flagCustomerSuccess" ? Boolean(operation.flag) : undefined,
+    lastActionAt: now,
+    updatedAt: now,
+  }).where(and(
+    eq(liveAgreements.id, id),
+    eq(liveAgreements.status, agreement.status),
+    eq(liveAgreements.version, agreement.version ?? 1),
+  )).returning();
+  if (!row) throw new Error("AGREEMENT_STATE_CONFLICT");
+  if (next.status === "closed") {
+    await db.update(liveAgreementMembers)
+      .set({ status: "released" })
+      .where(and(
+        eq(liveAgreementMembers.agreementId, id),
+        eq(liveAgreementMembers.status, "reserved"),
+      ));
+  }
+  const amountCents = dollarsToCents(result.event.amount);
+  await recordAgreementEvent(db, {
+    agreementId: id,
+    actorKind: result.event.actorKind as "retail" | "desk" | "system",
+    actorId: result.event.actorId,
+    action: result.event.action,
+    fromStatus: result.event.fromStatus,
+    toStatus: result.event.toStatus,
+    amountCents,
+    version: result.event.version,
+    note: result.event.note,
+    internal: result.event.internal,
+    createdAt: now,
+  });
+  return { agreement: projectRequestRow(row, agreement.watchIds, actor) };
 }

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import { getDb } from "@/lib/db/client";
 import { readLiveBookState } from "@/lib/db/live-book-adapter";
@@ -6,9 +7,26 @@ import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
 import { liveBookErrorResponse } from "@/lib/live-book-errors.mjs";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { requestActor } from "@/lib/server/request-actor";
+import { agreementDocumentStore } from "@/lib/storage/object-store.mjs";
+import { createObjectStore } from "@/lib/storage/r2-object-store.mjs";
 import { liveUnavailability, unavailableResponse } from "@/lib/unavailable-response.mjs";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * The same store the documents route uses. When R2 is not configured the
+ * render job records the document as failed with `DOCUMENT_STORE_UNAVAILABLE`
+ * instead of the request itself failing.
+ */
+function documentStore() {
+  try {
+    return agreementDocumentStore(createObjectStore());
+  } catch {
+    return undefined;
+  }
+}
+
+type AfterCommit = Array<() => Promise<unknown>>;
 
 function json(body: unknown, status = 200) {
   return Response.json(body, {
@@ -70,12 +88,22 @@ export async function POST(request: Request) {
     const input = await request.json().catch(() => null);
     const result = await executeLiveBookOperation(getDb(), context.actor, input, {
       clientAddress: clientAddress(request.headers),
+      documentStore: documentStore(),
     });
+    const { afterCommit, ...body } = (
+      result && typeof result === "object" ? result : {}
+    ) as { afterCommit?: AfterCommit } & Record<string, unknown>;
+    if (afterCommit?.length) {
+      // One chain, in order, after the response is sent (KTD27).
+      after(async () => {
+        for (const job of afterCommit) await job();
+      });
+    }
     return json({
       mode: "live",
       acknowledged: true,
       viewer: context.viewer,
-      ...(result && typeof result === "object" ? result : {}),
+      ...body,
     });
   } catch (error) {
     const failure = liveBookErrorResponse(error);

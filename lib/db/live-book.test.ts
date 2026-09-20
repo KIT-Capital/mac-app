@@ -1,15 +1,28 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
-import { and, eq, inArray } from "drizzle-orm";
-import { createDb } from "./client";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { INSPECTION_CONDITION } from "../contract/repo-agreement-snapshot.mjs";
+import { deskToday } from "../contract/repo-book.mjs";
+import { agreementDocumentStore, memoryObjectStore, sha256Hex } from "../storage/object-store.mjs";
+import { createDb, type Database } from "./client";
+import { clearAccessRateLimit } from "./collector-sessions";
 import { readLiveBookState } from "./live-book-adapter";
-import { executeLiveBookOperation } from "./live-book-mutations";
+import {
+  executeLiveBookOperation,
+  type RequestSubmitResult,
+  type RequestTransitionResult,
+} from "./live-book-mutations";
 import { insertLiveAgreement } from "./live-book";
 import { createTimepiece, deskActor, registerCollector, toCollectorActor } from "./records";
+import { listAgreementEvents } from "./request-events";
 import { createStaffAccount } from "./staff-accounts";
 import { hashStaffPassword } from "../staff-password.mjs";
 import {
+  agreementDocuments,
+  agreementEvents,
   agreementShells,
+  appraisalAttempts,
   catalogReferences,
   customers,
   deskAuditLog,
@@ -218,27 +231,25 @@ describe("live-book operation repository", { skip }, () => {
       valueLow: 100_000,
       valueHigh: 120_000,
     });
+    // Scale derivation at Apply is covered by the `repo requests` suite below;
+    // here an executed fixture is enough to open the terms disclosure.
     const repoId = `repo-server-scale-${suffix}`;
-    await executeLiveBookOperation(db, owner.actor, {
-      action: "agreement.create",
-      agreement: {
-        id: repoId,
-        watchIds: [piece.id],
-        amount: 50_000,
-        termMonths: 12,
-        delivery: "",
-        ownerName: owner.customer.name,
-        email: owner.customer.email,
-        createdAt: "2026-09-18",
-        agreementCode: `MAC-U5-${suffix}`,
-        scale: { purchaseShare: 0.01 },
-      },
+    await insertLiveAgreement(db, owner.actor, {
+      id: repoId,
+      customerId: owner.customer.id,
+      watchIds: [piece.id],
+      amount: 50_000,
+      termMonths: 12,
+      delivery: "",
+      ownerName: owner.customer.name,
+      email: owner.customer.email,
+      createdOn: "2026-09-18",
+      agreementCode: `MAC-U5-${suffix}`,
+      scale: { purchaseShare: 0.5, annualAdjustment: 0.21 },
     });
     const [created] = await db.select({ scale: liveAgreements.scale })
       .from(liveAgreements)
       .where(eq(liveAgreements.id, repoId));
-    assert.equal((created.scale as { purchaseShare: number }).purchaseShare, 0.5);
-    assert.equal((created.scale as { annualAdjustment: number }).annualAdjustment, 0.21);
     const disclosed = await readLiveBookState(db, owner.actor);
     assert.equal(disclosed.settings.maxLtv, 0.55);
     assert.equal(disclosed.settings.vaultLocation, "MAC Vault");
@@ -283,7 +294,7 @@ describe("live-book operation repository", { skip }, () => {
     assert.equal(replacedShells.shells.find((shell) => shell.id === `shell-u5-${suffix}`)?.status, "assigned");
     assert.equal(replacedShells.shells.find((shell) => shell.id === `shell-u5-nine-${suffix}`)?.status, "open");
     const firstApplicant = await collector("first-application-cap");
-    const firstApplicantPiece = await createTimepiece(
+    await createTimepiece(
       db,
       firstApplicant.actor,
       firstApplicant.customer.id,
@@ -301,25 +312,6 @@ describe("live-book operation repository", { skip }, () => {
     assert.deepEqual(firstApplicantState.shells, []);
     assert.equal(firstApplicantState.applicationPurchaseShares[9], 0.45);
     assert.equal(firstApplicantState.applicationPurchaseShares[12], 0.55);
-    const firstApplicantRepoId = `repo-first-application-cap-${suffix}`;
-    await executeLiveBookOperation(db, firstApplicant.actor, {
-      action: "agreement.create",
-      agreement: {
-        id: firstApplicantRepoId,
-        watchIds: [firstApplicantPiece.id],
-        amount: 45_000,
-        termMonths: 9,
-        delivery: "",
-        ownerName: firstApplicant.customer.name,
-        email: firstApplicant.customer.email,
-        createdAt: "2026-09-18",
-        agreementCode: `MAC-U5-FIRST-${suffix}`,
-      },
-    });
-    const [firstApplicantRepo] = await db.select({ scale: liveAgreements.scale })
-      .from(liveAgreements)
-      .where(eq(liveAgreements.id, firstApplicantRepoId));
-    assert.equal((firstApplicantRepo.scale as { purchaseShare: number }).purchaseShare, 0.45);
     await Promise.all([10, 11].map((termMonths) =>
       executeLiveBookOperation(db, adminActor, {
         action: "shell.upsert",
@@ -346,35 +338,6 @@ describe("live-book operation repository", { skip }, () => {
       afterConcurrentReplacement.shells.filter((shell) => shell.status === "open").length,
       1,
     );
-
-    const secondPiece = await createTimepiece(db, owner.actor, owner.customer.id, {
-      brand: "Rolex",
-      model: "Daytona",
-      status: "appraised",
-      financeable: true,
-      valueLow: 100_000,
-      valueHigh: 120_000,
-    });
-    const settingsScaleRepoId = `repo-settings-scale-${suffix}`;
-    await executeLiveBookOperation(db, owner.actor, {
-      action: "agreement.create",
-      agreement: {
-        id: settingsScaleRepoId,
-        watchIds: [secondPiece.id],
-        amount: 50_000,
-        termMonths: 12,
-        delivery: "",
-        ownerName: owner.customer.name,
-        email: owner.customer.email,
-        createdAt: "2026-09-18",
-        agreementCode: `MAC-U5-SETTINGS-${suffix}`,
-      },
-    });
-    const [settingsScaleRepo] = await db.select({ scale: liveAgreements.scale })
-      .from(liveAgreements)
-      .where(eq(liveAgreements.id, settingsScaleRepoId));
-    assert.equal((settingsScaleRepo.scale as { purchaseShare: number }).purchaseShare, 0.55);
-    assert.equal((settingsScaleRepo.scale as { annualAdjustment: number }).annualAdjustment, 0.2);
 
     await executeLiveBookOperation(db, adminActor, {
       action: "settings.update",
@@ -734,42 +697,6 @@ describe("live-book operation repository", { skip }, () => {
     );
   });
 
-  it("rejects an agreement id already owned by another customer", async () => {
-    const a = await collector("repo-id-a");
-    const b = await collector("repo-id-b");
-    const pieceA = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Tank" });
-    const pieceB = await createTimepiece(db, b.actor, b.customer.id, { brand: "Rolex", model: "Daytona" });
-    const id = `shared-repo-id-${suffix}`;
-    await insertLiveAgreement(db, b.actor, {
-      id,
-      customerId: b.customer.id,
-      watchIds: [pieceB.id],
-      amount: 50000,
-      termMonths: 12,
-      delivery: "",
-      ownerName: b.customer.name,
-      email: b.customer.email,
-      createdOn: "2026-09-17",
-    });
-    await assert.rejects(
-      () => executeLiveBookOperation(db, a.actor, {
-        action: "agreement.create",
-        agreement: {
-          id,
-          watchIds: [pieceA.id],
-          amount: 25000,
-          termMonths: 12,
-          delivery: "",
-          ownerName: a.customer.name,
-          email: a.customer.email,
-          createdAt: "2026-09-17",
-          agreementCode: `MAC-A-${suffix}`,
-        },
-      }),
-      { message: "ID_COLLISION" },
-    );
-  });
-
   it("does not let one customer take another piece's preview id", async () => {
     const a = await collector("preview-a");
     const b = await collector("preview-b");
@@ -793,82 +720,6 @@ describe("live-book operation repository", { skip }, () => {
       { message: "PREVIEW_ID_COLLISION" },
     );
     assert.deepEqual((await readLiveBookState(db, a.actor)).photos.map((row) => row.url), ["/preview-a.jpg"]);
-  });
-
-  it("ignores an unsafe client scale and stores the server scale", async () => {
-    const a = await collector("scale");
-    const piece = await createTimepiece(db, a.actor, a.customer.id, {
-      brand: "Cartier",
-      model: "Tank",
-      status: "appraised",
-      financeable: true,
-      valueLow: 100000,
-      valueHigh: 120000,
-    });
-    const id = `repo-scale-${suffix}`;
-    await executeLiveBookOperation(db, a.actor, {
-      action: "agreement.create",
-      agreement: {
-        id,
-        watchIds: [piece.id],
-        amount: 50000,
-        termMonths: 12,
-        delivery: "",
-        ownerName: a.customer.name,
-        email: a.customer.email,
-        createdAt: "2026-09-17",
-        scale: { purchaseShare: 1.5, setupFee: 0.01 },
-      },
-    });
-    const [stored] = await db.select({ scale: liveAgreements.scale })
-      .from(liveAgreements)
-      .where(eq(liveAgreements.id, id));
-    assert.equal((stored.scale as { purchaseShare: number }).purchaseShare, 0.6);
-  });
-
-  it("rejects unappraised and nonpurchaseable pieces on agreement creation", async () => {
-    const a = await collector("agreement-piece-safety");
-    const unappraised = await createTimepiece(db, a.actor, a.customer.id, {
-      brand: "Cartier",
-      model: "Tank",
-      status: "reviewing",
-      financeable: true,
-      valueLow: 100000,
-      valueHigh: 120000,
-    });
-    const nonpurchaseable = await createTimepiece(db, a.actor, a.customer.id, {
-      brand: "Rolex",
-      model: "Daytona",
-      status: "appraised",
-      financeable: false,
-      valueLow: 100000,
-      valueHigh: 120000,
-    });
-    for (const piece of [unappraised, nonpurchaseable]) {
-      await assert.rejects(
-        () => executeLiveBookOperation(db, a.actor, {
-          action: "agreement.create",
-          agreement: {
-            id: `repo-ineligible-${piece.id}`,
-            watchIds: [piece.id],
-            amount: 50000,
-            termMonths: 12,
-            delivery: "",
-            ownerName: a.customer.name,
-            email: a.customer.email,
-            createdAt: "2026-09-17",
-            scale: {
-              purchaseShare: 0.6,
-              setupFee: 0.01,
-              annualAdjustment: 0.185,
-              earlyRepurchaseAmount: 0.035,
-              brokerFee: 0.035,
-            },
-          },
-        }),
-        { message: "INELIGIBLE_PIECE" },
-      );
-    }
   });
 
   it("lets desk mutate explicit customers, previews, and agreements safely", async () => {
@@ -965,22 +816,6 @@ describe("live-book operation repository", { skip }, () => {
         { message: "AGREEMENT_IMMUTABLE" },
       );
       await assert.rejects(
-        () => executeLiveBookOperation(db, a.actor, {
-          action: "agreement.addWatches",
-          id,
-          watchIds: [id === signedId ? second.id : first.id],
-        }),
-        { message: "AGREEMENT_IMMUTABLE" },
-      );
-      await assert.rejects(
-        () => executeLiveBookOperation(db, a.actor, {
-          action: "agreement.setAmount",
-          id,
-          amount: 11000,
-        }),
-        { message: "AGREEMENT_IMMUTABLE" },
-      );
-      await assert.rejects(
         () => executeLiveBookOperation(db, desk, {
           action: "agreement.updateScale",
           id,
@@ -1000,5 +835,718 @@ describe("live-book operation repository", { skip }, () => {
         { message: "AGREEMENT_IMMUTABLE" },
       );
     }
+  });
+});
+
+/**
+ * Requests write to the append-only `agreement_events` thread, which no
+ * cleanup may delete. The suite therefore runs inside one root transaction
+ * that is rolled back in `after`, exactly as the appraisal suite does.
+ */
+describe("repo requests", { skip }, () => {
+  const rootDb = createDb();
+  let db: Database;
+  let releaseTransaction: (() => void) | undefined;
+  let transactionPromise: Promise<unknown> | undefined;
+  let appraiserId = "";
+  let admin: ReturnType<typeof deskActor>;
+  let adminEmail = "";
+  let adminStaffId = "";
+  const store = agreementDocumentStore(memoryObjectStore());
+  const deskOptions = {
+    env: { APP_ENV: "development", MAC_LIVE_BOOK: "1" } as NodeJS.ProcessEnv,
+    clientAddress: "127.0.0.1",
+  };
+  const retailOptions = { documentStore: store };
+  const DAY = 86_400_000;
+
+  before(async () => {
+    let ready!: () => void;
+    let release!: () => void;
+    const readyPromise = new Promise<void>((resolve) => { ready = resolve; });
+    const releasePromise = new Promise<void>((resolve) => { release = resolve; });
+    releaseTransaction = release;
+    transactionPromise = rootDb.transaction(async (tx) => {
+      db = tx as unknown as Database;
+      ready();
+      await releasePromise;
+      throw new Error("REQUEST_TEST_ROLLBACK");
+    });
+    await readyPromise;
+    // Deterministic caps: no desk row means Scenario 60 (share 0.6, $1,000 floor).
+    await db.delete(agreementShells);
+    await db.delete(deskSettings);
+    const passwordHash = await hashStaffPassword("request password 123");
+    const appraiser = await createStaffAccount(db, {
+      name: "Request Appraiser",
+      email: `request-appraiser.${suffix}@mac.test`,
+      role: "appraiser",
+      passwordHash,
+      mustRotate: false,
+    });
+    appraiserId = appraiser.id;
+    const adminRow = await createStaffAccount(db, {
+      name: "Request Admin",
+      email: `request-admin.${suffix}@mac.test`,
+      role: "admin",
+      passwordHash,
+      mustRotate: false,
+    });
+    adminEmail = adminRow.email;
+    adminStaffId = adminRow.id;
+    admin = deskActor("admin", adminRow.email, adminRow.id);
+  });
+
+  after(async () => {
+    releaseTransaction?.();
+    await assert.rejects(() => transactionPromise, { message: "REQUEST_TEST_ROLLBACK" });
+  });
+
+  async function collector(label: string) {
+    const customer = await registerCollector(db, {
+      email: `${label}.${suffix}@mac.test`,
+      name: label,
+    });
+    return { customer, actor: toCollectorActor(customer) };
+  }
+
+  /** An appraised, purchaseable piece whose Accept was decided `daysAgo` days ago. */
+  async function acceptedPiece(
+    owner: Awaited<ReturnType<typeof collector>>,
+    daysAgo = 0,
+    input: { valueLow?: number; valueHigh?: number; financeable?: boolean } = {},
+  ) {
+    const decidedAt = new Date(Date.now() - daysAgo * DAY);
+    const piece = await createTimepiece(db, owner.actor, owner.customer.id, {
+      brand: "Cartier",
+      model: `Tank ${randomUUID().slice(0, 6)}`,
+      status: "appraised",
+      financeable: input.financeable ?? true,
+      valueLow: input.valueLow ?? 100_000,
+      valueHigh: input.valueHigh ?? 120_000,
+      evaluatedAt: decidedAt.toISOString(),
+    });
+    await db.insert(appraisalAttempts).values({
+      id: randomUUID(),
+      timepieceId: piece.id,
+      customerId: owner.customer.id,
+      attemptNo: 1,
+      decisionNo: 1,
+      status: "accepted",
+      snapshot: {},
+      evidenceSealedAt: decidedAt,
+      decidedByStaffId: appraiserId,
+      decidedAt,
+      valueCents: 11_000_000,
+      rangeLowCents: (input.valueLow ?? 100_000) * 100,
+      rangeHighCents: (input.valueHigh ?? 120_000) * 100,
+    });
+    return piece;
+  }
+
+  function submit(
+    owner: Awaited<ReturnType<typeof collector>>,
+    id: string,
+    watchIds: string[],
+    amount: number,
+    extra: Record<string, unknown> = {},
+  ) {
+    return executeLiveBookOperation(db, owner.actor, {
+      action: "request.submit",
+      id,
+      watchIds,
+      termMonths: 12,
+      amount,
+      delivery: "Insured courier",
+      note: "Please keep the boxes together.",
+      ...extra,
+    }, retailOptions) as Promise<RequestSubmitResult>;
+  }
+
+  async function agreementRow(id: string) {
+    const [row] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, id));
+    return row;
+  }
+
+  async function membersOf(id: string) {
+    return db.select().from(liveAgreementMembers).where(eq(liveAgreementMembers.agreementId, id));
+  }
+
+  async function eventsOf(id: string) {
+    return db.select().from(agreementEvents).where(eq(agreementEvents.agreementId, id)).orderBy(agreementEvents.createdAt);
+  }
+
+  async function documentsOf(id: string) {
+    return db.select().from(agreementDocuments).where(eq(agreementDocuments.liveAgreementId, id));
+  }
+
+  it("submits three current pieces at the cap and mints a building proposal", async () => {
+    const owner = await collector("request-submit");
+    const pieces = [
+      await acceptedPiece(owner, 0),
+      await acceptedPiece(owner, 3),
+      await acceptedPiece(owner, 6),
+    ];
+    const id = `request-submit-${suffix}`;
+    const result = await submit(owner, id, pieces.map((piece) => piece.id), 180_000);
+    assert.equal(result.agreement.status, "submitted");
+    assert.equal(result.agreement.version, 1);
+    assert.deepEqual(
+      result.agreement.pieceCaps,
+      Object.fromEntries(pieces.map((piece) => [piece.id, 60_000])),
+    );
+    assert.equal(Object.hasOwn(result.agreement, "customerSuccess"), false);
+
+    const row = await agreementRow(id);
+    assert.equal(row.status, "submitted");
+    assert.equal(row.version, 1);
+    assert.equal(row.amountCents, 18_000_000);
+    assert.equal(row.termMonths, 12);
+    assert.equal(row.delivery, "Insured courier");
+    assert.equal(row.createdOn, deskToday());
+    assert.match(row.agreementCode ?? "", /^MAC-[A-Z0-9]{6}$/);
+    assert.equal(Object.keys(row.pieceCaps as Record<string, number>).length, 3);
+    assert.equal((row.scale as { purchaseShare: number }).purchaseShare, 0.6);
+
+    const members = await membersOf(id);
+    assert.equal(members.length, 3);
+    assert.ok(members.every((member) => member.status === "reserved"));
+    assert.deepEqual(members.map((member) => member.id).sort(), pieces.map((piece) => `${id}:${piece.id}`).sort());
+
+    const events = await eventsOf(id);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].action, "submit");
+    assert.equal(events[0].actorKind, "retail");
+    assert.equal(events[0].actorId, owner.customer.id);
+    assert.equal(events[0].fromStatus, null);
+    assert.equal(events[0].toStatus, "submitted");
+    assert.equal(events[0].amountCents, 18_000_000);
+    assert.equal(events[0].version, 1);
+    assert.equal(events[0].note, "Please keep the boxes together.");
+    assert.equal(events[0].internal, false);
+
+    const [building] = await documentsOf(id);
+    assert.equal(building.stage, "proposal");
+    assert.equal(building.status, "building");
+    assert.equal(building.version, 1);
+    assert.ok(building.objectKey);
+    assert.equal(building.createdByKind, "collector");
+
+    assert.equal(result.afterCommit.length, 1);
+    for (const job of result.afterCommit) await job();
+    const [stored] = await documentsOf(id);
+    assert.equal(stored.status, "stored");
+    assert.ok(await store.head(stored.objectKey ?? ""));
+    assert.equal(stored.checksum, sha256Hex(await store.get(stored.objectKey ?? "")));
+    const snapshot = stored.snapshot as { text: string; facts: string[] };
+    assert.ok(snapshot.text.includes(INSPECTION_CONDITION));
+    assert.ok(snapshot.facts.includes(INSPECTION_CONDITION));
+    assert.doesNotMatch(
+      snapshot.text.replaceAll("not a loan", ""),
+      /\b(loan|lender|interest|financing|collateral|borrower)\b/i,
+    );
+    // The job is idempotent: a second run leaves the stored row alone.
+    for (const job of result.afterCommit) await job();
+    assert.equal((await documentsOf(id)).length, 1);
+  });
+
+  it("refuses a fractional, sub-floor, or over-cap amount and leaves no row", async () => {
+    const owner = await collector("request-amounts");
+    const piece = await acceptedPiece(owner);
+    for (const [amount, message] of [
+      [500.5, "AMOUNT_WHOLE_DOLLARS"],
+      [999, "AMOUNT_BELOW_MINIMUM"],
+      [60_001, "AMOUNT_ABOVE_CAP"],
+    ] as const) {
+      const id = `request-amount-${message}-${suffix}`;
+      await assert.rejects(() => submit(owner, id, [piece.id], amount), { message });
+      assert.equal(await agreementRow(id), undefined);
+      assert.deepEqual(await eventsOf(id), []);
+    }
+    const ok = await submit(owner, `request-amount-ok-${suffix}`, [piece.id], 60_000);
+    assert.equal(ok.agreement.amount, 60_000);
+  });
+
+  it("refuses pieces another request holds, stale or open appraisals, and ineligible pieces", async () => {
+    const owner = await collector("request-pieces");
+    const held = await acceptedPiece(owner);
+    await submit(owner, `request-holder-${suffix}`, [held.id], 60_000);
+    await assert.rejects(
+      () => submit(owner, `request-conflict-${suffix}`, [held.id], 60_000),
+      { message: "LIVE_WATCH_CONFLICT" },
+    );
+
+    const stale = await acceptedPiece(owner, 8);
+    await assert.rejects(
+      () => submit(owner, `request-stale-${suffix}`, [stale.id], 60_000),
+      { message: "APPRAISAL_EXPIRED" },
+    );
+    const fresh = await acceptedPiece(owner, 6);
+    const accepted = await submit(owner, `request-fresh-${suffix}`, [fresh.id], 60_000);
+    assert.equal(accepted.agreement.status, "submitted");
+
+    const reviewing = await acceptedPiece(owner, 1);
+    await db.insert(appraisalAttempts).values({
+      id: randomUUID(),
+      timepieceId: reviewing.id,
+      customerId: owner.customer.id,
+      attemptNo: 2,
+      status: "under_review",
+      snapshot: {},
+    });
+    await assert.rejects(
+      () => submit(owner, `request-reviewing-${suffix}`, [reviewing.id], 60_000),
+      { message: "REVIEW_LOCKED" },
+    );
+
+    const unfinanceable = await acceptedPiece(owner, 0, { financeable: false });
+    await assert.rejects(
+      () => submit(owner, `request-unfinanceable-${suffix}`, [unfinanceable.id], 60_000),
+      { message: "INELIGIBLE_PIECE" },
+    );
+
+    const stranger = await collector("request-stranger");
+    await assert.rejects(
+      () => submit(stranger, `request-not-owned-${suffix}`, [fresh.id], 60_000),
+      { message: "TIMEPIECE_NOT_OWNED" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "request.submit",
+        id: `request-desk-${suffix}`,
+        watchIds: [fresh.id],
+        termMonths: 12,
+        amount: 60_000,
+        delivery: "Insured courier",
+        note: "",
+      }, deskOptions),
+      { message: "COLLECTOR_REQUIRED" },
+    );
+    const collision = await acceptedPiece(owner);
+    await assert.rejects(
+      () => submit(owner, `request-holder-${suffix}`, [collision.id], 60_000),
+      { message: "ID_COLLISION" },
+    );
+  });
+
+  it("freezes the server scale for the term at Apply and caps against it", async () => {
+    const owner = await collector("request-scale");
+    const piece = await acceptedPiece(owner);
+    await db.insert(agreementShells).values({
+      id: `shell-request-${suffix}`,
+      code: "MAC-OPEN-12",
+      title: "Open 12-month shell",
+      termMonths: 12,
+      rateBps: 2100,
+      ltvBps: 5000,
+      setupFeeBps: 200,
+      earlyRepurchaseAmountBps: 450,
+      brokerFeeBps: 450,
+      minMonths: 4,
+      earlyStartMonth: 5,
+      earlyUntilMonth: 9,
+      status: "open",
+      createdOn: "2026-09-18",
+    });
+    try {
+      await assert.rejects(
+        () => submit(owner, `request-scale-over-${suffix}`, [piece.id], 50_001),
+        { message: "AMOUNT_ABOVE_CAP" },
+      );
+      const id = `request-scale-${suffix}`;
+      // Client-supplied scale is not part of the operation and cannot leak in.
+      await submit(owner, id, [piece.id], 50_000, { scale: { purchaseShare: 1.5 } });
+      const row = await agreementRow(id);
+      assert.equal((row.scale as { purchaseShare: number }).purchaseShare, 0.5);
+      assert.equal((row.scale as { annualAdjustment: number }).annualAdjustment, 0.21);
+      assert.deepEqual(row.pieceCaps, { [piece.id]: 50_000 });
+    } finally {
+      await db.delete(agreementShells).where(eq(agreementShells.id, `shell-request-${suffix}`));
+    }
+  });
+
+  it("throttles the sixth submit by one collector in a day", async () => {
+    const owner = await collector("request-throttle");
+    try {
+      for (let index = 0; index < 5; index += 1) {
+        const piece = await acceptedPiece(owner);
+        await submit(owner, `request-throttle-${index}-${suffix}`, [piece.id], 60_000);
+      }
+      const sixth = await acceptedPiece(owner);
+      const id = `request-throttle-6-${suffix}`;
+      await assert.rejects(() => submit(owner, id, [sixth.id], 60_000), { message: "THROTTLED" });
+      assert.equal(await agreementRow(id), undefined);
+      assert.deepEqual(await eventsOf(id), []);
+    } finally {
+      await clearAccessRateLimit(db, "request.submit", owner.customer.id);
+    }
+  });
+
+  it("lets the Desk confirm once, scoped by owner and guarded by the expected row", async () => {
+    const owner = await collector("request-confirm");
+    const other = await collector("request-confirm-other");
+    const piece = await acceptedPiece(owner);
+    const id = `request-confirm-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    const expected = { expectedStatus: "submitted", expectedVersion: 1 };
+
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "request.deskReturn", id, decision: "lower", ...expected,
+      }, deskOptions),
+      { message: "REQUEST_DECISION_INVALID" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 0,
+      }, deskOptions),
+      { message: "AGREEMENT_STATE_CONFLICT" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, {
+        action: "request.deskReturn", id, decision: "confirm", ...expected,
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, other.actor, {
+        action: "request.deskReturn", id, decision: "confirm", ...expected,
+      }),
+      { message: "AGREEMENT_NOT_FOUND" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, other.actor, {
+        action: "request.withdraw", id, expectedStatus: "closed", expectedVersion: 7,
+      }),
+      { message: "AGREEMENT_NOT_FOUND" },
+    );
+    assert.equal((await agreementRow(id)).status, "submitted");
+
+    const confirmed = await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id, decision: "confirm", note: "Ready for you.", ...expected,
+    }, deskOptions) as RequestTransitionResult;
+    assert.equal(confirmed.agreement.status, "returned");
+    assert.equal(confirmed.agreement.version, 1);
+    const row = await agreementRow(id);
+    assert.equal(row.status, "returned");
+    assert.equal(row.version, 1);
+    assert.equal(row.closeReason, null);
+    assert.equal(row.amountCents, 6_000_000);
+    const events = await eventsOf(id);
+    assert.deepEqual(events.map((event) => event.action), ["submit", "deskReturn"]);
+    assert.equal(events[1].actorKind, "desk");
+    assert.equal(events[1].actorId, adminStaffId);
+    assert.equal(events[1].fromStatus, "submitted");
+    assert.equal(events[1].toStatus, "returned");
+    assert.equal(events[1].note, "Ready for you.");
+    // Confirming mints nothing: the proposal the owner reads is the v1 document.
+    assert.equal((await documentsOf(id)).length, 1);
+
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "request.deskReturn", id, decision: "confirm", ...expected,
+      }, deskOptions),
+      { message: "AGREEMENT_STATE_CONFLICT" },
+    );
+    const audits = await db.select().from(deskAuditLog).where(and(
+      eq(deskAuditLog.actorEmail, adminEmail),
+      eq(deskAuditLog.action, "request.deskReturn"),
+      eq(deskAuditLog.targetId, id),
+    ));
+    assert.equal(audits.length, 1);
+    assert.deepEqual(audits[0].detail, { decision: "confirm", note: "Ready for you." });
+  });
+
+  it("lets the Desk decline, closing the request and releasing its pieces", async () => {
+    const owner = await collector("request-desk-decline");
+    const piece = await acceptedPiece(owner);
+    const id = `request-desk-decline-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id, decision: "decline", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    const row = await agreementRow(id);
+    assert.equal(row.status, "closed");
+    assert.equal(row.closeReason, "declined_by_desk");
+    assert.ok((await membersOf(id)).every((member) => member.status === "released"));
+    assert.equal((await documentsOf(id)).length, 1);
+  });
+
+  it("lets the owner withdraw a returned request and reuse the pieces", async () => {
+    const owner = await collector("request-withdraw");
+    const piece = await acceptedPiece(owner);
+    const id = `request-withdraw-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    const withdrawn = await executeLiveBookOperation(db, owner.actor, {
+      action: "request.withdraw", id, expectedStatus: "returned", expectedVersion: 1, note: "Changed my mind.",
+    }) as RequestTransitionResult;
+    assert.equal(withdrawn.agreement.status, "closed");
+    assert.equal(withdrawn.agreement.closeReason, "withdrawn");
+    const row = await agreementRow(id);
+    assert.equal(row.status, "closed");
+    assert.equal(row.closeReason, "withdrawn");
+    assert.ok((await membersOf(id)).every((member) => member.status === "released"));
+    assert.deepEqual((await eventsOf(id)).map((event) => event.action), ["submit", "deskReturn", "withdraw"]);
+
+    const again = await submit(owner, `request-withdraw-again-${suffix}`, [piece.id], 60_000);
+    assert.equal(again.agreement.status, "submitted");
+  });
+
+  it("lets the owner decline a returned proposal", async () => {
+    const owner = await collector("request-decline");
+    const piece = await acceptedPiece(owner);
+    const id = `request-decline-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    // Nothing to decline while the Desk still holds it.
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, {
+        action: "request.decline", id, expectedStatus: "submitted", expectedVersion: 1,
+      }),
+      { message: "AGREEMENT_STATE_CONFLICT" },
+    );
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    await executeLiveBookOperation(db, owner.actor, {
+      action: "request.decline", id, expectedStatus: "returned", expectedVersion: 1,
+    });
+    const row = await agreementRow(id);
+    assert.equal(row.status, "closed");
+    assert.equal(row.closeReason, "declined_by_collector");
+    assert.equal((await documentsOf(id)).length, 1);
+  });
+
+  it("closes an expired request for real before refusing the move, and frees its pieces", async () => {
+    const owner = await collector("request-expired");
+    const piece = await acceptedPiece(owner);
+    const id = `request-expired-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    await db.update(liveAgreements)
+      .set({ lastActionAt: new Date(Date.now() - 15 * DAY) })
+      .where(eq(liveAgreements.id, id));
+
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, {
+        action: "request.decline", id, expectedStatus: "returned", expectedVersion: 1,
+      }),
+      { message: "REQUEST_EXPIRED" },
+    );
+    const row = await agreementRow(id);
+    assert.equal(row.status, "closed");
+    assert.equal(row.closeReason, "expired");
+    assert.ok((await membersOf(id)).every((member) => member.status === "released"));
+    const events = await eventsOf(id);
+    assert.deepEqual(events.map((event) => event.action), ["submit", "deskReturn", "expire"]);
+    assert.equal(events[2].actorKind, "system");
+    assert.equal(events[2].internal, false);
+
+    // Reading the thread agrees with the row; a second move sees a closed row.
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, {
+        action: "request.withdraw", id, expectedStatus: "returned", expectedVersion: 1,
+      }),
+      { message: "AGREEMENT_STATE_CONFLICT" },
+    );
+    const again = await submit(owner, `request-expired-again-${suffix}`, [piece.id], 60_000);
+    assert.equal(again.agreement.status, "submitted");
+  });
+
+  it("closes an expired holder inside a new submit instead of reporting a conflict", async () => {
+    const owner = await collector("request-expired-holder");
+    const piece = await acceptedPiece(owner);
+    const holderId = `request-expired-holder-${suffix}`;
+    await submit(owner, holderId, [piece.id], 60_000);
+    await executeLiveBookOperation(db, admin, {
+      action: "request.deskReturn", id: holderId, decision: "confirm", expectedStatus: "submitted", expectedVersion: 1,
+    }, deskOptions);
+    await db.update(liveAgreements)
+      .set({ lastActionAt: new Date(Date.now() - 15 * DAY) })
+      .where(eq(liveAgreements.id, holderId));
+    const fresh = await submit(owner, `request-expired-holder-next-${suffix}`, [piece.id], 60_000);
+    assert.equal(fresh.agreement.status, "submitted");
+    const holder = await agreementRow(holderId);
+    assert.equal(holder.status, "closed");
+    assert.equal(holder.closeReason, "expired");
+    assert.deepEqual((await eventsOf(holderId)).map((event) => event.action), ["submit", "deskReturn", "expire"]);
+  });
+
+  it("flags customer success as a desk-only event the owner never reads", async () => {
+    const owner = await collector("request-success");
+    const piece = await acceptedPiece(owner);
+    const id = `request-success-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, owner.actor, { action: "request.flagCustomerSuccess", id, flag: true }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const flagged = await executeLiveBookOperation(db, admin, {
+      action: "request.flagCustomerSuccess", id, flag: true, note: "VIP handling.",
+    }, deskOptions) as RequestTransitionResult;
+    assert.equal(flagged.agreement.customerSuccess, true);
+    assert.equal(flagged.agreement.status, "submitted");
+    const row = await agreementRow(id);
+    assert.equal(row.customerSuccess, true);
+    assert.equal(row.status, "submitted");
+    assert.equal(row.version, 1);
+    const events = await eventsOf(id);
+    assert.deepEqual(events.map((event) => [event.action, event.internal]), [["submit", false], ["flagCustomerSuccess", true]]);
+    assert.deepEqual((await listAgreementEvents(db, owner.actor, id)).map((event) => event.action), ["submit"]);
+    assert.deepEqual((await listAgreementEvents(db, admin, id)).map((event) => event.action), ["submit", "flagCustomerSuccess"]);
+    const stranger = await collector("request-success-stranger");
+    await assert.rejects(() => listAgreementEvents(db, stranger.actor, id), { message: "AGREEMENT_NOT_FOUND" });
+    const audits = await db.select().from(deskAuditLog).where(and(
+      eq(deskAuditLog.actorEmail, adminEmail),
+      eq(deskAuditLog.action, "request.flagCustomerSuccess"),
+      eq(deskAuditLog.targetId, id),
+    ));
+    assert.equal(audits.length, 1);
+    assert.deepEqual(audits[0].detail, { flag: true, note: "VIP handling." });
+  });
+
+  it("freezes the scale of a request and refuses removal", async () => {
+    const owner = await collector("request-immutable");
+    const piece = await acceptedPiece(owner);
+    const id = `request-immutable-${suffix}`;
+    await submit(owner, id, [piece.id], 60_000);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "agreement.updateScale",
+        id,
+        termMonths: 12,
+        scale: {
+          purchaseShare: 0.6,
+          setupFee: 0.01,
+          annualAdjustment: 0.185,
+          earlyRepurchaseAmount: 0.035,
+          brokerFee: 0.035,
+        },
+      }, deskOptions),
+      { message: "AGREEMENT_IMMUTABLE" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, { action: "agreement.remove", id }, deskOptions),
+      { message: "AGREEMENT_IMMUTABLE" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, { action: "agreement.markSigned", id }, deskOptions),
+      { message: "AGREEMENT_IMMUTABLE" },
+    );
+    assert.equal((await agreementRow(id)).status, "submitted");
+  });
+});
+
+/**
+ * Two desk users answering the same request at once need two real
+ * connections, so this suite runs on its own schema and drops it afterwards.
+ */
+describe("repo request concurrency", { skip }, () => {
+  const schema = `u10_race_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const rootDb = createDb();
+
+  before(async () => {
+    await rootDb.execute(sql.raw(`
+      create schema "${schema}";
+      create table "${schema}"."staff_accounts" (
+        "id" text primary key, "name" text not null, "email" text not null,
+        "password_hash" text, "password_salt" text, "password_params" jsonb,
+        "role" text not null, "is_master" boolean not null default false,
+        "must_rotate" boolean not null default false, "password_set_at" timestamptz,
+        "session_valid_after" timestamptz not null default 'epoch',
+        "disabled_at" timestamptz, "created_at" timestamptz not null default now(),
+        "updated_at" timestamptz not null default now()
+      );
+      create table "${schema}"."desk_audit_log" (
+        "id" text primary key, "actor_email" text not null, "actor_role" text not null,
+        "action" text not null, "target_id" text, "client_address" text not null,
+        "detail" jsonb not null default '{}'::jsonb, "created_at" timestamptz not null default now()
+      );
+      create table "${schema}"."live_agreements" (
+        "id" text primary key, "customer_id" text not null, "amount_cents" integer not null,
+        "term_months" integer not null, "delivery" text not null default '',
+        "owner_name" text not null, "email" text not null, "status" text not null,
+        "agreement_code" text, "created_on" text not null, "signed_on" text,
+        "executed_on" text, "delivered_on" text, "version" integer not null default 1,
+        "last_action_at" timestamptz not null default now(), "close_reason" text,
+        "customer_success" boolean not null default false, "payment_reference" text,
+        "piece_caps" jsonb, "scale" jsonb, "created_at" timestamptz not null default now(),
+        "updated_at" timestamptz not null default now()
+      );
+      create table "${schema}"."live_agreement_members" (
+        "id" text primary key, "agreement_id" text not null, "timepiece_id" text not null,
+        "status" text not null default 'live', "created_at" timestamptz not null default now()
+      );
+      create table "${schema}"."live_agreement_ends" (
+        "agreement_id" text primary key, "kind" text not null, "ended_on" text not null,
+        "amount_cents" integer not null, "created_at" timestamptz not null default now()
+      );
+      create table "${schema}"."agreement_events" (
+        "id" text primary key, "agreement_id" text not null, "actor_kind" text not null,
+        "actor_id" text, "action" text not null, "from_status" text, "to_status" text not null,
+        "amount_cents" integer, "version" integer not null, "note" text not null default '',
+        "internal" boolean not null default false, "created_at" timestamptz not null default now()
+      );
+      insert into "${schema}"."staff_accounts" ("id","name","email","role")
+      values ('staff-a','A','a@mac.test','admin'),('staff-b','B','b@mac.test','admin');
+      insert into "${schema}"."live_agreements"
+        ("id","customer_id","amount_cents","term_months","owner_name","email","status","created_on","scale")
+      values ('request','customer',6000000,12,'Owner','owner@mac.test','submitted','2026-09-20','{"purchaseShare":0.6}');
+      insert into "${schema}"."live_agreement_members" ("id","agreement_id","timepiece_id","status")
+      values ('request:piece','request','piece','reserved');
+    `));
+  });
+
+  after(async () => {
+    await rootDb.execute(sql.raw(`drop schema if exists "${schema}" cascade`));
+  });
+
+  it("lets exactly one of two concurrent confirmations through", async () => {
+    let arrivals = 0;
+    let release!: () => void;
+    const ready = new Promise<void>((resolve) => { release = resolve; });
+    const run = (staffId: string, email: string) =>
+      rootDb.transaction(async (tx) => {
+        await tx.execute(sql.raw(`set local search_path to "${schema}", public`));
+        arrivals += 1;
+        if (arrivals === 2) release();
+        await ready;
+        return executeLiveBookOperation(
+          tx as unknown as Database,
+          deskActor("admin", email, staffId),
+          {
+            action: "request.deskReturn",
+            id: "request",
+            decision: "confirm",
+            expectedStatus: "submitted",
+            expectedVersion: 1,
+          },
+          {
+            env: { APP_ENV: "development", MAC_LIVE_BOOK: "1" } as NodeJS.ProcessEnv,
+            clientAddress: "127.0.0.1",
+          },
+        );
+      });
+
+    const results = await Promise.allSettled([
+      run("staff-a", "a@mac.test"),
+      run("staff-b", "b@mac.test"),
+    ]);
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    const rejected = results.find((result) => result.status === "rejected");
+    assert.ok(rejected && rejected.status === "rejected");
+    assert.match(String(rejected.reason), /AGREEMENT_STATE_CONFLICT/);
+
+    await rootDb.transaction(async (tx) => {
+      await tx.execute(sql.raw(`set local search_path to "${schema}", public`));
+      const row = await tx.execute(sql`select status, version from live_agreements where id = 'request'`);
+      assert.deepEqual(row.rows, [{ status: "returned", version: 1 }]);
+      const events = await tx.execute(sql`select action from agreement_events where agreement_id = 'request'`);
+      assert.deepEqual(events.rows, [{ action: "deskReturn" }]);
+    });
   });
 });

@@ -55,10 +55,11 @@ export async function GET(request: Request) {
       return json({ mode: "live", error: failure.error }, failure.status);
     }
     const url = new URL(request.url);
+    // Passing the store lets a building or failed stage row render on read (KTD11).
     const documents = await listAgreementDocuments(getDb(), context.actor, {
       liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
       customerId: url.searchParams.get("customerId") ?? undefined,
-    });
+    }, documentStore());
     const sends = context.actor.role === "collector"
       ? []
       : await listAgreementDocumentSends(getDb(), context.actor, {

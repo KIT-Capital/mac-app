@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, gte, inArray, max } from "drizzle-orm";
+import { type SQL, and, desc, eq, gte, inArray, max } from "drizzle-orm";
 import {
   SENDS_PER_HOUR,
   SEND_WINDOW_MS,
@@ -21,12 +21,20 @@ import { agreementDocumentSends, agreementDocuments, liveAgreementMembers, liveA
 
 type QueryDb = Pick<Database, "select" | "insert" | "update">;
 
-type DocumentStore = {
+export type DocumentStore = {
   putIfAbsent: (key: string, body: Uint8Array, checksum: string) => Promise<void>;
   head: (key: string) => Promise<boolean>;
   get: (key: string) => Promise<Uint8Array>;
   presignGet: (key: string, expiresSeconds?: number) => Promise<{ url: string; expiresAt: string }>;
 };
+
+export type DocumentRow = typeof agreementDocuments.$inferSelect;
+type LiveAgreementRow = typeof liveAgreements.$inferSelect;
+
+/** Which step of a request a PDF records (KTD11). `legacy` is the Stage 4 path. */
+export type DocumentStage = "proposal" | "collector_signed" | "executed";
+
+type FrozenSnapshot = NonNullable<ReturnType<typeof buildAgreementSnapshot>["value"]>;
 
 function uniqueConstraint(error: unknown): string | null {
   let current: unknown = error;
@@ -49,6 +57,34 @@ function actorMeta(actor: Actor) {
     return { createdByKind: "collector", createdById: actor.customerId };
   }
   return { createdByKind: "desk", createdById: actor.email };
+}
+
+/**
+ * The subset of a built snapshot a document row stores. `text` rides along so
+ * the stored record itself carries every sentence the reader was shown (R44),
+ * not only the parts the renderer recomputes from.
+ */
+function frozenFields(value: FrozenSnapshot) {
+  return {
+    templateVersion: value.templateVersion,
+    templateLegalStatus: value.templateLegalStatus,
+    contract: value.contract,
+    scale: value.scale,
+    schedule: value.schedule,
+    clauses: value.clauses,
+    collectionLines: value.collectionLines,
+    facts: value.facts,
+    label: value.label,
+    text: value.text,
+  };
+}
+
+function failureCodeOf(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  return {
+    failureCode: message.slice(0, 80),
+    monitorCode: /^[A-Z0-9_]{1,80}$/.test(message) ? message : fallback,
+  };
 }
 
 function appEnv(env: NodeJS.ProcessEnv) {
@@ -139,7 +175,11 @@ async function reconcileBuilding(db: Database, store: DocumentStore, row: typeof
   return updated ?? row;
 }
 
-async function freezeSnapshot(db: QueryDb, agreement: typeof liveAgreements.$inferSelect) {
+/**
+ * Every member of the agreement, whatever its status: a request's pieces are
+ * `reserved`, an executed repo's are `live`, and the document names them all.
+ */
+async function freezeSnapshot(db: QueryDb, agreement: LiveAgreementRow) {
   const pieces = await livePieces(db, agreement.id);
   return buildAgreementSnapshot({
     sellerName: agreement.ownerName,
@@ -173,17 +213,7 @@ export async function buildAgreementDocument(
     if (!snapshot.ok || !snapshot.value) {
       throw new Error(snapshot.errors[0] ?? "SCALE_UNFROZEN");
     }
-    const frozen = {
-      templateVersion: snapshot.value.templateVersion,
-      templateLegalStatus: snapshot.value.templateLegalStatus,
-      contract: snapshot.value.contract,
-      scale: snapshot.value.scale,
-      schedule: snapshot.value.schedule,
-      clauses: snapshot.value.clauses,
-      collectionLines: snapshot.value.collectionLines,
-      facts: snapshot.value.facts,
-      label: snapshot.value.label,
-    };
+    const frozen = frozenFields(snapshot.value);
     const documentId = randomUUID();
     const created = actorMeta(actor);
     let building: typeof agreementDocuments.$inferSelect | undefined;
@@ -263,10 +293,7 @@ export async function buildAgreementDocument(
       const recovered = await reconcileBuilding(db, store, current);
       if (recovered.status === "stored") return recovered;
     }
-    const failureCode = error instanceof Error ? error.message : "DOCUMENT_BUILD_FAILED";
-    const monitorCode = /^[A-Z0-9_]{1,80}$/.test(failureCode)
-      ? failureCode
-      : "DOCUMENT_BUILD_FAILED";
+    const { failureCode, monitorCode } = failureCodeOf(error, "DOCUMENT_BUILD_FAILED");
     await captureOperationalErrorOnce(
       error,
       {
@@ -277,19 +304,226 @@ export async function buildAgreementDocument(
     );
     const [failed] = await db
       .update(agreementDocuments)
-      .set({ status: "failed", failureCode: failureCode.slice(0, 80), objectKey })
+      .set({ status: "failed", failureCode, objectKey })
       .where(and(eq(agreementDocuments.id, documentId), eq(agreementDocuments.status, "building")))
       .returning();
     throw new Error(failed?.failureCode ?? failureCode);
   }
 }
 
+/**
+ * Freeze a request's snapshot and insert its `building` row inside the
+ * caller's transaction (KTD11, KTD27). The bytes are rendered after commit by
+ * `renderStageDocument`; the object key is fixed here so the two agree.
+ *
+ * No retry loop: `agreement_documents_stage_uidx` allows one usable document
+ * per (agreement, version, stage), and a second insert is a real conflict.
+ */
+export async function insertStageDocumentRow(
+  tx: QueryDb,
+  agreement: LiveAgreementRow,
+  stage: DocumentStage,
+  actor: Actor,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  const snapshot = await freezeSnapshot(tx, agreement);
+  if (!snapshot.ok || !snapshot.value) {
+    throw new Error(snapshot.errors[0] ?? "SCALE_UNFROZEN");
+  }
+  return insertStageRowFromSnapshot(tx, agreement, stage, frozenFields(snapshot.value), actorMeta(actor), env);
+}
+
+async function insertStageRowFromSnapshot(
+  tx: QueryDb,
+  agreement: LiveAgreementRow,
+  stage: DocumentStage,
+  frozen: ReturnType<typeof frozenFields>,
+  created: ReturnType<typeof actorMeta>,
+  env: NodeJS.ProcessEnv,
+  // A retry of a failed row re-uses the frozen snapshot as stored; jsonb does
+  // not preserve key order, so the hash must travel with it rather than be
+  // recomputed from the round-tripped object.
+  hash = snapshotHash(frozen),
+) {
+  const documentId = randomUUID();
+  const objectKey = agreementObjectKey({
+    appEnv: appEnv(env),
+    customerId: agreement.customerId,
+    liveAgreementId: agreement.id,
+    version: agreement.version,
+    documentId,
+  });
+  try {
+    const [row] = await tx
+      .insert(agreementDocuments)
+      .values({
+        id: documentId,
+        liveAgreementId: agreement.id,
+        customerId: agreement.customerId,
+        version: agreement.version,
+        supersedesDocumentId: await latestStoredId(tx, agreement.id),
+        templateVersion: frozen.templateVersion,
+        status: "building",
+        stage,
+        snapshot: frozen,
+        snapshotHash: hash,
+        objectKey,
+        createdByKind: created.createdByKind,
+        createdById: created.createdById,
+      })
+      .returning();
+    return row;
+  } catch (error) {
+    if (uniqueConstraint(error) === "agreement_documents_stage_uidx") {
+      throw new Error("DOCUMENT_VERSION_CONFLICT");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Render a `building` stage row into its object and mark it `stored`.
+ * Idempotent: a row that is no longer building is returned untouched, and a
+ * put that finds the object already there is accepted when the bytes match.
+ * Runs as an after-commit job, so it records a failure instead of throwing.
+ */
+export async function renderStageDocument(
+  db: Database,
+  documentId: string,
+  store: DocumentStore | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<DocumentRow | null> {
+  const [row] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, documentId)).limit(1);
+  if (!row) return null;
+  if (row.status !== "building") return row;
+  const objectKey = row.objectKey ?? agreementObjectKey({
+    appEnv: appEnv(env),
+    customerId: row.customerId,
+    liveAgreementId: row.liveAgreementId,
+    version: row.version,
+    documentId: row.id,
+  });
+  try {
+    if (!store) throw new Error("DOCUMENT_STORE_UNAVAILABLE");
+    const pdf = await renderAgreementSnapshotPdf(row.snapshot as FrozenSnapshot);
+    if (!pdf.ok || !pdf.bytes) {
+      throw new Error(pdf.errors[0] ?? "CONTRACT_PDF_FAILED");
+    }
+    const checksum = sha256Hex(pdf.bytes);
+    try {
+      await store.putIfAbsent(objectKey, pdf.bytes, checksum);
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== "OBJECT_EXISTS") throw error;
+      const existing = await store.get(objectKey);
+      if (sha256Hex(existing) !== checksum || existing.byteLength !== pdf.bytes.byteLength) {
+        // Another render of this same row got there first; its row wins.
+        const [current] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, row.id)).limit(1);
+        if (current && current.status !== "building") return current;
+        throw new Error("OBJECT_EXISTS");
+      }
+    }
+    const [stored] = await db
+      .update(agreementDocuments)
+      .set({
+        status: "stored",
+        objectKey,
+        checksum,
+        bytes: pdf.bytes.byteLength,
+        storedAt: new Date(),
+        failureCode: null,
+      })
+      .where(and(eq(agreementDocuments.id, row.id), eq(agreementDocuments.status, "building")))
+      .returning();
+    if (stored) return stored;
+    const [current] = await db.select().from(agreementDocuments).where(eq(agreementDocuments.id, row.id)).limit(1);
+    return current ?? row;
+  } catch (error) {
+    const { failureCode, monitorCode } = failureCodeOf(error, "DOCUMENT_BUILD_FAILED");
+    try {
+      await captureOperationalErrorOnce(
+        error,
+        {
+          operation: "agreement_document.render",
+          errorCode: monitorCode,
+          recordId: row.id,
+        },
+      );
+      const [failed] = await db
+        .update(agreementDocuments)
+        .set({ status: "failed", failureCode, objectKey })
+        .where(and(eq(agreementDocuments.id, row.id), eq(agreementDocuments.status, "building")))
+        .returning();
+      return failed ?? row;
+    } catch {
+      return row;
+    }
+  }
+}
+
+function stageKey(row: DocumentRow) {
+  return `${row.liveAgreementId}\u0000${row.version}\u0000${row.stage}`;
+}
+
+/**
+ * Render on read (KTD27). A stage row still `building` is rendered now; a
+ * `failed` one with no usable sibling gets a fresh `building` row for the same
+ * (agreement, version, stage) — the partial unique index admits it because
+ * failed rows are excluded — and that row is rendered. Legacy rows keep their
+ * own reconcile path. Without a store there is nothing to render into, so the
+ * rows are returned as they are rather than flipped to failed.
+ */
+async function renderStageDocumentsOnRead(
+  db: Database,
+  rows: DocumentRow[],
+  store: DocumentStore | undefined,
+  env: NodeJS.ProcessEnv,
+) {
+  if (!store) return { rows, changed: false };
+  const usable = new Set(
+    rows.filter((row) => row.stage !== "legacy" && row.status !== "failed").map(stageKey),
+  );
+  let changed = false;
+  const reattempted = new Set<string>();
+  for (const row of rows) {
+    if (row.stage === "legacy") continue;
+    if (row.status === "building") {
+      await renderStageDocument(db, row.id, store, env);
+      changed = true;
+      continue;
+    }
+    if (row.status !== "failed" || usable.has(stageKey(row)) || reattempted.has(stageKey(row))) continue;
+    reattempted.add(stageKey(row));
+    const [agreement] = await db.select().from(liveAgreements).where(eq(liveAgreements.id, row.liveAgreementId)).limit(1);
+    if (!agreement) continue;
+    let fresh: DocumentRow | undefined;
+    try {
+      fresh = await insertStageRowFromSnapshot(
+        db,
+        { ...agreement, version: row.version },
+        row.stage as DocumentStage,
+        row.snapshot as ReturnType<typeof frozenFields>,
+        { createdByKind: row.createdByKind, createdById: row.createdById },
+        env,
+        row.snapshotHash,
+      );
+    } catch (error) {
+      // A concurrent reader inserted the fresh row first; the re-read picks it up.
+      if (!(error instanceof Error) || error.message !== "DOCUMENT_VERSION_CONFLICT") throw error;
+    }
+    if (fresh) await renderStageDocument(db, fresh.id, store, env);
+    changed = true;
+  }
+  return { rows, changed };
+}
+
 export async function listAgreementDocuments(
   db: Database,
   actor: Actor,
   filter: { liveAgreementId?: string; customerId?: string } = {},
+  store?: DocumentStore,
+  env: NodeJS.ProcessEnv = process.env,
 ) {
-  const clauses = [];
+  const clauses: SQL[] = [];
   if (actor.role === "collector") {
     clauses.push(eq(agreementDocuments.customerId, actor.customerId));
   } else if (filter.customerId) {
@@ -298,11 +532,54 @@ export async function listAgreementDocuments(
   if (filter.liveAgreementId) {
     clauses.push(eq(agreementDocuments.liveAgreementId, filter.liveAgreementId));
   }
-  const query = db.select().from(agreementDocuments);
-  const rows = clauses.length
-    ? await query.where(and(...clauses)).orderBy(desc(agreementDocuments.version))
-    : await query.orderBy(desc(agreementDocuments.version));
-  return rows;
+  const query = () => {
+    const base = db.select().from(agreementDocuments);
+    return clauses.length
+      ? base.where(and(...clauses)).orderBy(desc(agreementDocuments.version), desc(agreementDocuments.createdAt))
+      : base.orderBy(desc(agreementDocuments.version), desc(agreementDocuments.createdAt));
+  };
+  const rows = await query();
+  const rendered = await renderStageDocumentsOnRead(db, rows, store, env);
+  return rendered.changed ? query() : rows;
+}
+
+/** A stage row a reader asked for, rendered now if it still owes its object. */
+async function readyStageDocument(
+  db: Database,
+  row: DocumentRow,
+  store: DocumentStore,
+  env: NodeJS.ProcessEnv,
+) {
+  if (row.stage === "legacy") return row;
+  if (row.status === "building") return (await renderStageDocument(db, row.id, store, env)) ?? row;
+  if (row.status !== "failed") return row;
+  const siblings = await db
+    .select()
+    .from(agreementDocuments)
+    .where(
+      and(
+        eq(agreementDocuments.liveAgreementId, row.liveAgreementId),
+        eq(agreementDocuments.version, row.version),
+        eq(agreementDocuments.stage, row.stage),
+      ),
+    )
+    .orderBy(desc(agreementDocuments.createdAt));
+  const rendered = await renderStageDocumentsOnRead(db, siblings, store, env);
+  if (!rendered.changed) return row;
+  const [latest] = await db
+    .select()
+    .from(agreementDocuments)
+    .where(
+      and(
+        eq(agreementDocuments.liveAgreementId, row.liveAgreementId),
+        eq(agreementDocuments.version, row.version),
+        eq(agreementDocuments.stage, row.stage),
+        eq(agreementDocuments.status, "stored"),
+      ),
+    )
+    .orderBy(desc(agreementDocuments.createdAt))
+    .limit(1);
+  return latest ?? row;
 }
 
 export async function mintAgreementDocumentUrl(
@@ -310,8 +587,9 @@ export async function mintAgreementDocumentUrl(
   actor: Actor,
   input: { documentId: string },
   store: DocumentStore,
+  env: NodeJS.ProcessEnv = process.env,
 ) {
-  const row = await scopedDocument(db, actor, input.documentId);
+  const row = await readyStageDocument(db, await scopedDocument(db, actor, input.documentId), store, env);
   const reconciled = await reconcileBuilding(db, store, row);
   if (reconciled.status !== "stored" || !reconciled.objectKey || !reconciled.checksum || reconciled.bytes == null) {
     throw new Error("DOCUMENT_NOT_FOUND");
