@@ -105,44 +105,49 @@ export default function AgreementDetailPage() {
       })
     : { ok: false, errors: ["AGREEMENT_NOT_FOUND"], value: null };
 
+  async function loadDocuments(): Promise<{ mode: "browser" | "live" | "unavailable"; documents: ListedDocument[] }> {
+    if (!agreement) return { mode: "browser", documents: [] };
+    const response = await fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreement.id)}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const body = (await response.json().catch(() => null)) as {
+      mode?: string;
+      error?: string;
+      documents?: ListedDocument[];
+      events?: RetailThreadEvent[];
+    } | null;
+    if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
+      window.location.replace("/admin/password");
+      return { mode: "browser", documents: [] };
+    }
+    if (body?.mode === "live") {
+      const listed = Array.isArray(body.documents) ? body.documents : [];
+      setBookMode("live");
+      setDocuments(listed);
+      setThreadEvents(Array.isArray(body.events) ? body.events : []);
+      return { mode: "live", documents: listed };
+    }
+    if (body?.mode === "unavailable") {
+      // A missing live prerequisite is not browser mode: no preview mint, no stored list.
+      setBookMode("unavailable");
+      setDocuments([]);
+      return { mode: "unavailable", documents: [] };
+    }
+    setBookMode("browser");
+    setDocuments([]);
+    return { mode: "browser", documents: [] };
+  }
+
   useEffect(() => {
     if (!agreement) return;
     let cancelled = false;
-    fetch(`/api/agreement-documents?liveAgreementId=${encodeURIComponent(agreement.id)}`, {
-      credentials: "include",
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => null)) as {
-          mode?: string;
-          error?: string;
-          documents?: ListedDocument[];
-          events?: RetailThreadEvent[];
-        } | null;
-        if (cancelled) return;
-        if (body?.error === "PASSWORD_ROTATION_REQUIRED") {
-          window.location.replace("/admin/password");
-          return;
-        }
-        if (body?.mode === "live") {
-          setBookMode("live");
-          setDocuments(Array.isArray(body.documents) ? body.documents : []);
-          setThreadEvents(Array.isArray(body.events) ? body.events : []);
-        } else if (body?.mode === "unavailable") {
-          // A missing live prerequisite is not browser mode: no preview mint, no stored list.
-          setBookMode("unavailable");
-          setDocuments([]);
-        } else {
-          setBookMode("browser");
-          setDocuments([]);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setBookMode("browser");
-          setDocuments([]);
-        }
-      });
+    loadDocuments().catch(() => {
+      if (!cancelled) {
+        setBookMode("browser");
+        setDocuments([]);
+      }
+    });
     return () => {
       cancelled = true;
     };
@@ -336,15 +341,32 @@ export default function AgreementDetailPage() {
     }
     setRequestBusy(true);
     setSignError("");
-    const current = documents.find((row) => row.version === (agreement.version ?? 1) && row.snapshotHash)
-      ?? documents.find((row) => row.snapshotHash);
-    const snapshotHash = current?.snapshotHash && /^[0-9a-f]{64}$/i.test(current.snapshotHash)
+    let loaded: { mode: "browser" | "live" | "unavailable"; documents: ListedDocument[] };
+    try {
+      loaded = await loadDocuments();
+    } catch {
+      setRequestBusy(false);
+      setSignError("This agreement is still preparing. Try again in a moment.");
+      return;
+    }
+    const listed = loaded.documents;
+    const current = listed.find((row) => row.version === (agreement.version ?? 1) && row.snapshotHash)
+      ?? listed.find((row) => row.snapshotHash);
+    const serverHash = current?.snapshotHash && /^[0-9a-f]{64}$/i.test(current.snapshotHash)
       ? current.snapshotHash
-      : await hashSnapshot(snapshot.ok ? snapshot.value : {
-          id: agreement.id,
-          version: agreement.version ?? 1,
-          amount: agreement.amount,
-        });
+      : "";
+    // Live signing binds to the stored proposal hash. A client-built hash
+    // cannot match those frozen fields, so wait rather than send a stale one.
+    if (loaded.mode === "live" && !serverHash) {
+      setRequestBusy(false);
+      setSignError("This agreement is still preparing. Try again in a moment.");
+      return;
+    }
+    const snapshotHash = serverHash || await hashSnapshot(snapshot.ok ? snapshot.value : {
+      id: agreement.id,
+      version: agreement.version ?? 1,
+      amount: agreement.amount,
+    });
     const result = await signCollectorRequest(agreement.id, {
       typedName: typedName.trim(),
       snapshotHash,

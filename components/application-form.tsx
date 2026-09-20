@@ -91,10 +91,14 @@ export function RequestBuilder({ backHref = "/collection" }: { backHref?: string
     0,
   );
   const parsedTyped = typedAmount == null ? null : parseAmount(typedAmount);
-  const amountNumber = parsedTyped == null || !parsedTyped
+  // null = still following the maximum; a cleared or zero field stays empty
+  // so Apply can ask for an amount instead of sending the cap.
+  const amountNumber = parsedTyped == null
     ? maxPurchase
-    : Math.min(parsedTyped, maxPurchase || parsedTyped);
-  const amount = amountNumber ? amountNumber.toLocaleString("en-US") : "";
+    : Math.min(parsedTyped || 0, maxPurchase || 0);
+  const amount = parsedTyped == null
+    ? (maxPurchase ? maxPurchase.toLocaleString("en-US") : "")
+    : (amountNumber ? amountNumber.toLocaleString("en-US") : "");
 
   function toggle(id: string, checked: boolean) {
     setUnticked((prev) => (checked ? prev.filter((item) => item !== id) : [...prev, id]));
