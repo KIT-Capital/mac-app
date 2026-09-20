@@ -79,7 +79,9 @@ app/api/          mail + desk-session + contract PDF
 components/       collector/desk UI + shadcn primitives
 lib/              auth, store, mail, theme, types
 neon.ts           Neon config (Auth off)
+CONCEPTS.md       shared domain vocabulary (entities, named processes, status concepts)
 docs/             project contract — see docs/README.md
+docs/solutions/   documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (module, tags, problem_type)
 e2e/              Playwright
 tools/kit-guard/  payload boundary check
 tools/harness/    read-only structural check + neon-ping

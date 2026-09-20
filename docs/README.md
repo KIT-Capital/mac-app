@@ -1,6 +1,6 @@
 # Docs index
 
-**Tier: CONTRACT** · Last verified: 2026-09-19
+**Tier: CONTRACT** · Last verified: 2026-09-20
 
 This is a **router, not a summary**. Mechanical Art Capital is a Next.js collector/desk app. Norfolk Kit client-safe tooling is equipped at `bf25a84ca761379ecfc8656793fec1f377f4b28a`. `product-os.lock.json` is **proposed**, not signed or adopted.
 
@@ -9,7 +9,9 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | You are changing… | Read first |
 |---|---|
 | Starting, assessing, or Kit tooling | `kit-equip-record.md` · `product-os-adoption.md` · `../AGENTS.md` |
-| Lifecycle, evaluation, testing | `harness.md` · `../AGENTS.md` |
+| Lifecycle, evaluation, testing | `harness.md` · `../AGENTS.md` · `solutions/` |
+| Domain vocabulary (env mapping, fixture, live book) | `../CONCEPTS.md` · `workflows.md` |
+| GitHub Actions `test:db`, `APP_ENV=ci`, Neon mapping | `config-and-env-map.md` · `solutions/` · `../CONCEPTS.md` · `runbooks/restore-drill.md` |
 | Agent names or identities | `agent-naming.md` |
 | UI, styling, components, brand | `design-system.md` · `design-reference.md` |
 | Hosting, Railway, DNS, mail domain | `hosting.md` · `config-and-env-map.md` |
@@ -40,6 +42,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | `design-reference.md` | CONTRACT | 2022 Limus deck + language overrides |
 | `security.md` | CONTRACT | Auth, desk cookie, data handling |
 | `config-and-env-map.md` | REFERENCE | Env/Doppler key names only |
+| `../CONCEPTS.md` | REFERENCE | Shared domain vocabulary (env mapping and accreted terms) |
 | `hosting.md` | REFERENCE | Railway + Cloudflare |
 | `product-os-adoption.md` | CONTRACT | How Kit adopts a Product OS pin |
 | `harness.md` | REFERENCE | Work cycle and read-only check |
@@ -48,6 +51,9 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | `setup/` | REFERENCE | Editor operator setup |
 | `decisions/` | CONTRACT | One record per decision |
 | `plans/` | REFERENCE | Living plans, including production persistence |
+| `solutions/` | REFERENCE | Documented solutions (YAML frontmatter: module, tags, problem_type) |
+| `runbooks/` | REFERENCE | Operator drills (restore preview, never a live branch) |
+| `superpowers/` | REFERENCE | Design specs that accompany a living plan |
 
 ## Tiers
 

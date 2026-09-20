@@ -1,6 +1,6 @@
 # Design system
 
-**Tier: CONTRACT** · Last verified: 2026-09-19
+**Tier: CONTRACT** · Last verified: 2026-09-20
 
 Mechanical Art Capital visual contract. Source: Limus Design 14 November 2022 and official Logo-FF. Details and screen list live in `design-reference.md`. This file is what agents must not “improve” locally.
 
@@ -35,6 +35,12 @@ Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plu
 - Desk tutorial: `/admin/guide`, listed as Tutorial inside the admin wall. Collectors cannot open it.
 - Opt-in phone review: `?view=phone` stages the collector at iPhone width on a computer. Default chrome stays full-bleed with no device frame. `?view=desktop` or **Show full screen** leaves that review.
 
+## Interaction
+
+- Enabled native `button` elements share one global press: 1px down, 0.98 scale, slight dim. Disabled buttons stay still. Links and `[role="button"]` do not get this treatment. Reduced-motion users get the same pressed state with no transition.
+- Collector tap targets use `.mac-tap` (44×44).
+- A few existing native buttons also set Tailwind `active:scale-*` (full-width submits at 0.99, social icon buttons at 0.95). Do not add new local press treatments.
+
 ## Tenant overlay (proposed)
 
 Default tenant is Mechanical Art Capital. Do not restyle it. Decision `0004`: a **non-MAC** tenant may store its own navy/gold/champagne equivalents, wordmark, and logo objects. Only that tenant’s Super Admin writes those tokens. Implementation waits on `docs/plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Geist remains the face. Catalog sparkle (appraiser, gold) is an allowed control once that plan ships; it must not appear as a second brand mark.
@@ -49,3 +55,4 @@ Keep slide layouts. Rewrite loan words. MAC buys; the collector may buy back. No
 - Linking the desk from collector nav.
 - Showing vault location or buyback scale on collector screens before an application is sent.
 - New reusable patterns that are not added here.
+- Ripples, press JavaScript, sound, vibration, or a new local press treatment.

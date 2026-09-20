@@ -24,6 +24,8 @@ Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-l
 
 Forbidden on retail copy: loan, lender, interest, debt, vesting, paid off.
 
+Environment-mapping words (`APP_ENV`, fixture environment, Neon ci, live-book flag) live in `CONCEPTS.md`. Visual chrome stays in `design-system.md`.
+
 ## Users
 
 Two planes. One email cannot be both.
