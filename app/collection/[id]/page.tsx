@@ -80,7 +80,10 @@ export default function WatchDetailPage() {
     normalizeRequiredPhotoKinds(settings.requiredPhotoKinds),
     { allowDataUrls: bookMode !== "live" },
   );
-  const canSend = !underReview && !closed && !held && missingKinds.length === 0;
+  // An accepted piece already has its number; its one action is the repo
+  // application, not another submission that would spend a scarce decision.
+  const sendable = !underReview && !closed && !held && view.word !== "accepted";
+  const canSend = sendable && missingKinds.length === 0;
 
   async function send() {
     if (!watch || sending) return;
@@ -196,6 +199,16 @@ export default function WatchDetailPage() {
                 {CLOSED_PHRASE}
               </p>
             ) : null}
+            {view.returnedAttempt?.responseNote ? (
+              <div className="mt-3 border-t border-mac-line pt-3">
+                <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FCB040] uppercase">
+                  MAC asked for a change before deciding
+                </p>
+                <p className="mt-1 text-[13px] text-mac-fg">
+                  {view.returnedAttempt.responseNote}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {/* Informational band. The appraisal value above is the business number. */}
@@ -254,7 +267,7 @@ export default function WatchDetailPage() {
           </div>
 
           {/* One primary action (R29) */}
-          {!underReview && !closed ? (
+          {sendable ? (
             <div className="space-y-3">
               <div>
                 <label

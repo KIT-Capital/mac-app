@@ -200,6 +200,9 @@ test.describe("desk", () => {
     await expect(page.getByText("$150,000")).toBeVisible();
     await expect(page.getByText(/Provisional — physical inspection required/i)).toBeVisible();
     await expect(page.getByText(/attempt 1 of 3/i)).toBeVisible();
+    // An accepted piece has one action: the repo application, not a resubmission.
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Apply to Sell/i })).toBeVisible();
 
     await page.goto("/appraisal");
     await expect(page.getByText("UR-100V")).toBeVisible();
@@ -227,6 +230,27 @@ test.describe("desk", () => {
     await expect(page.getByText(/does not meet the MAC appraisal criteria/i)).toBeVisible();
     await expect(page.getByText(/attempt 1 of 3/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Edit details/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Send for appraisal" })).toBeEnabled();
+  });
+
+  test("appraiser returns a submission and the collector reads what to fix", async ({ page }) => {
+    await signInHale(page);
+    await addTimepieceWithPhotos(page, "Urwerk", "UR-100V");
+    await sendForAppraisal(page);
+    await signOutFromMenu(page);
+
+    await signInAppraiser(page);
+    await openDeskReview(page, "UR-100V");
+    await page.getByLabel("What should the collector fix?").fill("Add a clearer caseback photo.");
+    await page.getByRole("button", { name: "Return with note" }).click();
+    await signOutFromMenu(page);
+
+    await signInHale(page);
+    await page.getByRole("link", { name: /UR-100V/ }).click();
+    await expect(page.getByText(/MAC asked for a change before deciding/i)).toBeVisible();
+    await expect(page.getByText("Add a clearer caseback photo.")).toBeVisible();
+    // A return costs no decision, and the piece is the collector's again.
+    await expect(page.getByText(/attempt \d of 3/i)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send for appraisal" })).toBeEnabled();
   });
 
