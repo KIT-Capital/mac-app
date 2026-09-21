@@ -1826,11 +1826,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         );
       },
       updateTenantBrand: async (id, patch) => {
-        if (!canEditTenantBrand(state.user)) {
-          return { ok: false, error: "ROLE_FORBIDDEN" };
-        }
         const current = state.tenants.find((row) => row.id === id);
         if (!current) return { ok: false, error: "TENANT_NOT_FOUND" };
+        if (!canEditTenantBrand(state.user, id)) {
+          return { ok: false, error: "ROLE_FORBIDDEN" };
+        }
         let next;
         try {
           next = applyTenantBrandPatch(current, patch);

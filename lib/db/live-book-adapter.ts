@@ -597,7 +597,9 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       tx.select().from(catalogReferences).where(eq(catalogReferences.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(catalogBrands).where(eq(catalogBrands.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(agreementShells),
-      tx.select().from(tenants),
+      isRetailActor(actor)
+        ? tx.select().from(tenants).where(eq(tenants.id, DEFAULT_TENANT_ID))
+        : tx.select().from(tenants),
       isRetailActor(actor)
         ? tx.select({ id: applications.id })
             .from(applications)

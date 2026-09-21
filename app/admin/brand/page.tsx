@@ -103,7 +103,7 @@ export default function AdminBrandPage() {
           <Field label="Display name">
             <input
               value={form.name}
-              disabled={macLocked}
+              disabled={macLocked || !canCreate}
               onChange={(event) => setDraft({ ...form, name: event.target.value })}
               className="w-full bg-transparent py-1 text-[16px] outline-none disabled:text-white/40"
             />
@@ -118,14 +118,15 @@ export default function AdminBrandPage() {
           <Field label="From name">
             <input
               value={form.fromName}
+              disabled={!macLocked && !canCreate}
               onChange={(event) => setDraft({ ...form, fromName: event.target.value })}
-              className="w-full bg-transparent py-1 text-[16px] outline-none"
+              className="w-full bg-transparent py-1 text-[16px] outline-none disabled:text-white/40"
             />
           </Field>
           <Field label="Logo URL">
             <input
               value={form.logoUrl}
-              disabled={macLocked}
+              disabled={macLocked || !canCreate}
               placeholder={macLocked ? "Logo-FF" : "/brand/mark.svg or https://…"}
               onChange={(event) => setDraft({ ...form, logoUrl: event.target.value })}
               className="w-full bg-transparent py-1 text-[16px] outline-none disabled:text-white/40"
@@ -136,7 +137,7 @@ export default function AdminBrandPage() {
               <Field key={key} label={key}>
                 <input
                   value={form.palette[key]}
-                  disabled={macLocked}
+                  disabled={macLocked || !canCreate}
                   onChange={(event) =>
                     setDraft({
                       ...form,

@@ -919,8 +919,8 @@ async function executeLiveBookOperationCore(
 
   if (action === "tenant.update") {
     requireDesk(actor);
-    if (!canEditTenantBrand(actor)) throw new Error("ROLE_FORBIDDEN");
     const tenantId = String(operation.id);
+    if (!canEditTenantBrand(actor, tenantId)) throw new Error("ROLE_FORBIDDEN");
     const [row] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).for("update").limit(1);
     if (!row) throw new Error("TENANT_NOT_FOUND");
     const next = applyTenantBrandPatch(tenantFromRow(row), operation.patch);

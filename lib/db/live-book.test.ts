@@ -658,7 +658,15 @@ describe("live-book operation repository", { skip }, () => {
       }),
       { message: "MAC_BRAND_LOCKED" },
     );
-    await executeLiveBookOperation(db, otherSuper, {
+    await assert.rejects(
+      () => executeLiveBookOperation(db, otherSuper, {
+        action: "tenant.update",
+        id: created.tenant.id,
+        patch: { palette: { primary: "#1B3A4B", accent: "#E8B931", soft: "#E6D5C3" } },
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    await executeLiveBookOperation(db, master, {
       action: "tenant.update",
       id: created.tenant.id,
       patch: { palette: { primary: "#1B3A4B", accent: "#E8B931", soft: "#E6D5C3" }, fromName: "Desk Demo Notices" },
@@ -672,6 +680,9 @@ describe("live-book operation repository", { skip }, () => {
     assert.equal(fromName.tenant.palette.primary, "#0E2A44");
     const book = await readLiveBookState(db, master);
     assert.equal(book.tenants.some((row) => row.id === created.tenant.id), true);
+    const viewer = await collector("brand-scope");
+    const retailBook = await readLiveBookState(db, viewer.actor);
+    assert.deepEqual(retailBook.tenants.map((row) => row.id), ["tenant-mac"]);
     await executeLiveBookOperation(db, master, {
       action: "tenant.update",
       id: "tenant-mac",
