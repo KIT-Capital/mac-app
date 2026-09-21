@@ -1,6 +1,6 @@
 # Design system
 
-**Tier: CONTRACT** · Last verified: 2026-09-20
+**Tier: CONTRACT** · Last verified: 2026-09-21
 
 Mechanical Art Capital visual contract. Source: Limus Design 14 November 2022 and official Logo-FF. Details and screen list live in `design-reference.md`. This file is what agents must not “improve” locally.
 
@@ -24,7 +24,7 @@ Geist (`next/font/google`) is the app face. Do not switch to Inter or IBM Plex t
 
 ## Brand mark
 
-Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plus MECHANICAL ART CAPITAL on splash and sign-in. On dark, the gear is **solid white**, never a hollow outline or a white plate. Chrome uses the gear mark. No MB&F mark. No Norfolk brand tree.
+Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plus MECHANICAL ART CAPITAL on splash and sign-in. On dark, the gear is **solid white**, never a hollow outline or a white plate. Chrome uses the gear mark. No MB&F mark under the MAC preset. No Norfolk brand tree.
 
 ## Layout
 
@@ -41,9 +41,9 @@ Official Logo-FF only: black gear, gray arc, three gold pinions with jewels, plu
 - Collector tap targets use `.mac-tap` (44×44).
 - A few existing native buttons also set Tailwind `active:scale-*` (full-width submits at 0.99, social icon buttons at 0.95). Do not add new local press treatments.
 
-## Tenant overlay (proposed)
+## Two brand presets
 
-Default tenant is Mechanical Art Capital. Do not restyle it. Decision `0004`: a **non-MAC** tenant may store its own navy/gold/champagne equivalents, wordmark, and logo objects. Only that tenant’s Super Admin writes those tokens. Implementation waits on `docs/plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Geist remains the face. Catalog sparkle (appraiser, gold) is an allowed control once that plan ships; it must not appear as a second brand mark.
+Default tenant is Mechanical Art Capital. Do not restyle it. A super admin may switch the live desk to the **MB&F** preset; that overlay is allowed only while selected, and MB&F assets stay placeholder until authorized. Geist remains the face. Catalog Sparkle (appraiser, gold) is an allowed control; it must not appear as a second brand mark. Per-tenant brand rows beyond these two presets wait on `docs/plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`.
 
 ## Language (overrides the 2022 deck)
 
@@ -53,6 +53,6 @@ Keep slide layouts. Rewrite loan words. MAC buys; the collector may buy back. No
 
 - Nested device frames around the collector app.
 - Linking the desk from collector nav.
-- Showing vault location or buyback scale on collector screens before an application is sent.
+- Showing vault location on collector screens before an application is sent. The buyback scale is shown live in the Apply picker.
 - New reusable patterns that are not added here.
 - Ripples, press JavaScript, sound, vibration, or a new local press treatment.

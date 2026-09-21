@@ -103,4 +103,4 @@ Copy `.env.example` to `.env.local` and set `RESEND_API_KEY`. Until a key is pre
 
 Mechanical Art Capital is a repo desk: it **buys** qualifying timepieces and the collector may **buy them back** later on a preset pricing scale. This is not a loan, there is no interest rate, and the collector app must not describe it as one.
 
-Custody location and the pricing scale stay off collector screens until an application is sent (contact inquiry or repurchase application). The desk still stores those values internally.
+Custody location stays off collector screens until an application is sent (contact inquiry or repurchase application). The buyback scale is shown live in the Apply picker before anything is sent. The desk still stores those values internally.

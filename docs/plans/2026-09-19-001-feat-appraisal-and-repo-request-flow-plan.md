@@ -2,6 +2,7 @@
 title: Appraisal and Repo Request Flow - Plan
 type: feat
 date: 2026-09-19
+status: completed
 deepened: 2026-09-19
 amended: 2026-09-20 (owner — no negotiation; 7-day appraisal validity; inspection re-appraisal)
 artifact_contract: ce-unified-plan/v1
@@ -19,7 +20,7 @@ execution: code
 - **Stop conditions.** Stop and report if a unit would change which dollar drives the LTV cap, raise the 60% purchase share, post cash, enable Neon Auth or WorkOS, add a server file proxy, or auto-migrate `localStorage`.
 - **Execution profile.** One PR per unit on `KIT-Capital/mac-app`, dependency order below, gates green before merge. Migrations apply to Neon `development` only through `npm run db:migrate`.
 - **Tail.** Merge on green is standing authorization. Production migrate and `MAC_LIVE_BOOK` flip stay owner actions.
-- **Shipped.** U1 (#53), U2 (#55), U3 (#56), U4 (#57), U5 (#58, #59, #60). Next in order: U10.
+- **Shipped.** U1 (#53), U2 (#55), U3 (#56), U4 (#57), U5 (#58, #59, #60), U6–U8, U10–U11, U12 (#69, #70), U13 (#71). U9 is this documentation unit.
 - **Owner amendment 2026-09-20.** The app exists to avoid negotiation. The Desk only confirms or declines a request; nobody lowers or counter-offers. An Accept is valid for repo purposes for 7 days. At inspection MAC re-appraises every piece and may reprice; the inspected value is final for that repo. Every proposal states that MAC accepts only after physical inspection and other checks, will re-appraise each piece, and reserves the right not to execute. Rules R12, R13, R15, R33, R42–R45, KTD6, KTD8, and units U10, U11, U6, U7, U8 were rewritten in place; the earlier "lower / ask for less" text is superseded, not preserved.
 
 ---

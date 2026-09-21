@@ -1,6 +1,6 @@
 # Security
 
-**Tier: CONTRACT** · Last verified: 2026-09-18
+**Tier: CONTRACT** · Last verified: 2026-09-21
 
 ## Authentication (current)
 
@@ -107,14 +107,27 @@ Desk-account verbs are fenced by `lib/roles.mjs` and refused with
 super admin creates appraisers or super admins; only the master edits, disables,
 or resets another super admin; super-admin rows are listed only to super
 admins. Every desk role holds the former admin verbs (settings, renew, ends).
-Appraisal-number and MAC-signature fences ship in later units of the roles plan.
+Appraisal-number, inspection, and MAC-signature fences are shipped: only an
+appraiser or super admin writes appraisal values, inspects, or signs for MAC.
 
 ## Data
 
-Browser-mode collection state and photos still live in the browser. Live
-collector and staff identity rows live in Neon. Neon `development` also has
-synthetic product rows for repository tests. Mail payloads go to Resend or the
-in-memory outbox. Do not log secrets, temporary passwords, or cookie tokens.
+Browser-mode collection state and photos still live in the browser. That store is
+a development and Playwright default, not a trust boundary: browser Sign is a
+behavioral mirror, not live evidence, and browser data is not production
+evidence. Live collector and staff identity rows live in Neon. Neon `development`
+also has synthetic product rows for repository tests. Mail payloads go to Resend
+or the in-memory outbox. Do not log secrets, temporary passwords, or cookie tokens.
+
+Appraisal attempt snapshots pin the exact stored photo-object keys and checksums
+the appraiser saw. Those objects stay retention-pinned for the life of the
+attempt; replacing a photo writes a new object and never overwrites a referenced
+key. Stage PDFs (`proposal`, `collector_signed`, `executed`) are checksummed the
+same way.
+
+Live agreement projections sent to a collector omit desk-only fields
+(`customerSuccess`) and desk-internal event rows. The retail-visible events
+thread is the allowlist; do not add a second undocumented collector field.
 
 ## Authorization
 

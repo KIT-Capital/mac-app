@@ -106,7 +106,7 @@ Skipped. Local store and desk/collector patterns are enough. External loan-servi
 - **Any of the three kinds** may be set from open or past due. No required `in liquidation → liquidated` ladder.
 - **Desk UX stays on the list.** Modal or expand-row on `/admin/agreements`. Two columns: signature (Mark signed) and book (label + Record end). No `/admin/agreements/[id]`.
 - **Collector list chip is the book label only.** Detail shows the book label plus the existing Sign / Executed control.
-- **Unsigned repos are in the book.** Hale stays `pending_signature` and reads **past due**.
+- **Unexecuted requests are not on the book.** Decision `0005` (2026-09-21). Hale was mapped once to executed on the day it was created, so it still reads **past due**.
 - **Signature after an end is allowed.** Axes stay independent (prototype HTML sign remains a flag).
 - **Same piece on two repos stays allowed.** The book is per agreement, not per piece.
 - **Staff and admin both record ends.** Collectors never do.

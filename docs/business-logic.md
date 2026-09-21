@@ -1,27 +1,27 @@
 # Business logic
 
-**Tier: CONTRACT** · Last verified: 2026-09-19
+**Tier: CONTRACT** · Last verified: 2026-09-21
 
 Mechanical Art Capital is a **repo desk**. It buys qualifying timepieces. The collector may buy them back later on a preset pricing scale. This app is the **repo operations book** and analytics surface — not the official ledger. Official cash lives in QuickBooks. Official inventory lives with the third-party inventory book.
 
 ## What this rules out
 
 - Describing the product as a loan, lender, interest-bearing advance, or “Get Estimate” financing.
-- Showing custody location or the buyback scale on collector screens before an application (contact inquiry or repurchase application) is sent.
+- Showing vault or custody location on collector screens before an application (contact inquiry or repurchase application) is sent. The buyback scale is shown live in the Apply picker.
 - Auto-valuing a piece after Appraise — only the desk edits valuations (Reviewing → Appraised).
 
 Lifecycle diagrams, owner-language glossary (active / repossessed / liquidation value), and exclusive-piece rules: `workflows.md`. Decision `0003-repo-lifecycle-language.md`. Identity and dealer/appraiser/super-admin changes: `plans/2026-09-19-roles-identity-repo-parties-plan.md` (**approved 2026-09-19, shipping unit by unit**).
 
 ## Roles
 
-**Shipped:** collector on the front; desk roles admin, appraiser, super admin (`lib/roles.mjs`, migrations 0020 and 0021). Master super admin `rc@mechartcap.com`, Dov Tuzman appraiser, Rosario David admin, passwords unset until first sign-in. Desk-account and appraisal fences are live: only an appraiser or super admin writes appraisal values, catalog ranges, or a bulk import carrying them, and only they may move a piece off `appraised`. The MAC-signature fence ships with the repo-request units.
+**Shipped:** collector on the front; desk roles admin, appraiser, super admin (`lib/roles.mjs`, migrations 0020 and 0021). Master super admin `rc@mechartcap.com`, Dov Tuzman appraiser, Rosario David admin, passwords unset until first sign-in. Desk-account, appraisal, and MAC-signature fences are live: only an appraiser or super admin writes appraisal values, catalog ranges, or a bulk import carrying them, only they may move a piece off `appraised`, inspect, or sign for MAC. Admin cannot.
 
 - Collector — vault, add piece, appraise request, repurchase application, membership, account, and the How MAC works tutorial. Adding a piece always requires five guided photographs (front, back, left and right sides of the barrel, clasp or band) and confirmation that the collector has the box and original documentation. A super admin may also require box and/or papers photographs through Desk Configure. Collectors see the shared book label. They do not record an end.
 - Staff / admin — desk console: catalog, assets, agreements, photos, outbound mail, access, config, and the in-wall Tutorial. Staff and admin record, overwrite, or clear a repo end.
 
 **Approved, shipping unit by unit:** collector | dealer on the front of the app; admin | appraiser | super admin on the Desk; exclusive emails; whole-collection buyback only. Implement from the roles plan and `lib/roles.mjs`, not from this summary.
 
-**Appraisal persistence shipped in U3:** `appraisal.submit`, `return`, `decide`, and `reopen` persist immutable attempt snapshots, exact retained photo-object evidence, one deciding appraiser, and at most three completed decisions in both books. The current Request/Appraise UI still uses the legacy status/range path until U4 replaces those button calls; attempt-based locks begin only after a real `appraisal.submit`.
+**Appraisal screens shipped in U4:** the collector sends a piece with **Send for appraisal** and reads one of five words (Not sent / With MAC / Accepted / Not accepted / Closed). The Desk decides on a review screen. One-click Desk Appraise is gone; a value is only written by deciding a submission. `appraisal.submit`, `return`, `decide`, and `reopen` persist immutable attempt snapshots, exact retained photo-object evidence, one deciding appraiser, and at most three completed decisions.
 
 ## Membership
 
@@ -50,7 +50,7 @@ Changing money math needs owner approval and the full review required by
 
 ## Operations book
 
-Every live agreement is read with the same six labels on desk and collector: **open**, **past due**, **bought back**, **in liquidation**, **liquidated**, **renewed**. Pieces stay listed on `watchIds` and do not get their own book labels. A timepiece on an **open**, **past due**, or **in liquidation** repo cannot join another live repo. After **bought back**, **liquidated**, or **renewed**, those pieces are free unless a renewal moved them to the successor.
+Every **executed** agreement is read with the same six labels on desk and collector: **open**, **past due**, **bought back**, **in liquidation**, **liquidated**, **renewed**. Unexecuted requests are not on this book; they use request words (With MAC / Your turn / Closed). Pieces stay listed on `watchIds` and do not get their own book labels. A timepiece on an **open**, **past due**, or **in liquidation** repo cannot join another live repo. After **bought back**, **liquidated**, or **renewed**, those pieces are free unless a renewal moved them to the successor.
 
 - Signature stays `draft` / `pending_signature` / `signed`. Signing does not write a book end. A book end does not change the signature flag.
 - Staff persist one current generic end: kind (`bought_back` | `in_liquidation` | `liquidated`), calendar date, and dollar amount. Staff may overwrite or clear that end. There is no end history in this app. Paid close is **bought back**. Admin **Renew** is the only path to **renewed**: it closes a live repo at that month’s Scenario 60 repurchase dollars and atomically opens a new 12-month repo with the same pieces at that scheduled amount. The collector may add free pieces; they may raise the sale amount only up to the desk LTV cap. Renewal does not post cash.
@@ -61,9 +61,9 @@ Every live agreement is read with the same six labels on desk and collector: **o
   repo's frozen scale. Replacing the current open shell atomically assigns the
   prior shell; the sole open shell cannot be removed or closed without an open
   replacement.
-- **Open** and **past due** are derived. Term date is calendar months from `createdAt`. The last day of the term is still **open**. **Past due** begins the next calendar day. Staff do not toggle those two words.
+- **Open** and **past due** are derived only after `executedOn` exists. Term date is calendar months from that execution date. The last day of the term is still **open**. **Past due** begins the next calendar day. Staff do not toggle those two words.
 - A recorded end always wins. Clearing the end returns the derived label.
-- Unsigned repos stay in the book. The Hale demo (created 2021-03-14, 12 months, pending signature) reads **past due**.
+- Unexecuted requests stay off the book. The Hale demo was mapped once to executed on the day it was created, so it still reads **past due**.
 - Copy stays sale-and-repurchase. Forbidden: loan, lender, interest, debt, vesting, paid off.
 
 ## Production records
