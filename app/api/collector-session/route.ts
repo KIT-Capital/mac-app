@@ -17,12 +17,15 @@ function errorStatus(message: string) {
     message === "COLLECTOR_MAGIC_LINK_ORIGIN_REQUIRED" ||
     message === "COLLECTOR_MAGIC_LINK_ORIGIN_INVALID" ||
     message === "COLLECTOR_ACCESS_EMAIL_REQUIRED"
+    ||
+    message === "COLLECTOR_ACCESS_SMS_UNAVAILABLE"
   ) {
     return 503;
   }
-  if (message === "COLLECTOR_ACCESS_EMAIL_FAILED") return 502;
+  if (message === "COLLECTOR_ACCESS_EMAIL_FAILED" || message === "COLLECTOR_ACCESS_SMS_FAILED") return 502;
   if (
     message === "COLLECTOR_EMAIL_INVALID" ||
+    message === "COLLECTOR_PHONE_INVALID" ||
     message === "COLLECTOR_ACTION_INVALID" ||
     message === "RESERVED_DESK_EMAIL" ||
     message.startsWith("REGISTRATION_")

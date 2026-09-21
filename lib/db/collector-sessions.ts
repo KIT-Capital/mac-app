@@ -228,6 +228,54 @@ export async function redeemCollectorAccessToken(
   });
 }
 
+export async function issueCollectorSessionForCustomer(
+  db: Database,
+  customerId: string,
+  options: { now?: Date; sessionId?: string } = {},
+) {
+  const now = options.now ?? new Date();
+  return db.transaction(async (tx) => {
+    let [customer] = await tx
+      .select()
+      .from(customers)
+      .where(and(
+        eq(customers.id, customerId),
+        eq(customers.tenantId, DEFAULT_TENANT_ID),
+      ))
+      .for("update")
+      .limit(1);
+    if (!customer || !["active", "invited"].includes(customer.status)) {
+      throw new Error("ACCESS_TOKEN_INVALID");
+    }
+    if (customer.status === "invited") {
+      const invited = customer;
+      [customer] = await tx.update(customers).set({
+        status: "active",
+        updatedAt: now,
+      }).where(and(
+        eq(customers.id, invited.id),
+        customerEmailOnDefaultTenant(invited.email),
+        eq(customers.status, "invited"),
+      )).returning();
+      if (!customer) {
+        [customer] = await tx.select().from(customers).where(and(
+          eq(customers.id, invited.id),
+          customerEmailOnDefaultTenant(invited.email),
+          eq(customers.status, "active"),
+        )).limit(1);
+      }
+      if (!customer) throw new Error("ACCESS_TOKEN_INVALID");
+    }
+    const sessionId = options.sessionId ?? randomUUID();
+    await tx.insert(collectorSessions).values({
+      id: sessionId,
+      customerId: customer.id,
+      expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
+    });
+    return { customer, sessionId, redirectPath: "/collection" as const };
+  });
+}
+
 export async function consumeDeskLoginCode(
   db: Database,
   input: { secret: string; email: string; code: string; now?: Date },

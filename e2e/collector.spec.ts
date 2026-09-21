@@ -32,6 +32,12 @@ test.describe("collector app", () => {
     await expect(page.getByText(/continue with google|continue with apple/i)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "MAC desk staff" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Use phone" })).toBeVisible();
+    await page.getByRole("button", { name: "Use phone" }).click();
+    await expect(page.getByLabel("Phone Number")).toBeVisible();
+    await expect(page.getByLabel("Email Address")).toHaveCount(0);
+    await expect(page.locator("#login-password")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Use email" })).toBeVisible();
   });
 
   test("an unusable verification link shows one safe retry path", async ({ page }) => {
@@ -61,6 +67,12 @@ test.describe("collector app", () => {
     await expect(page.getByText(/lasts 15 minutes and works once/i)).toBeVisible();
     await expect(page.getByLabel("Sign-in code")).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign up" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Use phone" }).click();
+    await page.getByLabel("Phone Number").fill("212 555 0100");
+    await page.getByRole("button", { name: "Send code" }).click();
+    await expect(page.getByText(/check your phone for a sign-in code/i)).toBeVisible();
+    await expect(page.getByLabel("Sign-in code")).toBeVisible();
 
     await page.goto("/signup");
     await page.getByLabel("Full Legal Name").fill("Ada Locke");
