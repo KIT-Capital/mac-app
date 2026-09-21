@@ -115,6 +115,10 @@ Sentry code is installed but project creation remains an owner gate. Once approv
 | `EXA_API_KEY` | Sparkle first research adapter | Optional | Desk catalog only; unset means Sparkle returns `SPARKLE_UNAVAILABLE` and writes no rows |
 | `FIRECRAWL_API_KEY` | Sparkle Firecrawl adapter | Optional | Used after Exa for the one brand or model the appraiser clicked |
 | `APIFY_TOKEN` | Sparkle Apify adapter | Optional | Second scrape adapter; never scheduled or bulk |
+| `TWILIO_ACCOUNT_SID` | Twilio Verify + WhatsApp | Optional | Norfolk AI account until MAC cutover; names only |
+| `TWILIO_AUTH_TOKEN` | Twilio Verify + WhatsApp | Optional | Never logged; Sentry scrubs this name |
+| `TWILIO_VERIFY_SERVICE_SID` | Retail SMS login codes | Optional | Email codes still work when unset |
+| `TWILIO_WHATSAPP_FROM` | Retail WhatsApp From | Optional | Must look like `whatsapp:+15551234567`. Unset means notices stay on email |
 
 ## Production fail-closed rule
 

@@ -35,6 +35,11 @@ test.describe("desk", () => {
     expect(response.status()).toBe(403);
   });
 
+  test("WhatsApp inbox requires a desk session", async ({ request }) => {
+    const response = await request.get("/api/desk/whatsapp");
+    expect(response.status()).toBe(403);
+  });
+
   test("live-book import requires a desk session and does not change the store", async ({ request }) => {
     const response = await request.post("/api/desk/live-book-import", {
       headers: sameOrigin,

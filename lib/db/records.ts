@@ -43,6 +43,7 @@ const DEFAULT_PREFERENCES = {
   pushNotifications: true,
   emailUpdates: true,
   smsUpdates: false,
+  whatsappUpdates: false,
   preferredContact: "email",
   language: "en",
 };

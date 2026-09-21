@@ -1145,3 +1145,31 @@ export const agreementDocumentSends = pgTable(
     ),
   ],
 );
+
+/** Retail WhatsApp thread. Desk people are never parties. */
+export const whatsappMessages = pgTable(
+  "whatsapp_messages",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
+    customerId: text("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    direction: text("direction").notNull(),
+    phone: text("phone").notNull(),
+    body: text("body").notNull(),
+    providerSid: text("provider_sid"),
+    kind: text("kind"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("whatsapp_messages_tenant_id_idx").on(table.tenantId),
+    index("whatsapp_messages_customer_id_idx").on(table.customerId),
+    index("whatsapp_messages_created_at_idx").on(table.createdAt),
+    uniqueIndex("whatsapp_messages_provider_sid_uidx")
+      .on(table.providerSid)
+      .where(sql`${table.providerSid} is not null`),
+    check("whatsapp_messages_direction_check", sql`${table.direction} in ('inbound', 'outbound')`),
+  ],
+);

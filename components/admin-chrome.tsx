@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  MessageCircle,
   Sliders,
   Smartphone,
   Users2,
@@ -31,6 +32,7 @@ const LINKS = [
   { href: "/admin/agreements", label: "Repo Agreements", icon: FileText },
   { href: "/admin/photos", label: "Photo Vault", icon: Camera },
   { href: "/admin/mail", label: "Outbound Mail", icon: Mail },
+  { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
 ];
 
 export function AdminChrome({

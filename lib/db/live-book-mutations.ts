@@ -21,6 +21,7 @@ import {
 } from "@/lib/contract/repo-scale.mjs";
 import { parseLiveBookOperation } from "@/lib/live-book-operation.mjs";
 import { dispatchMail } from "@/lib/mail";
+import { dispatchRetailWhatsAppNotice } from "@/lib/whatsapp.server";
 import { isLiveBookEnabled } from "@/lib/env/live-book-flag.mjs";
 import type { Agreement } from "@/lib/types";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS } from "@/lib/theme";
@@ -361,17 +362,28 @@ function noticeMail(
   context: OperationContext,
   message = "",
 ) {
-  return async () => dispatchMail({
-    kind,
-    name: agreement.ownerName,
-    email: agreement.email,
-    watch: agreement.agreementCode ?? "",
-    amount: String(centsToDollars(agreement.amountCents)),
-    delivery: agreement.delivery,
-    termMonths: agreement.termMonths,
-    message,
-    brandPreset: await deskBrandPreset(context.rootDb),
-  }, { env: context.env, sendEmail: context.sendEmail });
+  return async () => {
+    await dispatchMail({
+      kind,
+      name: agreement.ownerName,
+      email: agreement.email,
+      watch: agreement.agreementCode ?? "",
+      amount: String(centsToDollars(agreement.amountCents)),
+      delivery: agreement.delivery,
+      termMonths: agreement.termMonths,
+      message,
+      brandPreset: await deskBrandPreset(context.rootDb),
+    }, { env: context.env, sendEmail: context.sendEmail });
+    try {
+      await dispatchRetailWhatsAppNotice({
+        email: agreement.email,
+        name: agreement.ownerName,
+        kind,
+      }, context.env);
+    } catch {
+      // Email remains the durable notice path.
+    }
+  };
 }
 
 function renderThen(
