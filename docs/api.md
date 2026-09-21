@@ -108,11 +108,13 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 ## `POST` / `PATCH` / `DELETE` `/api/desk-session`
 
 - `POST` verifies the development runtime fixture only in browser-mode
-  development, otherwise a live Neon staff row. Unknown and disabled emails share
-  the same **401**. When live identity is fully configured, a correct password
-  without a code returns **202** `{ needsCode: true }` and emails a six-digit
-  desk code; a passwordless seeded row returns **202** `{ setup: true }` and
-  emails a first-password link. Success sets a session-only `mac_desk` token with
+  development, otherwise a live Neon staff row. When live identity is fully
+  configured and no code is sent, the answer is always **202** `{ needsCode: true }`.
+  A matching password emails a six-digit desk code. A passwordless seeded row
+  emails a first-password link. Callers cannot tell those states apart, and
+  unknown or wrong passwords get the same **202** with no mail. A submitted
+  code that does not match still shares **401** with unknown and disabled
+  emails. Success sets a session-only `mac_desk` token with
   key id, role, 12-hour expiry, and forced-rotation flag.
 - `POST /api/desk-session/first-password` consumes a `desk_set_password` link
   and writes the first hash in the same transaction. It does not open a desk

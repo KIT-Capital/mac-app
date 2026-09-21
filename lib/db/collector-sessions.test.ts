@@ -375,6 +375,62 @@ describe("collector access rows", { skip }, () => {
     }
   });
 
+  it("stops extra collector code guesses after the email window", async () => {
+    const previous = {
+      MAC_LIVE_BOOK: process.env.MAC_LIVE_BOOK,
+      APP_ENV: process.env.APP_ENV,
+      COLLECTOR_SESSION_SECRET: process.env.COLLECTOR_SESSION_SECRET,
+      COLLECTOR_MAGIC_LINK_ORIGIN: process.env.COLLECTOR_MAGIC_LINK_ORIGIN,
+      RESEND_API_KEY: process.env.RESEND_API_KEY,
+    };
+    Object.assign(process.env, {
+      MAC_LIVE_BOOK: "1",
+      COLLECTOR_SESSION_SECRET: SECRET,
+      COLLECTOR_MAGIC_LINK_ORIGIN: "http://localhost:43173",
+      RESEND_API_KEY: "test-api-key",
+    });
+    try {
+      const owner = await collector("guess-limit");
+      const code = "424242";
+      const id = randomUUID();
+      await db.insert(collectorAccessTokens).values({
+        id,
+        tokenHash: hashAccessCode(SECRET, owner.email, code),
+        customerId: owner.id,
+        purpose: "login",
+        expiresAt: new Date(Date.now() + 15 * 60_000),
+      });
+      tokenIds.push(id);
+      const guess = (value: string) => verifyPost(new Request(
+        "https://mechart.app/api/collector-session/verify",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "sec-fetch-site": "same-origin",
+            "x-forwarded-for": "198.51.100.24",
+          },
+          body: JSON.stringify({ email: owner.email, code: value }),
+        },
+      ));
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const response = await guess("000000");
+        assert.equal(response.status, 400);
+      }
+      const blocked = await guess(code);
+      assert.equal(blocked.status, 400);
+      const [row] = await db.select({ consumedAt: collectorAccessTokens.consumedAt })
+        .from(collectorAccessTokens)
+        .where(eq(collectorAccessTokens.id, id));
+      assert.equal(row.consumedAt, null);
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
   it("lets two collectors share a six-digit code because hashes bind email", async () => {
     const firstOwner = await collector("code-a");
     const secondOwner = await collector("code-b");
@@ -467,6 +523,46 @@ describe("collector access rows", { skip }, () => {
       }),
       /ACCESS_TOKEN_INVALID/,
     );
+  });
+
+  it("rate-limits first-password guesses by address before hashing", async () => {
+    const staffId = randomUUID();
+    const email = `desk-set-limit.${suffix}@mac.test`;
+    await db.insert(staffAccounts).values({
+      id: staffId,
+      name: "Desk Set Limit",
+      email,
+      role: "admin",
+    });
+    staffIds.push(staffId);
+    const issued = await issue({
+      purpose: "desk_set_password",
+      staffId,
+      email,
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(issued.id);
+    const address = `203.0.113.${suffix.slice(-2)}`;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await assert.rejects(
+        () => completeDeskSetPassword(db, {
+          token: `wrong-link-${attempt}`,
+          newPassword: "first desk password 123",
+          clientAddress: address,
+        }),
+        /ACCESS_TOKEN_INVALID/,
+      );
+    }
+    await assert.rejects(
+      () => completeDeskSetPassword(db, {
+        token: issued.token,
+        newPassword: "first desk password 123",
+        clientAddress: address,
+      }),
+      /ACCESS_TOKEN_INVALID/,
+    );
+    const [staff] = await db.select().from(staffAccounts).where(eq(staffAccounts.id, staffId));
+    assert.equal(staff.passwordHash, null);
   });
 
   it("sweeps only rows beyond their retention windows", async () => {

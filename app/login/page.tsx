@@ -26,16 +26,10 @@ export default function LoginPage() {
       role: DeskRole;
       mustRotate?: boolean;
       needsCode?: boolean;
-      setup?: boolean;
     };
-    if (authenticated.setup) {
-      setNotice("Check your email for a secure link to set your desk password. It lasts 15 minutes and works once.");
-      setBusy(false);
-      return;
-    }
     if (authenticated.needsCode) {
       setAwaitingCode(true);
-      setNotice("Check your email for a sign-in code. It lasts 15 minutes and works once.");
+      setNotice("Check your email to continue. It lasts 15 minutes and works once.");
       setBusy(false);
       return;
     }

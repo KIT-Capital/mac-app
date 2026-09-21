@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clientAddress } from "@/lib/access-rate-limit.mjs";
 import {
   COLLECTOR_COOKIE,
   collectorCookieOptions,
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     return invalidRedirect(request);
   }
   try {
-    const verified = await verifyCollectorAccess(token, email);
+    const verified = await verifyCollectorAccess(token, email, clientAddress(request.headers));
     if (wantsJson) {
       const response = NextResponse.json({
         ok: true,

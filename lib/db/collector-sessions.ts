@@ -264,10 +264,31 @@ export async function completeDeskSetPassword(
   const newPassword = String(input.newPassword ?? "");
   if (newPassword.length < 12) throw new Error("PASSWORD_TOO_WEAK");
   if (!String(input.clientAddress ?? "").trim()) throw new Error("CLIENT_ADDRESS_REQUIRED");
+  const now = input.now ?? new Date();
+  const attempt = await consumeAccessRateLimit(db, {
+    scope: "desk-set-password",
+    key: input.clientAddress,
+    limit: 8,
+    windowMs: 15 * 60_000,
+    now,
+  });
+  if (!attempt.allowed) throw new Error("ACCESS_TOKEN_INVALID");
+  const [preview] = await db
+    .select()
+    .from(collectorAccessTokens)
+    .where(and(
+      eq(collectorAccessTokens.tokenHash, linkHash(input.token)),
+      eq(collectorAccessTokens.purpose, "desk_set_password"),
+      isNull(collectorAccessTokens.consumedAt),
+      gt(collectorAccessTokens.expiresAt, now),
+    ))
+    .limit(1);
+  if (!preview) throw new Error("ACCESS_TOKEN_INVALID");
+  const payload = preview.registrationPayload as { staffId?: string } | null;
+  if (!payload?.staffId) throw new Error("ACCESS_TOKEN_INVALID");
   const serialized = await hashStaffPassword(newPassword);
   const parsed = parseStaffPasswordHash(serialized);
   if (!parsed) throw new Error("STAFF_PASSWORD_HASH_INVALID");
-  const now = input.now ?? new Date();
   return db.transaction(async (tx) => {
     const [candidate] = await tx
       .select()

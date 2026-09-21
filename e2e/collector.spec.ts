@@ -71,6 +71,17 @@ test.describe("collector app", () => {
     await expect(page.getByText(/check your email for a sign-in code/i)).toBeVisible();
     await expect(page.getByLabel("Sign-in code")).toBeVisible();
     await expect(page.getByRole("link", { name: /already registered/i })).toBeVisible();
+
+    await page.route("**/api/collector-session/verify", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, redirect: "/collection" }),
+      });
+    });
+    await page.getByLabel("Sign-in code").fill("424242");
+    await page.getByRole("button", { name: "Confirm code" }).click();
+    await expect(page).toHaveURL(/\/collection$/);
   });
 
   test("Hale collection shows demo pieces and photographs", async ({ page }) => {

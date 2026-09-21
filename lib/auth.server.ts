@@ -11,6 +11,7 @@ import {
   verifyStaffCredentials,
 } from "@/lib/db/staff-accounts";
 import {
+  consumeAccessRateLimit,
   consumeDeskLoginCode,
   createCollectorAccessToken,
 } from "@/lib/db/collector-sessions";
@@ -69,7 +70,7 @@ export async function authenticateDeskAccount(
   clientAddress: string,
   env: Environment = process.env,
   code?: string,
-): Promise<{ staff: NonNullable<ReturnType<typeof developmentDeskFixture>> | Awaited<ReturnType<typeof verifyStaffCredentials>> } | { pending: "code" | "setup" }> {
+): Promise<{ staff: NonNullable<ReturnType<typeof developmentDeskFixture>> | Awaited<ReturnType<typeof verifyStaffCredentials>> } | { pending: "code" }> {
   if (deskAuthenticationMode(env) === "development-fixture") {
     return { staff: developmentDeskFixture(email, password, env) };
   }
@@ -84,6 +85,13 @@ export async function authenticateDeskAccount(
       address: clientAddress,
     });
     if (!staff) return { staff: null };
+    const attempt = await consumeAccessRateLimit(db, {
+      scope: "desk-code-verify",
+      key: staff.email,
+      limit: 8,
+      windowMs: 15 * 60_000,
+    });
+    if (!attempt.allowed) return { staff: null };
     try {
       await consumeDeskLoginCode(db, {
         secret: live.secret,
@@ -99,32 +107,47 @@ export async function authenticateDeskAccount(
   if (live.enabled && live.ok && !trimmedCode) {
     const row = await findStaffByEmail(db, email);
     if (row && !row.disabledAt && !hasPassword(row)) {
-      const issued = await createCollectorAccessToken(db, {
-        purpose: "desk_set_password",
-        secret: live.secret,
-        staffId: row.id,
-        email: row.email,
-        expiresAt: new Date(Date.now() + 15 * 60_000),
+      const issueLimit = await consumeAccessRateLimit(db, {
+        scope: "desk-login-issue",
+        key: row.email,
+        limit: 3,
+        windowMs: 60 * 60_000,
       });
-      const setUrl = new URL("/admin/password/set", live.origin);
-      setUrl.searchParams.set("token", issued.token);
-      try {
-        await dispatchCollectorAccessMail({
-          to: row.email,
-          name: row.name,
-          action: "desk_set_password",
-          url: setUrl.toString(),
-          tokenId: issued.id,
+      if (issueLimit.allowed) {
+        const issued = await createCollectorAccessToken(db, {
+          purpose: "desk_set_password",
+          secret: live.secret,
+          staffId: row.id,
+          email: row.email,
+          expiresAt: new Date(Date.now() + 15 * 60_000),
         });
-      } catch {
-        return { staff: null };
+        const setUrl = new URL("/admin/password/set", live.origin);
+        setUrl.searchParams.set("token", issued.token);
+        try {
+          await dispatchCollectorAccessMail({
+            to: row.email,
+            name: row.name,
+            action: "desk_set_password",
+            url: setUrl.toString(),
+            tokenId: issued.id,
+          });
+        } catch {
+          return { pending: "code" };
+        }
       }
-      return { pending: "setup" };
+      return { pending: "code" };
     }
     const staff = await verifyStaffCredentials(db, email, password, {
       address: clientAddress,
     });
     if (staff) {
+      const issueLimit = await consumeAccessRateLimit(db, {
+        scope: "desk-login-issue",
+        key: staff.email,
+        limit: 3,
+        windowMs: 60 * 60_000,
+      });
+      if (!issueLimit.allowed) return { pending: "code" };
       const issued = await createCollectorAccessToken(db, {
         purpose: "desk_login",
         secret: live.secret,
@@ -141,7 +164,7 @@ export async function authenticateDeskAccount(
           tokenId: issued.id,
         });
       } catch {
-        return { staff: null };
+        return { pending: "code" };
       }
     }
     return { pending: "code" };

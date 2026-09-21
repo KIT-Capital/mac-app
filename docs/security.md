@@ -40,10 +40,12 @@ remain disabled.
 
 An invited collector may request the same non-enumerating login code. Successful
 verification atomically activates that exact customer ID and email before issuing
-the session. Suspended collectors remain blocked. Login-code limits are stored in
-Postgres per email and forwarded address; unknown, suspended, and active emails
-receive the same accepted response. Address windows are observed but not enforced
-until the production forwarding smoke in the go-live runbook.
+the session. Suspended collectors remain blocked. Login-code **send** limits are
+stored in Postgres per email and forwarded address; unknown, suspended, and
+active emails receive the same accepted response. Address windows are observed
+but not enforced until the production forwarding smoke in the go-live runbook.
+Code **guess** limits are enforced: eight tries per email and twenty per
+forwarded address in fifteen minutes, then the same invalid response.
 
 ### Production runs live only
 
@@ -76,7 +78,10 @@ password verifies against the fixed dummy hash and is refused even on a match,
 so it can never sign in until its first password is set. Unknown and disabled
 emails use the same dummy path. A passwordless row cannot be given a temporary
 password by another desk member (`PASSWORD_NOT_SET`); it gets a first sign-in
-link at `/admin/password/set`. If the bootstrap email names a seeded passwordless
+link at `/admin/password/set`. Live `POST /api/desk-session` without a code
+always answers **202** `{ needsCode: true }` whether that mail is a desk code
+or a first-password link. First-password matching peeks the token before scrypt
+and rate-limits eight tries per address in fifteen minutes. If the bootstrap email names a seeded passwordless
 row, bootstrap sets that row's password and keeps its seeded role.
 Failed password attempts atomically reserve both per-email and per-address
 Postgres windows before scrypt, limiting concurrent memory use; successful

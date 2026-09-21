@@ -10,7 +10,7 @@ import { useStore } from "@/lib/store";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signUp } = useStore();
+  const { signUp, signIn } = useStore();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -39,14 +39,20 @@ export default function SignupPage() {
         setBusy(false);
         return;
       }
-      signUp({
-        name,
-        email,
-        phone: phone || "+1 (212) 555-0100",
-        member: false,
-      });
+      const result = await verified.json().catch(() => null) as { redirect?: string } | null;
+      const redirect = result?.redirect || "/collection/setup";
+      if (redirect === "/collection") {
+        signIn({ email: email.trim(), role: "collector" });
+      } else {
+        signUp({
+          name,
+          email,
+          phone: phone || "+1 (212) 555-0100",
+          member: false,
+        });
+      }
       setBusy(false);
-      router.push("/collection/setup");
+      router.push(redirect);
       return;
     }
     if (!name || !email.includes("@")) {

@@ -37,8 +37,7 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       accepted: true,
-      needsCode: result.pending === "code",
-      setup: result.pending === "setup",
+      needsCode: true,
     }, { status: 202 });
   }
   const staff = result.staff;
