@@ -22,6 +22,8 @@ describe("tenant member ID allocation", { skip }, () => {
     assert.ok(mac);
     assert.equal(mac.code, DEFAULT_TENANT_CODE);
     assert.equal(mac.name, "Mechanical Art Capital");
+    assert.equal(mac.primaryColor, "#0E2A44");
+    assert.equal(mac.fromName, "Mechanical Art Capital");
   });
 
   it("allocates PREFIX#####-YY per tenant and never reuses a number", async () => {

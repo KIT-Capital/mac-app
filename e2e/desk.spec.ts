@@ -47,6 +47,7 @@ test.describe("desk", () => {
     await expect(page.getByText("MAC00001-21")).toBeVisible();
     await expect(page.getByText("jonathan.hale@mechartcap.com")).toBeVisible();
     await expect(page.getByText("admin@mechartcap.com")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Brand" })).toHaveCount(0);
     await page.getByRole("link", { name: "Repos" }).click();
     await page.getByRole("tab", { name: "Book" }).click();
     await expect(page.getByText("Jonathan Hale · MAC00001-21")).toBeVisible();

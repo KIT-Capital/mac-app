@@ -66,6 +66,9 @@ describe("live-book adapter mapping", () => {
     assert.equal(state.timepieces[0].valueLow, 280000);
     assert.equal(state.timepieces[0].ownerEmail, "jonathan.hale@mechartcap.com");
     assert.equal(state.users[0].memberId, "MAC00001-21");
+    assert.equal(state.tenants[0].id, "tenant-mac");
+    assert.equal(state.tenants[0].name, "Mechanical Art Capital");
+    assert.equal(state.tenants[0].palette.primary, "#0E2A44");
     assert.equal(state.profiles["jonathan.hale@mechartcap.com"].memberId, "MAC00001-21");
     assert.deepEqual(state.agreements[0], {
       id: "agr-31419",

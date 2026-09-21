@@ -1,13 +1,39 @@
 import { and, eq, sql } from "drizzle-orm";
 import { DEFAULT_TENANT_ID, formatMemberId } from "../tenant.mjs";
+import type { TenantBrand } from "../types";
 import type { Database } from "./client";
 import { customers, tenants } from "./schema";
 
 const MAX_SEQUENCE = 99999;
 
-/** Login and registration look up people on the seeded MAC tenant until U-brand exists. */
+/** Login and registration look up people on the seeded MAC tenant until a
+ * retail domain per tenant exists. Overlay lives on the tenant row. */
 export function customerEmailOnDefaultTenant(email: string) {
   return and(eq(customers.tenantId, DEFAULT_TENANT_ID), eq(customers.email, email));
+}
+
+export function tenantFromRow(row: {
+  id: string;
+  code: string;
+  name: string;
+  logoUrl: string;
+  primaryColor: string;
+  accentColor: string;
+  softColor: string;
+  fromName: string;
+}): TenantBrand {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    logoUrl: row.logoUrl,
+    palette: {
+      primary: row.primaryColor,
+      accent: row.accentColor,
+      soft: row.softColor,
+    },
+    fromName: row.fromName,
+  };
 }
 
 type TenantTx = {

@@ -35,6 +35,7 @@ import {
   liveAgreements,
   livePreviews,
   staffAccounts,
+  tenants,
   timepieces,
 } from "./schema";
 
@@ -42,6 +43,7 @@ const skip = !process.env.DATABASE_URL;
 const suffix = Date.now();
 const customerIds: string[] = [];
 const staffIds: string[] = [];
+const tenantIds: string[] = [];
 let originalSettings: (typeof deskSettings.$inferSelect)[] = [];
 let originalShells: (typeof agreementShells.$inferSelect)[] = [];
 
@@ -82,6 +84,9 @@ describe("live-book operation repository", { skip }, () => {
     }
     if (staffIds.length) {
       await db.delete(staffAccounts).where(inArray(staffAccounts.id, staffIds));
+    }
+    if (tenantIds.length) {
+      await db.delete(tenants).where(inArray(tenants.id, tenantIds));
     }
   });
 
@@ -621,6 +626,68 @@ describe("live-book operation repository", { skip }, () => {
     });
     const afterOther = await readLiveBookState(db, superAdmin);
     assert.equal(afterOther.settings.brandPreset, "mbf");
+  });
+
+  it("lets the master create a tenant overlay without restyling MAC", async () => {
+    const admin = deskActor("admin", "rosario@mechartcap.com");
+    const otherSuper = deskActor("super_admin", "other.super@mechartcap.com");
+    const master = deskActor("super_admin", "rc@mechartcap.com", undefined, true);
+    const code = `Z${suffix.toString(36).replace(/[0-9]/g, (digit) => "ABCDEFGHIJ"[Number(digit)])}`
+      .slice(0, 8)
+      .toUpperCase();
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, { action: "tenant.create", code, name: "Desk Demo" }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, otherSuper, { action: "tenant.create", code, name: "Desk Demo" }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    const created = await executeLiveBookOperation(db, master, {
+      action: "tenant.create",
+      code,
+      name: "Desk Demo",
+    }) as { tenant: { id: string; code: string } };
+    tenantIds.push(created.tenant.id);
+    assert.equal(created.tenant.code, code);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, master, {
+        action: "tenant.update",
+        id: "tenant-mac",
+        patch: { palette: { primary: "#1B3A4B", accent: "#E8B931", soft: "#E6D5C3" } },
+      }),
+      { message: "MAC_BRAND_LOCKED" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, otherSuper, {
+        action: "tenant.update",
+        id: created.tenant.id,
+        patch: { palette: { primary: "#1B3A4B", accent: "#E8B931", soft: "#E6D5C3" } },
+      }),
+      { message: "ROLE_FORBIDDEN" },
+    );
+    await executeLiveBookOperation(db, master, {
+      action: "tenant.update",
+      id: created.tenant.id,
+      patch: { palette: { primary: "#1B3A4B", accent: "#E8B931", soft: "#E6D5C3" }, fromName: "Desk Demo Notices" },
+    });
+    const fromName = await executeLiveBookOperation(db, master, {
+      action: "tenant.update",
+      id: "tenant-mac",
+      patch: { fromName: "MAC Desk" },
+    }) as { tenant: { fromName: string; palette: { primary: string } } };
+    assert.equal(fromName.tenant.fromName, "MAC Desk");
+    assert.equal(fromName.tenant.palette.primary, "#0E2A44");
+    const book = await readLiveBookState(db, master);
+    assert.equal(book.tenants.some((row) => row.id === created.tenant.id), true);
+    const viewer = await collector("brand-scope");
+    const retailBook = await readLiveBookState(db, viewer.actor);
+    assert.deepEqual(retailBook.tenants.map((row) => row.id), ["tenant-mac"]);
+    await executeLiveBookOperation(db, master, {
+      action: "tenant.update",
+      id: "tenant-mac",
+      patch: { fromName: "Mechanical Art Capital" },
+    });
   });
 
   it("reserves appraisal values and catalog writes for appraisers and super admins", async () => {
