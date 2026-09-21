@@ -112,6 +112,9 @@ Sentry code is installed but project creation remains an owner gate. Once approv
 | `R2_REGION` | R2 S3 region | Verified | `auto`; Doppler + Railway |
 | `R2_ACCESS_KEY_ID` | R2 S3 access key | Verified | Doppler + Railway; signs direct uploads and preview reads; never returned or printed |
 | `R2_SECRET_ACCESS_KEY` | R2 S3 secret | Verified | Doppler + Railway; signs direct uploads and preview reads; never returned, printed, or committed |
+| `EXA_API_KEY` | Sparkle first research adapter | Optional | Desk catalog only; unset means Sparkle returns `SPARKLE_UNAVAILABLE` and writes no rows |
+| `FIRECRAWL_API_KEY` | Sparkle Firecrawl adapter | Optional | Used after Exa for the one brand or model the appraiser clicked |
+| `APIFY_TOKEN` | Sparkle Apify adapter | Optional | Second scrape adapter; never scheduled or bulk |
 
 ## Production fail-closed rule
 

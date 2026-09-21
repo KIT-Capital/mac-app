@@ -35,6 +35,8 @@ import {
   sendExecutedDocumentEmails,
 } from "./agreement-documents";
 import { consumeAccessRateLimit } from "./collector-sessions";
+import { SPARKLE_DAILY_LIMIT, SPARKLE_SCOPE, SPARKLE_WINDOW_MS } from "./catalog";
+import { researchCatalog } from "../sparkle/research.mjs";
 import { centsToDollars, dollarsToCents } from "./money.mjs";
 import { closeExpiredRequest, recordAgreementEvent } from "./request-events";
 import {
@@ -60,6 +62,7 @@ import {
   allocations,
   appraisalAttempts,
   applications,
+  catalogBrands,
   catalogReferences,
   collectorSessions,
   customers,
@@ -193,6 +196,37 @@ function requireDesk(actor: Actor) {
 function requireAppraiser(actor: Actor) {
   requireDesk(actor);
   if (!canEditAppraisal(actor)) throw new Error("ROLE_FORBIDDEN");
+}
+
+async function consumeSparkleQuota(db: Database, actor: Actor) {
+  requireAppraiser(actor);
+  const throttle = await consumeAccessRateLimit(db, {
+    scope: SPARKLE_SCOPE,
+    key: isDesk(actor) ? actor.staffId ?? actor.email : actor.email,
+    limit: SPARKLE_DAILY_LIMIT,
+    windowMs: SPARKLE_WINDOW_MS,
+  });
+  if (!throttle.allowed) throw new Error("THROTTLED");
+}
+
+async function researchSparkleSuggestion(
+  db: Database,
+  operation: Operation & Record<string, unknown>,
+  env: NodeJS.ProcessEnv,
+) {
+  const kind = operation.kind === "model" ? "model" : "brand";
+  const sparkleId = String(operation.id);
+  let query = "";
+  if (kind === "brand") {
+    const [row] = await db.select().from(catalogBrands).where(eq(catalogBrands.id, sparkleId)).limit(1);
+    if (!row) throw new Error("CATALOG_BRAND_NOT_FOUND");
+    query = `${row.name} watch models references`;
+  } else {
+    const [row] = await db.select().from(catalogReferences).where(eq(catalogReferences.id, sparkleId)).limit(1);
+    if (!row) throw new Error("CATALOG_ENTRY_NOT_FOUND");
+    query = `${row.brand} ${row.model} ${row.reference} market price`;
+  }
+  return { suggestion: await researchCatalog({ kind, id: sparkleId, query }, env) };
 }
 
 async function ownedPiece(db: Database, actor: Actor, id: string) {
@@ -538,6 +572,7 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "settings.update",
   "catalog.upsert",
   "catalog.remove",
+  "brand.upsert",
   "shell.upsert",
   "shell.remove",
 ]);
@@ -574,6 +609,9 @@ const LOCKED_AGREEMENT_ACTIONS = new Set([
 function auditTargetId(operation: Operation & Record<string, unknown>) {
   if (typeof operation.id === "string") return operation.id;
   if (operation.action === "settings.update") return "default";
+  if (operation.brand && typeof operation.brand === "object") {
+    return String((operation.brand as Record<string, unknown>).id ?? "");
+  }
   if (operation.shell && typeof operation.shell === "object") {
     return String((operation.shell as Record<string, unknown>).id ?? "");
   }
@@ -664,6 +702,35 @@ export async function executeLiveBookOperation(
   }
   if (REQUEST_TRANSITIONS.has(operation.action)) {
     await closeIfExpiredBeforeMove(db, actor, String(operation.id), context);
+  }
+  // Sparkle records the daily cap, then researches outside that transaction so
+  // a missing key or upstream failure cannot unwind the count.
+  if (operation.action === "catalog.sparkle") {
+    if (isDesk(actor) && isLiveBookEnabled(context.env.MAC_LIVE_BOOK) && !actor.staffId) {
+      throw new Error("SESSION_INVALID");
+    }
+    if (isDesk(actor) && isLiveBookEnabled(context.env.MAC_LIVE_BOOK) && actor.staffId) {
+      const staffId = actor.staffId;
+      await db.transaction(async (tx) => {
+        const staff = await lockStaffForDeskMutation(tx, {
+          id: staffId,
+          email: actor.email,
+          role: actor.role,
+        });
+        const trusted = deskActor(staff.role, staff.email, staff.id);
+        await consumeSparkleQuota(tx as unknown as Database, trusted);
+        await writeDeskAudit(
+          tx,
+          staff,
+          operation.action,
+          auditTargetId(operation),
+          options.clientAddress ?? "unknown",
+          {},
+        );
+      });
+      return researchSparkleSuggestion(db, operation, context.env);
+    }
+    return executeLiveBookOperationCore(db, actor, operation, context);
   }
   if (
     isDesk(actor) &&
@@ -828,8 +895,21 @@ async function executeLiveBookOperationCore(
     if (typicalLowCents === null || typicalHighCents === null) {
       throw new Error("CATALOG_ENTRY_INVALID");
     }
+    let brandId = String(entry.brandId ?? "").trim();
+    if (!brandId) {
+      const [found] = await db.select({ id: catalogBrands.id })
+        .from(catalogBrands)
+        .where(sql`lower(${catalogBrands.name}) = lower(${String(entry.brand)})`)
+        .limit(1);
+      brandId = found?.id ?? "";
+    }
+    if (!brandId) throw new Error("CATALOG_BRAND_NOT_FOUND");
+    const retrievedOn = entry.marketRetrievedOn
+      ? new Date(`${String(entry.marketRetrievedOn)}T12:00:00Z`)
+      : null;
     const values = {
       id: String(entry.id),
+      brandId,
       brand: String(entry.brand),
       model: String(entry.model),
       reference: String(entry.reference),
@@ -839,10 +919,19 @@ async function executeLiveBookOperationCore(
       typicalHighCents,
       financeable: Boolean(entry.financeable),
       notes: String(entry.notes),
+      retailVisible: Boolean(entry.retailVisible),
+      photoObjectKey: entry.photoObjectKey ? String(entry.photoObjectKey) : null,
+      photoSourceUrl: String(entry.photoSourceUrl ?? ""),
+      photoLicense: String(entry.photoLicense ?? ""),
+      photoAttribution: String(entry.photoAttribution ?? ""),
+      marketSourceUrls: Array.isArray(entry.marketSourceUrls) ? entry.marketSourceUrls : [],
+      marketRetrievedOn: retrievedOn && !Number.isNaN(retrievedOn.getTime()) ? retrievedOn : null,
+      lastEditedByStaffId: isDesk(actor) ? actor.staffId ?? null : null,
     };
     await db.insert(catalogReferences).values(values).onConflictDoUpdate({
       target: catalogReferences.id,
       set: {
+        brandId: values.brandId,
         brand: values.brand,
         model: values.model,
         reference: values.reference,
@@ -852,10 +941,50 @@ async function executeLiveBookOperationCore(
         typicalHighCents: values.typicalHighCents,
         financeable: values.financeable,
         notes: values.notes,
+        retailVisible: values.retailVisible,
+        photoObjectKey: values.photoObjectKey,
+        photoSourceUrl: values.photoSourceUrl,
+        photoLicense: values.photoLicense,
+        photoAttribution: values.photoAttribution,
+        marketSourceUrls: values.marketSourceUrls,
+        marketRetrievedOn: values.marketRetrievedOn,
+        lastEditedByStaffId: values.lastEditedByStaffId,
         updatedAt: new Date(),
       },
     });
     return;
+  }
+
+  if (action === "brand.upsert") {
+    requireAppraiser(actor);
+    const brand = operation.brand as Record<string, unknown>;
+    const values = {
+      id: String(brand.id),
+      name: String(brand.name),
+      tier: Number(brand.tier) === 2 ? 2 : 1,
+      slug: String(brand.slug),
+      logoAssetKey: brand.logoAssetKey ? String(brand.logoAssetKey) : null,
+      retailVisible: Boolean(brand.retailVisible),
+      sortOrder: Number(brand.sortOrder),
+    };
+    await db.insert(catalogBrands).values(values).onConflictDoUpdate({
+      target: catalogBrands.id,
+      set: {
+        name: values.name,
+        tier: values.tier,
+        slug: values.slug,
+        logoAssetKey: values.logoAssetKey,
+        retailVisible: values.retailVisible,
+        sortOrder: values.sortOrder,
+        updatedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (action === "catalog.sparkle") {
+    await consumeSparkleQuota(db, actor);
+    return researchSparkleSuggestion(db, operation, context.env);
   }
 
   if (action === "catalog.remove") {

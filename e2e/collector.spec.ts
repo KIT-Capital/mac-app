@@ -634,8 +634,10 @@ test.describe("collector app", () => {
     await expect(page.getByRole("link", { name: "Repurchase" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Desk" })).toHaveCount(0);
     await page.getByRole("link", { name: "Partners" }).click();
-    await expect(page.getByText("MB&F")).toBeVisible();
-    await expect(page.getByText("Richard Mille")).toBeVisible();
+    await expect(page.getByText(/still reviewing which names to show/i)).toBeVisible();
+    await openMenu(page);
+    await page.getByRole("link", { name: "Brands we cover" }).click();
+    await expect(page.getByTestId("brands-empty")).toBeVisible();
   });
 
   test("collectors cannot open the desk", async ({ page }) => {

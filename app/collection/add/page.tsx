@@ -14,11 +14,11 @@ import {
   COMPLICATIONS,
   CONDITIONS,
   DIAL_COLORS,
-  MODELS_BY_BRAND,
   STRAP_MATERIALS,
-  TIER_ONE_BRANDS,
+  catalogValuation,
   isDesk,
 } from "@/lib/catalog";
+import { pickerBrandNames, pickerModelsForBrand } from "@/lib/catalog-retail.mjs";
 import { nextId } from "@/lib/ids";
 import { fetchWithTimeout } from "@/lib/fetch-timeout.mjs";
 import { readImageFile, type ImageReadResult } from "@/lib/image";
@@ -70,7 +70,7 @@ function AddFormEditor() {
   const router = useRouter();
   const params = useSearchParams();
   const onboarding = params.get("onboarding") === "1";
-  const { addTimepiece, updateTimepiece, bookMode, catalog, user, settings, timepieces } = useStore();
+  const { addTimepiece, updateTimepiece, bookMode, brands, catalog, user, settings, timepieces } = useStore();
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
   const editingId = params.get("id");
   const existing = timepieces.find((w) => {
@@ -91,17 +91,21 @@ function AddFormEditor() {
   const [hasBox, setHasBox] = useState(() => Boolean(existing));
   const [hasPapers, setHasPapers] = useState(() => Boolean(existing));
   const [videoName, setVideoName] = useState("");
-  const [brand, setBrand] = useState(
-    existing && TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])
-      ? existing.brand
-      : "Audemars Piguet",
-  );
+  const deskPicker = isDesk(user);
+  const brandNames = pickerBrandNames(brands ?? [], catalog ?? [], deskPicker);
+  const [brand, setBrand] = useState(() => {
+    const requested = params.get("brand") ?? "";
+    if (existing && brandNames.includes(existing.brand)) return existing.brand;
+    if (requested && brandNames.includes(requested)) return requested;
+    return brandNames[0] ?? "";
+  });
   const [customBrand, setCustomBrand] = useState(
-    existing && !TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])
-      ? existing.brand
-      : "",
+    existing && !brandNames.includes(existing.brand) ? existing.brand : "",
   );
-  const [model, setModel] = useState(existing?.model ?? "Royal Oak Selfwinding");
+  const [model, setModel] = useState(() => {
+    const requested = params.get("model") ?? "";
+    return existing?.model ?? requested ?? "";
+  });
   const [reference, setReference] = useState(existing?.reference || "");
   const [condition, setCondition] = useState(existing?.condition ?? "Like new");
   const [boxPapers, setBoxPapers] = useState(existing?.boxPapers ?? "Box and papers");
@@ -115,12 +119,12 @@ function AddFormEditor() {
   const [complication, setComplication] = useState(existing?.complication ?? "I don't know");
   const [error, setError] = useState("");
   const [missingBrand, setMissingBrand] = useState(
-    Boolean(existing && !TIER_ONE_BRANDS.includes(existing.brand as (typeof TIER_ONE_BRANDS)[number])),
+    Boolean((existing && !brandNames.includes(existing.brand)) || !brandNames.length),
   );
   const [draftId] = useState(() => nextId("tp"));
 
   const resolvedBrand = missingBrand ? customBrand.trim() : brand;
-  const models = MODELS_BY_BRAND[brand] ?? catalog.filter((c) => c.brand === brand).map((c) => c.model);
+  const models = pickerModelsForBrand(brands ?? [], catalog ?? [], brand, deskPicker);
 
   const persistedImages = images.map((image, index) =>
     bookMode === "live" && slotStates[index] !== "stored" ? "" : image,
@@ -146,7 +150,7 @@ function AddFormEditor() {
         evaluatedAt: existing?.evaluatedAt,
         financeable:
           existing?.financeable ??
-          TIER_ONE_BRANDS.includes(resolvedBrand as (typeof TIER_ONE_BRANDS)[number]),
+          catalogValuation({ brand: resolvedBrand, model }, catalog).financeable,
         condition,
         boxPapers,
         caseMetal,
@@ -175,6 +179,7 @@ function AddFormEditor() {
       model,
       reference,
       resolvedBrand,
+      catalog,
       user?.email,
     ]
   );
@@ -545,7 +550,7 @@ function AddFormEditor() {
             <LineField
               label="Manufacturer / Brand"
               onClear={() => {
-                setBrand(TIER_ONE_BRANDS[0]);
+                setBrand(brandNames[0] ?? "");
                 setCustomBrand("");
                 setMissingBrand(false);
               }}
@@ -562,11 +567,11 @@ function AddFormEditor() {
                   value={brand}
                   onChange={(e) => {
                     setBrand(e.target.value);
-                    const next = MODELS_BY_BRAND[e.target.value]?.[0];
+                    const next = pickerModelsForBrand(brands ?? [], catalog ?? [], e.target.value, deskPicker)[0];
                     if (next) setModel(next);
                   }}
                 >
-                  {TIER_ONE_BRANDS.map((item) => (
+                  {brandNames.map((item) => (
                     <option key={item} value={item} className="bg-mac-card">
                       {item}
                     </option>

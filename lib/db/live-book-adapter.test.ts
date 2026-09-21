@@ -303,6 +303,7 @@ describe("live-book adapter mapping", () => {
     assert.equal(defaults.settings.startingRate, 0.185);
     assert.equal(defaults.settings.minAdvance, 1_000);
     assert.deepEqual(defaults.catalog, []);
+    assert.deepEqual(defaults.brands, []);
     assert.deepEqual(defaults.shells, []);
 
     const state = mapLiveBookRows({

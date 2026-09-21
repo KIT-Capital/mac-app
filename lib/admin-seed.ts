@@ -1,7 +1,10 @@
+import { catalogSeedBrands, catalogSeedModels } from "@/lib/catalog-seed.mjs";
+import { hydrateCatalogBrand, hydrateCatalogEntry } from "@/lib/catalog-retail.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type {
   AgreementShell,
   AppSettings,
+  CatalogBrand,
   CatalogEntry,
   ManagedUser,
   PhotoRecord,
@@ -42,68 +45,8 @@ export const DEMO_USERS: ManagedUser[] = [
   },
 ];
 
-export const DEMO_CATALOG: CatalogEntry[] = [
-  {
-    id: "cat-rm-011",
-    brand: "Richard Mille",
-    model: "RM 011",
-    reference: "RM 011",
-    caseMetal: "Rose gold",
-    caseDiameter: "44mm",
-    typicalLow: 280000,
-    typicalHigh: 350000,
-    financeable: true,
-    notes: "Flyback chronograph. Confirm Felipe Massa variant.",
-  },
-  {
-    id: "cat-pp-5711",
-    brand: "Patek Philippe",
-    model: "Nautilus",
-    reference: "5711/1A",
-    caseMetal: "Steel",
-    caseDiameter: "40mm",
-    typicalLow: 95000,
-    typicalHigh: 120000,
-    financeable: true,
-    notes: "Discontinued steel Nautilus. Box and papers preferred.",
-  },
-  {
-    id: "cat-ap-15400",
-    brand: "Audemars Piguet",
-    model: "Royal Oak Selfwinding",
-    reference: "15400ST",
-    caseMetal: "Steel",
-    caseDiameter: "41mm",
-    typicalLow: 38000,
-    typicalHigh: 48000,
-    financeable: true,
-    notes: "Below typical $40k piece floor unless liquidation supports it.",
-  },
-  {
-    id: "cat-rg-lo",
-    brand: "Romain Gauthier",
-    model: "Logical One",
-    reference: "Logical One",
-    caseMetal: "White gold",
-    caseDiameter: "43mm",
-    typicalLow: 145000,
-    typicalHigh: 175000,
-    financeable: true,
-    notes: "Independent. Desk review required.",
-  },
-  {
-    id: "cat-pp-5524",
-    brand: "Patek Philippe",
-    model: "Calatrava Pilot Travel Time",
-    reference: "5524G",
-    caseMetal: "White gold",
-    caseDiameter: "42mm",
-    typicalLow: 62000,
-    typicalHigh: 78000,
-    financeable: true,
-    notes: "Selected dual-time reference.",
-  },
-];
+export const DEMO_CATALOG_BRANDS: CatalogBrand[] = catalogSeedBrands().map(hydrateCatalogBrand);
+export const DEMO_CATALOG: CatalogEntry[] = catalogSeedModels().map(hydrateCatalogEntry);
 
 export const DEMO_SHELLS: AgreementShell[] = [
   {

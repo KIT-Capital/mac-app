@@ -277,8 +277,19 @@ export type ManagedUser = {
   lastActive: string;
 };
 
+export type CatalogBrand = {
+  id: string;
+  name: string;
+  tier: 1 | 2;
+  slug: string;
+  logoAssetKey: string | null;
+  retailVisible: boolean;
+  sortOrder: number;
+};
+
 export type CatalogEntry = {
   id: string;
+  brandId: string;
   brand: string;
   model: string;
   reference: string;
@@ -288,6 +299,14 @@ export type CatalogEntry = {
   typicalHigh: number;
   financeable: boolean;
   notes: string;
+  retailVisible: boolean;
+  photoObjectKey: string | null;
+  photoSourceUrl: string;
+  photoLicense: string;
+  photoAttribution: string;
+  marketSourceUrls: string[];
+  marketRetrievedOn: string | null;
+  lastEditedByStaffId: string | null;
 };
 
 export type AgreementShell = {
@@ -353,6 +372,7 @@ export type AppState = {
   agreements: Agreement[];
   users: ManagedUser[];
   catalog: CatalogEntry[];
+  brands: CatalogBrand[];
   shells: AgreementShell[];
   photos: PhotoRecord[];
   appraisalAttempts: AppraisalAttempt[];

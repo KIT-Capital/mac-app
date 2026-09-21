@@ -3,29 +3,6 @@ import { isDeskRole } from "@/lib/roles.mjs";
 import { APPLICATION_TERMS } from "@/lib/contract/repo-scale.mjs";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 
-export const TIER_ONE_BRANDS = [
-  "A. Lange & Söhne",
-  "Audemars Piguet",
-  "Christophe Claret",
-  "David Candaux",
-  "De Bethune",
-  "F.P. Journe",
-  "Greubel Forsey",
-  "Grönefeld",
-  "Kari Voutilainen",
-  "Laurent Ferrier",
-  "Maîtres du Temps",
-  "MB&F",
-  "Patek Philippe",
-  "Philippe Dufour",
-  "Richard Mille",
-  "Roger Dubuis",
-  "Rolex",
-  "Romain Gauthier",
-  "Urwerk",
-  "Vacheron Constantin",
-] as const;
-
 export const CONDITIONS = [
   "Unworn",
   "Like new",
@@ -74,16 +51,6 @@ export const DELIVERY_METHODS = [
   "Desk arranges intake",
   "Private appointment",
 ];
-
-export const MODELS_BY_BRAND: Record<string, string[]> = {
-  "Audemars Piguet": ["Royal Oak Selfwinding", "Royal Oak Offshore", "Royal Oak Perpetual Calendar"],
-  "Patek Philippe": ["Nautilus", "Calatrava Pilot Travel Time", "Aquanaut", "Grand Complications"],
-  "Richard Mille": ["RM 011", "RM 027", "RM 035"],
-  "Romain Gauthier": ["Logical One", "Insight Micro-Rotor"],
-  "MB&F": ["HMX", "Legacy Machine", "Horological Machine"],
-  Rolex: ["Daytona", "GMT-Master II", "Day-Date"],
-  "Vacheron Constantin": ["Overseas", "Patrimony", "Traditionnelle"],
-};
 
 export const COMPANY = {
   name: DEFAULT_SETTINGS.companyName,
@@ -187,11 +154,6 @@ export function catalogValuation(
   return {
     valueLow: match?.typicalLow ?? watch.valueLow ?? 40000,
     valueHigh: match?.typicalHigh ?? watch.valueHigh ?? 55000,
-    financeable:
-      match?.financeable ??
-      TIER_ONE_BRANDS.some(
-        (tierOneBrand) =>
-          tierOneBrand.toLowerCase() === watch.brand.trim().toLowerCase(),
-      ),
+    financeable: match?.financeable ?? false,
   };
 }
