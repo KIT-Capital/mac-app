@@ -291,6 +291,15 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   longer apply. `agreement.create`, `agreement.addWatches`, and
   `agreement.setAmount` no longer exist; a piece set or amount change is a
   withdraw and a new request.
+- `agreement.freezeScale` is the exception for a null scale: admin or super
+  admin only, including signed and ended rows. It does not use the mutable
+  fence and does not change amount, term, or a recorded end. Parse still
+  floor-checks the submitted scale; the write derives the stored scale from
+  server settings and the matching-term open shell and ignores the client
+  scale. `WHERE scale IS NULL` plus one audit row in the same transaction; a
+  second freeze is **409** `AGREEMENT_SCALE_FROZEN`. An appraiser is **403**
+  `ADMIN_REQUIRED`. A scale below Scenario 60 floors is **422**
+  `AGREEMENT_SCALE_INVALID`.
 - In live mode `request.submit` and `agreement.renew` ignore any client scale
   and derive the new row's frozen scale and per-piece caps inside the
   transaction from server settings and the open agreement shell. Existing

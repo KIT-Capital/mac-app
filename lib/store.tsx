@@ -29,7 +29,7 @@ import {
 } from "@/lib/appraisal-attempt-apply.mjs";
 import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { planRenewal } from "@/lib/contract/repo-renewal.mjs";
-import { agreementScaleFromDesk, applicationPurchaseShare } from "@/lib/contract/repo-scale.mjs";
+import { agreementScaleFromDesk, applicationPurchaseShare, assertScenario60Floors } from "@/lib/contract/repo-scale.mjs";
 import { applyTransition, hasRecordReturn } from "@/lib/contract/request-transitions.mjs";
 import { nextId } from "@/lib/ids";
 import {
@@ -143,6 +143,7 @@ type Store = AppState & {
   resendExecutedRequest: (id: string, note?: string) => Promise<OperationAck>;
   recordReturnRequest: (id: string, note?: string) => Promise<OperationAck>;
   updateAgreement: (id: string, patch: Partial<Agreement>) => void;
+  freezeAgreementScale: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   removeAgreement: (id: string) => Promise<OperationAck>;
   signAgreement: (id: string) => Promise<OperationAck>;
   recordAgreementEnd: (id: string, end: AgreementEnd) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -1656,6 +1657,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             termMonths: patch.termMonths ?? state.agreements.find((item) => item.id === id)?.termMonths ?? 12,
           },
         }),
+      freezeAgreementScale: async (id) => {
+        const current = refreshStoreFromDisk();
+        const actor = current.user;
+        if (!actor || !isDeskRole(actor.role) || actor.role === "appraiser") {
+          return { ok: false, error: "ADMIN_REQUIRED" };
+        }
+        const agreement = current.agreements.find((item) => item.id === id);
+        if (!agreement) return { ok: false, error: "AGREEMENT_NOT_FOUND" };
+        if (agreement.scale) return { ok: false, error: "AGREEMENT_SCALE_FROZEN" };
+        const openShell = current.shells.find((shell) => (
+          shell.status === "open" && shell.termMonths === agreement.termMonths
+        ));
+        const scale = agreementScaleFromDesk(current.settings, openShell, agreement.termMonths);
+        if (!assertScenario60Floors(scale).ok) return { ok: false, error: "AGREEMENT_SCALE_INVALID" };
+        const acknowledgement = await updateStore((prev) => ({
+          ...prev,
+          agreements: prev.agreements.map((item) => (
+            item.id === id ? { ...item, scale } : item
+          )),
+        }), { operation: { action: "agreement.freezeScale", id, scale }, deferLive: true });
+        if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
+        return { ok: true };
+      },
       removeAgreement: async (id) =>
         updateStore((prev) => ({
           ...prev,

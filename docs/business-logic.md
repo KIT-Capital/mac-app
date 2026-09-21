@@ -61,6 +61,11 @@ Every **executed** agreement is read with the same six labels on desk and collec
   repo's frozen scale. Replacing the current open shell atomically assigns the
   prior shell; the sole open shell cannot be removed or closed without an open
   replacement.
+- Imported and demo repos may still have a null scale. An admin or super admin
+  may freeze the current desk scale onto that row once. The freeze does not
+  change amount, term, or a recorded end, and it is allowed on signed and ended
+  rows. Appraisers cannot freeze. Production starts empty and derives every new
+  scale on create, so no production row is ever null.
 - **Open** and **past due** are derived only after `executedOn` exists. Term date is calendar months from that execution date. The last day of the term is still **open**. **Past due** begins the next calendar day. Staff do not toggle those two words.
 - A recorded end always wins. Clearing the end returns the derived label.
 - Unexecuted requests stay off the book. The Hale demo was mapped once to executed on the day it was created, so it still reads **past due**.

@@ -756,4 +756,35 @@ test.describe("desk", () => {
     await page.getByRole("tab", { name: "Book" }).click();
     await expect(page.getByRole("row").filter({ hasText: "Jonathan Hale" }).getByText("open", { exact: true })).toBeVisible();
   });
+
+  test("appraiser does not see Freeze scale on Hale", async ({ page }) => {
+    await signInAppraiser(page);
+    await openDeskBook(page);
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).click();
+    await expect(page.getByRole("button", { name: "Freeze scale" })).toHaveCount(0);
+    await expect(page.getByText(/paid off|vesting/i)).toHaveCount(0);
+  });
+
+  test("admin freezes Hale scale once and the collector reads frozen terms", async ({ page }) => {
+    await signInDesk(page);
+    await openDeskBook(page);
+    const haleRow = page.getByRole("row").filter({ hasText: "Jonathan Hale" });
+    await haleRow.click();
+    await expect(page.getByRole("button", { name: "Freeze scale" })).toBeVisible();
+    await page.getByRole("button", { name: "Freeze scale" }).click();
+    await expect(page.getByRole("button", { name: "Freeze scale" })).toHaveCount(0);
+    await expect(haleRow.getByText("past due")).toBeVisible();
+    await expect(haleRow.getByText("$200,000")).toBeVisible();
+    await page.goto("/login");
+
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await page.getByRole("link", { name: /MAC-31419/ }).click();
+    await expect(page.getByRole("heading", { name: /Sale of the named collection/i })).toBeVisible();
+    await expect(page.locator("article section h3")).toHaveCount(19);
+    await expect(page.getByRole("heading", { name: /Monthly repurchase schedule/i })).toBeVisible();
+    await expect(page.getByText(/not a loan/i)).toBeVisible();
+    await expect(page.getByText(/Temporary preview — not stored/i)).toBeVisible();
+    await expect(page.getByText(/\bstored document\b/i)).toHaveCount(0);
+  });
 });

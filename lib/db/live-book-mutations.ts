@@ -196,6 +196,11 @@ function requireDesk(actor: Actor) {
   if (!isDesk(actor)) throw new Error("DESK_REQUIRED");
 }
 
+function requireAdmin(actor: Actor) {
+  requireDesk(actor);
+  if (actor.role === "appraiser") throw new Error("ADMIN_REQUIRED");
+}
+
 /**
  * Appraisal numbers and catalog ranges belong to appraisers and super admins.
  * Admins may read them and operate the rest of the desk (R5, KTD2).
@@ -630,6 +635,7 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "request.resendExecuted",
   "request.recordReturn",
   "agreement.updateScale",
+  "agreement.freezeScale",
   "agreement.recordEnd",
   "agreement.clearEnd",
   "agreement.renew",
@@ -668,6 +674,7 @@ const LOCKED_AGREEMENT_ACTIONS = new Set([
   "request.resendExecuted",
   "request.recordReturn",
   "agreement.updateScale",
+  "agreement.freezeScale",
   "agreement.recordEnd",
   "agreement.clearEnd",
   "agreement.renew",
@@ -1397,6 +1404,20 @@ async function executeLiveBookOperationCore(
       termMonths: Number(operation.termMonths),
       updatedAt: new Date(),
     }).where(eq(liveAgreements.id, String(operation.id)));
+    return;
+  }
+
+  if (action === "agreement.freezeScale") {
+    requireAdmin(actor);
+    const agreement = await ownedAgreement(db, actor, String(operation.id));
+    const scale = await serverAgreementScale(db, agreement.termMonths);
+    const updated = await db.update(liveAgreements).set({
+      scale,
+      updatedAt: new Date(),
+    }).where(and(eq(liveAgreements.id, agreement.id), isNull(liveAgreements.scale))).returning({
+      id: liveAgreements.id,
+    });
+    if (!updated[0]) throw new Error("AGREEMENT_SCALE_FROZEN");
     return;
   }
 
