@@ -32,7 +32,7 @@ export default function BrandModelsPage() {
                 <div className="aspect-square overflow-hidden bg-mac-bg">
                   {entry.photoSourceUrl || entry.photoObjectKey ? (
                     <WatchPhoto
-                      src={entry.photoSourceUrl}
+                      src={entry.photoSourceUrl || entry.photoObjectKey}
                       alt={`${entry.brand} ${entry.model}`}
                       watch={{ brand: entry.brand, model: entry.model }}
                     />

@@ -67,6 +67,7 @@ export default function AdminCatalogPage() {
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [error, setError] = useState("");
   const [sparkle, setSparkle] = useState<SparkleSuggestion | null>(null);
+  const [sparkleTarget, setSparkleTarget] = useState<{ kind: "brand" | "model"; id: string } | null>(null);
   const [pickedModels, setPickedModels] = useState<Record<number, boolean>>({});
 
   const sortedBrands = useMemo(
@@ -129,6 +130,7 @@ export default function AdminCatalogPage() {
 
   async function runSparkle(kind: "brand" | "model", id: string, query: string) {
     setError("");
+    setSparkleTarget({ kind, id });
     const result = await sparkleCatalog({ kind, id, query });
     if (!result.ok) {
       setError(
@@ -170,6 +172,31 @@ export default function AdminCatalogPage() {
       });
     }
     setSparkle(null);
+  }
+
+  async function applySparkleRange() {
+    if (!sparkle?.range || sparkleTarget?.kind !== "model") return;
+    const entry = catalog.find((row) => row.id === sparkleTarget.id);
+    if (!entry) return;
+    const photo = sparkle.photos?.[0];
+    const result = await upsertCatalog({
+      ...entry,
+      typicalLow: sparkle.range.typicalLow,
+      typicalHigh: sparkle.range.typicalHigh,
+      photoSourceUrl: entry.photoSourceUrl || photo?.sourceUrl || "",
+      photoLicense: entry.photoLicense || photo?.license || "",
+      photoAttribution: entry.photoAttribution || photo?.attribution || "",
+      marketSourceUrls: sparkle.marketSourceUrls ?? entry.marketSourceUrls,
+      marketRetrievedOn: sparkle.marketRetrievedOn ?? entry.marketRetrievedOn,
+    });
+    if (!result.ok) {
+      setError(result.error === "PHOTO_REQUIRED"
+        ? "A retail-visible model needs a photo MAC may use or a recorded photo link."
+        : "The catalog reference could not be saved.");
+      return;
+    }
+    setSparkle(null);
+    setSparkleTarget(null);
   }
 
   return (
@@ -229,27 +256,41 @@ export default function AdminCatalogPage() {
         </div>
       ) : null}
 
-      {sparkle?.models?.length ? (
+      {sparkle && (sparkle.models?.length || sparkle.range) ? (
         <div className="mb-8 rounded-lg border border-white/10 p-4">
-          <p className="mb-3 text-sm text-white/70">Sparkle suggestions — tick what to save. Nothing is written until you save.</p>
-          {sparkle.models.map((model, index) => (
-            <label key={`${model.name}-${index}`} className="mb-2 flex items-start gap-3 text-sm text-white/80">
-              <input
-                type="checkbox"
-                checked={Boolean(pickedModels[index])}
-                onChange={(event) => setPickedModels((current) => ({ ...current, [index]: event.target.checked }))}
-              />
-              <span>
-                {model.name} {model.reference ? `· ${model.reference}` : ""}
-                {sparkle.photos?.[index]?.license === "unknown"
-                  ? " · photo as link only"
-                  : ""}
-              </span>
-            </label>
-          ))}
-          <PillButton type="button" variant="gold" onClick={() => void saveSparkleModels()}>
-            Save selected
-          </PillButton>
+          <p className="mb-3 text-sm text-white/70">Sparkle suggestions — nothing is written until you save.</p>
+          {sparkle.range ? (
+            <p className="mb-3 text-sm text-white/80">
+              Suggested range {money(sparkle.range.typicalLow)} – {money(sparkle.range.typicalHigh)}
+            </p>
+          ) : null}
+          {sparkleTarget?.kind === "model" && sparkle.range ? (
+            <PillButton type="button" variant="gold" onClick={() => void applySparkleRange()}>
+              Apply suggested range
+            </PillButton>
+          ) : null}
+          {sparkle.models?.length ? (
+            <>
+              {sparkle.models.map((model, index) => (
+                <label key={`${model.name}-${index}`} className="mb-2 flex items-start gap-3 text-sm text-white/80">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(pickedModels[index])}
+                    onChange={(event) => setPickedModels((current) => ({ ...current, [index]: event.target.checked }))}
+                  />
+                  <span>
+                    {model.name} {model.reference ? `· ${model.reference}` : ""}
+                    {sparkle.photos?.[index]?.license === "unknown"
+                      ? " · photo as link only"
+                      : ""}
+                  </span>
+                </label>
+              ))}
+              <PillButton type="button" variant="gold" onClick={() => void saveSparkleModels()}>
+                Save selected
+              </PillButton>
+            </>
+          ) : null}
         </div>
       ) : null}
 
