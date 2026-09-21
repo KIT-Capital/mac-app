@@ -198,6 +198,37 @@ function requireAppraiser(actor: Actor) {
   if (!canEditAppraisal(actor)) throw new Error("ROLE_FORBIDDEN");
 }
 
+async function consumeSparkleQuota(db: Database, actor: Actor) {
+  requireAppraiser(actor);
+  const throttle = await consumeAccessRateLimit(db, {
+    scope: SPARKLE_SCOPE,
+    key: isDesk(actor) ? actor.staffId ?? actor.email : actor.email,
+    limit: SPARKLE_DAILY_LIMIT,
+    windowMs: SPARKLE_WINDOW_MS,
+  });
+  if (!throttle.allowed) throw new Error("THROTTLED");
+}
+
+async function researchSparkleSuggestion(
+  db: Database,
+  operation: Operation & Record<string, unknown>,
+  env: NodeJS.ProcessEnv,
+) {
+  const kind = operation.kind === "model" ? "model" : "brand";
+  const sparkleId = String(operation.id);
+  let query = "";
+  if (kind === "brand") {
+    const [row] = await db.select().from(catalogBrands).where(eq(catalogBrands.id, sparkleId)).limit(1);
+    if (!row) throw new Error("CATALOG_BRAND_NOT_FOUND");
+    query = `${row.name} watch models references`;
+  } else {
+    const [row] = await db.select().from(catalogReferences).where(eq(catalogReferences.id, sparkleId)).limit(1);
+    if (!row) throw new Error("CATALOG_ENTRY_NOT_FOUND");
+    query = `${row.brand} ${row.model} ${row.reference} market price`;
+  }
+  return { suggestion: await researchCatalog({ kind, id: sparkleId, query }, env) };
+}
+
 async function ownedPiece(db: Database, actor: Actor, id: string) {
   const where = !isDesk(actor)
     ? and(eq(timepieces.id, id), eq(timepieces.customerId, actor.customerId))
@@ -541,7 +572,6 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "settings.update",
   "catalog.upsert",
   "catalog.remove",
-  "catalog.sparkle",
   "brand.upsert",
   "shell.upsert",
   "shell.remove",
@@ -672,6 +702,35 @@ export async function executeLiveBookOperation(
   }
   if (REQUEST_TRANSITIONS.has(operation.action)) {
     await closeIfExpiredBeforeMove(db, actor, String(operation.id), context);
+  }
+  // Sparkle records the daily cap, then researches outside that transaction so
+  // a missing key or upstream failure cannot unwind the count.
+  if (operation.action === "catalog.sparkle") {
+    if (isDesk(actor) && isLiveBookEnabled(context.env.MAC_LIVE_BOOK) && !actor.staffId) {
+      throw new Error("SESSION_INVALID");
+    }
+    if (isDesk(actor) && isLiveBookEnabled(context.env.MAC_LIVE_BOOK) && actor.staffId) {
+      const staffId = actor.staffId;
+      await db.transaction(async (tx) => {
+        const staff = await lockStaffForDeskMutation(tx, {
+          id: staffId,
+          email: actor.email,
+          role: actor.role,
+        });
+        const trusted = deskActor(staff.role, staff.email, staff.id);
+        await consumeSparkleQuota(tx as unknown as Database, trusted);
+        await writeDeskAudit(
+          tx,
+          staff,
+          operation.action,
+          auditTargetId(operation),
+          options.clientAddress ?? "unknown",
+          {},
+        );
+      });
+      return researchSparkleSuggestion(db, operation, context.env);
+    }
+    return executeLiveBookOperationCore(db, actor, operation, context);
   }
   if (
     isDesk(actor) &&
@@ -924,28 +983,8 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "catalog.sparkle") {
-    requireAppraiser(actor);
-    const kind = operation.kind === "model" ? "model" : "brand";
-    const sparkleId = String(operation.id);
-    const throttle = await consumeAccessRateLimit(db, {
-      scope: SPARKLE_SCOPE,
-      key: isDesk(actor) ? actor.staffId ?? actor.email : actor.email,
-      limit: SPARKLE_DAILY_LIMIT,
-      windowMs: SPARKLE_WINDOW_MS,
-    });
-    if (!throttle.allowed) throw new Error("THROTTLED");
-    let query = "";
-    if (kind === "brand") {
-      const [row] = await db.select().from(catalogBrands).where(eq(catalogBrands.id, sparkleId)).limit(1);
-      if (!row) throw new Error("CATALOG_BRAND_NOT_FOUND");
-      query = `${row.name} watch models references`;
-    } else {
-      const [row] = await db.select().from(catalogReferences).where(eq(catalogReferences.id, sparkleId)).limit(1);
-      if (!row) throw new Error("CATALOG_ENTRY_NOT_FOUND");
-      query = `${row.brand} ${row.model} ${row.reference} market price`;
-    }
-    const suggestion = await researchCatalog({ kind, id: sparkleId, query }, context.env);
-    return { suggestion };
+    await consumeSparkleQuota(db, actor);
+    return researchSparkleSuggestion(db, operation, context.env);
   }
 
   if (action === "catalog.remove") {
