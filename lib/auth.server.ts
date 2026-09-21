@@ -6,9 +6,17 @@ import { getDb } from "@/lib/db/client";
 import {
   bootstrapFirstAdmin,
   findStaffByEmail,
+  hasPassword,
   rotateStaffPassword,
   verifyStaffCredentials,
 } from "@/lib/db/staff-accounts";
+import {
+  consumeAccessRateLimit,
+  consumeDeskLoginCode,
+  createCollectorAccessToken,
+} from "@/lib/db/collector-sessions";
+import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
+import { dispatchCollectorAccessMail } from "@/lib/mail";
 import type { Database } from "@/lib/db/client";
 import {
   issueDeskToken,
@@ -61,16 +69,112 @@ export async function authenticateDeskAccount(
   password: string,
   clientAddress: string,
   env: Environment = process.env,
-) {
+  code?: string,
+): Promise<{ staff: NonNullable<ReturnType<typeof developmentDeskFixture>> | Awaited<ReturnType<typeof verifyStaffCredentials>> } | { pending: "code" }> {
   if (deskAuthenticationMode(env) === "development-fixture") {
-    return developmentDeskFixture(email, password, env);
+    return { staff: developmentDeskFixture(email, password, env) };
   }
 
   const db = getDb();
   await bootstrapFirstAdmin(db, env);
-  return verifyStaffCredentials(db, email, password, {
-    address: clientAddress,
-  });
+  const live = evaluateLiveBookConfig(env);
+  const trimmedCode = String(code ?? "").trim();
+
+  if (live.enabled && live.ok && trimmedCode) {
+    const staff = await verifyStaffCredentials(db, email, password, {
+      address: clientAddress,
+    });
+    if (!staff) return { staff: null };
+    const attempt = await consumeAccessRateLimit(db, {
+      scope: "desk-code-verify",
+      key: staff.email,
+      limit: 8,
+      windowMs: 15 * 60_000,
+    });
+    if (!attempt.allowed) return { staff: null };
+    try {
+      await consumeDeskLoginCode(db, {
+        secret: live.secret,
+        email: staff.email,
+        code: trimmedCode,
+      });
+    } catch {
+      return { staff: null };
+    }
+    return { staff };
+  }
+
+  if (live.enabled && live.ok && !trimmedCode) {
+    const row = await findStaffByEmail(db, email);
+    if (row && !row.disabledAt && !hasPassword(row)) {
+      const issueLimit = await consumeAccessRateLimit(db, {
+        scope: "desk-login-issue",
+        key: row.email,
+        limit: 3,
+        windowMs: 60 * 60_000,
+      });
+      if (issueLimit.allowed) {
+        const issued = await createCollectorAccessToken(db, {
+          purpose: "desk_set_password",
+          secret: live.secret,
+          staffId: row.id,
+          email: row.email,
+          expiresAt: new Date(Date.now() + 15 * 60_000),
+        });
+        const setUrl = new URL("/admin/password/set", live.origin);
+        setUrl.searchParams.set("token", issued.token);
+        try {
+          await dispatchCollectorAccessMail({
+            to: row.email,
+            name: row.name,
+            action: "desk_set_password",
+            url: setUrl.toString(),
+            tokenId: issued.id,
+          });
+        } catch {
+          return { pending: "code" };
+        }
+      }
+      return { pending: "code" };
+    }
+    const staff = await verifyStaffCredentials(db, email, password, {
+      address: clientAddress,
+    });
+    if (staff) {
+      const issueLimit = await consumeAccessRateLimit(db, {
+        scope: "desk-login-issue",
+        key: staff.email,
+        limit: 3,
+        windowMs: 60 * 60_000,
+      });
+      if (!issueLimit.allowed) return { pending: "code" };
+      const issued = await createCollectorAccessToken(db, {
+        purpose: "desk_login",
+        secret: live.secret,
+        staffId: staff.id,
+        email: staff.email,
+        expiresAt: new Date(Date.now() + 15 * 60_000),
+      });
+      try {
+        await dispatchCollectorAccessMail({
+          to: staff.email,
+          name: staff.name,
+          action: "desk_login",
+          code: issued.token,
+          tokenId: issued.id,
+        });
+      } catch {
+        return { pending: "code" };
+      }
+    }
+    return { pending: "code" };
+  }
+
+  return {
+    staff: await verifyStaffCredentials(db, email, password, {
+      address: clientAddress,
+    }),
+  };
 }
 
 export async function rotateDeskPasswordRequest(

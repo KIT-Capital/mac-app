@@ -25,16 +25,13 @@ test.describe("collector app", () => {
     await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
   });
 
-  test("collector sign-in uses email only and desk credentials stay hidden", async ({ page }) => {
+  test("collector sign-in uses email and a desk password box without a hidden reveal", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByLabel("Email Address")).toHaveValue("");
-    await expect(page.locator("input[type=password]")).toHaveCount(0);
-    await expect(page.getByText(/continue with google|continue with apple/i)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Send sign-in link" })).toBeVisible();
-
-    await page.getByRole("button", { name: "MAC desk staff" }).click();
     await expect(page.locator("#login-password")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(page.getByText(/continue with google|continue with apple/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "MAC desk staff" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
   });
 
   test("an unusable verification link shows one safe retry path", async ({ page }) => {
@@ -60,9 +57,9 @@ test.describe("collector app", () => {
 
     await page.goto("/login");
     await page.getByLabel("Email Address").fill("known@example.com");
-    await page.getByRole("button", { name: "Send sign-in link" }).click();
+    await page.getByRole("button", { name: "Send code" }).click();
     await expect(page.getByText(/lasts 15 minutes and works once/i)).toBeVisible();
-    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByLabel("Sign-in code")).toBeVisible();
     await expect(page.getByRole("link", { name: "Sign up" })).toBeVisible();
 
     await page.goto("/signup");
@@ -71,9 +68,20 @@ test.describe("collector app", () => {
     await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
     await page.getByRole("checkbox", { name: /privacy policy/i }).check();
     await page.getByRole("button", { name: "Create Account" }).click();
-    await expect(page.getByText(/check your email to verify/i)).toBeVisible();
-    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByText(/check your email for a sign-in code/i)).toBeVisible();
+    await expect(page.getByLabel("Sign-in code")).toBeVisible();
     await expect(page.getByRole("link", { name: /already registered/i })).toBeVisible();
+
+    await page.route("**/api/collector-session/verify", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, redirect: "/collection" }),
+      });
+    });
+    await page.getByLabel("Sign-in code").fill("424242");
+    await page.getByRole("button", { name: "Confirm code" }).click();
+    await expect(page).toHaveURL(/\/collection$/);
   });
 
   test("Hale collection shows demo pieces and photographs", async ({ page }) => {

@@ -81,7 +81,7 @@ import {
   agreementSignatures,
 } from "./schema";
 
-import { canEditAppraisal, canInspect, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
+import { canEditAppraisal, canInspect, canManageRetailAccount, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
 import { normalizeRequiredPhotoKinds } from "../timepiece-shots.mjs";
 import type { DeskRole } from "../types";
 
@@ -1075,6 +1075,7 @@ async function executeLiveBookOperationCore(
 
   if (action === "customer.update") {
     requireDesk(actor);
+    if (!canManageRetailAccount(actor)) throw new Error("ROLE_FORBIDDEN");
     const id = String(operation.id);
     const [customer] = await db.select({ id: customers.id }).from(customers).where(eq(customers.id, id)).limit(1);
     if (!customer) throw new Error("CUSTOMER_NOT_FOUND");

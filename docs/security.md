@@ -7,9 +7,10 @@
 Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
 - **Collector** — browser mode accepts a valid non-desk email without a password.
-  Live mode sends a one-time email link and creates no session until confirmation.
+  Live mode emails a six-digit one-time code and creates no session until that
+  code is confirmed. There is no collector password and no social login.
 - **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). Live-book authorization adds a signed, HttpOnly, session-only `mac_collector` cookie after collector Sign In or development live registration and clears it on Sign Out. A new browser session still starts at splash / Sign In.
-- **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first.
+- **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first. The login form always shows the password box; there is no hidden “MAC desk staff” reveal.
 ### Verified collector access
 
 `MAC_LIVE_BOOK` defaults off and accepts only `1`, `true`, or `on`. While off,
@@ -19,7 +20,7 @@ mail, or setting a cookie, so the existing browser login remains unchanged.
 When enabled, collector access runs in development, staging, or production and
 fails closed unless `COLLECTOR_SESSION_SECRET`, a valid fixed HTTPS
 `COLLECTOR_MAGIC_LINK_ORIGIN` (HTTP localhost is development-only), and
-`RESEND_API_KEY` are present. Preview mail cannot prove identity. Login links are
+`RESEND_API_KEY` are present. Preview mail cannot prove identity. Login codes are
 issued only for an existing Neon customer, but valid unknown emails receive the
 same generic accepted response. Suspended collectors receive that same response
 without mail, and existing sessions are rejected as soon as the Neon customer is
@@ -27,22 +28,24 @@ no longer active. Registration details are bounded and held only in the access
 token row; reserved desk identities are refused and the customer is created only
 after confirmation.
 
-Access links contain a random 32-byte token. Neon stores only its SHA-256 hash, a
-15-minute expiry, and a consumed time. `GET /verify` never consumes it; the
-same-origin confirmation `POST` conditionally consumes it once and creates a
-30-day revocable session row in the same transaction. The HttpOnly, Secure,
-SameSite=Lax `mac_collector` cookie contains only a signed opaque session-row id.
-Expired, consumed, and missing links show the same retry message. Links are never
-derived from request hosts and access mail is never retained in the generic desk
-outbox, including send failures. Tokens, recipient addresses, and session ids
-must not be logged. WorkOS and Neon Auth remain disabled.
+Access codes are six digits. Neon stores only an HMAC-SHA256 of `email:code`
+with `COLLECTOR_SESSION_SECRET`, a 15-minute expiry, and a consumed time. JSON
+`POST /api/collector-session/verify` with `{ email, code }` consumes the code
+once and creates a 30-day revocable session row in the same transaction. The
+HttpOnly, Secure, SameSite=Lax `mac_collector` cookie contains only a signed
+opaque session-row id. Expired, consumed, and missing codes show the same retry
+message. Codes are never logged or stored in plaintext. Access mail is never
+retained in the generic desk outbox, including send failures. WorkOS and Neon Auth
+remain disabled.
 
-An invited collector may request the same non-enumerating login link. Successful
+An invited collector may request the same non-enumerating login code. Successful
 verification atomically activates that exact customer ID and email before issuing
-the session. Suspended collectors remain blocked. Login-link limits are stored in
-Postgres per email and forwarded address; unknown, suspended, and active emails
-receive the same accepted response. Address windows are observed but not enforced
-until the production forwarding smoke in the go-live runbook.
+the session. Suspended collectors remain blocked. Login-code **send** limits are
+stored in Postgres per email and forwarded address; unknown, suspended, and
+active emails receive the same accepted response. Address windows are observed
+but not enforced until the production forwarding smoke in the go-live runbook.
+Code **guess** limits are enforced: eight tries per email and twenty per
+forwarded address in fifteen minutes, then the same invalid response.
 
 ### Production runs live only
 
@@ -75,7 +78,10 @@ password verifies against the fixed dummy hash and is refused even on a match,
 so it can never sign in until its first password is set. Unknown and disabled
 emails use the same dummy path. A passwordless row cannot be given a temporary
 password by another desk member (`PASSWORD_NOT_SET`); it gets a first sign-in
-link in the passwords unit. If the bootstrap email names a seeded passwordless
+link at `/admin/password/set`. Live `POST /api/desk-session` without a code
+always answers **202** `{ needsCode: true }` whether that mail is a desk code
+or a first-password link. First-password matching peeks the token before scrypt
+and rate-limits eight tries per address in fifteen minutes. If the bootstrap email names a seeded passwordless
 row, bootstrap sets that row's password and keeps its seeded role.
 Failed password attempts atomically reserve both per-email and per-address
 Postgres windows before scrypt, limiting concurrent memory use; successful

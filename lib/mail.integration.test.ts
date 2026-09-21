@@ -28,8 +28,6 @@ describe("mail delivery boundaries", () => {
       [[INTERNAL_EMAIL], [collectorEmail]],
     );
 
-    const accessUrl =
-      "https://development.example.com/api/collector-session/verify?token=secret-token-marker";
     await assert.rejects(
       () =>
         dispatchCollectorAccessMail(
@@ -37,17 +35,14 @@ describe("mail delivery boundaries", () => {
             to: collectorEmail,
             name: "Collector",
             action: "login",
-            url: accessUrl,
+            code: "123456",
           },
           { env },
         ),
       /COLLECTOR_ACCESS_EMAIL_REQUIRED/,
     );
     assert.equal(listOutbox().some((item) => item.kind === "access"), false);
-    assert.equal(
-      listOutbox().some((item) => item.text.includes("secret-token-marker")),
-      false,
-    );
+    assert.equal(listOutbox().some((item) => item.text.includes("123456")), false);
   });
 
   it("puts the selected brand name in letter chrome", async () => {
@@ -77,8 +72,6 @@ describe("mail delivery boundaries", () => {
   });
 
   it("fails access requests when Resend returns an error and retains no token", async () => {
-    const accessUrl =
-      "https://development.example.com/api/collector-session/verify?token=failed-token-marker";
     await assert.rejects(
       () =>
         dispatchCollectorAccessMail(
@@ -86,7 +79,7 @@ describe("mail delivery boundaries", () => {
             to: "collector@example.com",
             name: "Collector",
             action: "login",
-            url: accessUrl,
+            code: "654321",
           },
           {
             env: {
@@ -102,22 +95,17 @@ describe("mail delivery boundaries", () => {
       /COLLECTOR_ACCESS_EMAIL_FAILED/,
     );
     assert.equal(listOutbox().some((item) => item.kind === "access"), false);
-    assert.equal(
-      listOutbox().some((item) => item.text.includes("failed-token-marker")),
-      false,
-    );
+    assert.equal(listOutbox().some((item) => item.text.includes("654321")), false);
   });
 
-  it("delivers access mail without retaining its URL in the desk outbox", async () => {
-    const accessUrl =
-      "https://development.example.com/api/collector-session/verify?token=delivered-token-marker";
+  it("delivers access mail without retaining its code in the desk outbox", async () => {
     let sendOptions: { idempotencyKey?: string } | undefined;
     const delivered = await dispatchCollectorAccessMail(
       {
         to: "collector@example.com",
         name: "Collector",
         action: "login",
-        url: accessUrl,
+        code: "424242",
         tokenId: "token-row-123",
       },
       {
@@ -138,10 +126,7 @@ describe("mail delivery boundaries", () => {
     assert.equal(delivered.resendId, "resend-test-id");
     assert.deepEqual(sendOptions, { idempotencyKey: "collector-access/token-row-123" });
     assert.equal(listOutbox().some((item) => item.kind === "access"), false);
-    assert.equal(
-      listOutbox().some((item) => item.text.includes("delivered-token-marker")),
-      false,
-    );
+    assert.equal(listOutbox().some((item) => item.text.includes("424242")), false);
   });
 
   it("refuses the retired financing alias and still sends request notices", async () => {

@@ -10,12 +10,11 @@ export async function signIn(page: Page, email: string, password: string) {
   await page.goto("/login");
   await page.getByLabel("Email Address").fill(email);
   if (["admin@mechartcap.com", "desk@mechartcap.com"].includes(email.toLowerCase())) {
-    await page.getByRole("button", { name: "MAC desk staff" }).click();
     await page.locator("#login-password").fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     return;
   }
-  await page.getByRole("button", { name: "Send sign-in link" }).click();
+  await page.getByRole("button", { name: "Send code" }).click();
 }
 
 export async function signInHale(page: Page) {

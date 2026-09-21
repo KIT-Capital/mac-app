@@ -21,12 +21,26 @@ export async function POST(request: Request) {
   if (origin) return origin;
   const unavailable = liveUnavailability(process.env);
   if (unavailable) return unavailableResponse(unavailable);
-  const body = (await request.json().catch(() => null)) as { email?: string; password?: string } | null;
-  const staff = await authenticateDeskAccount(
+  const body = (await request.json().catch(() => null)) as {
+    email?: string;
+    password?: string;
+    code?: string;
+  } | null;
+  const result = await authenticateDeskAccount(
     String(body?.email ?? ""),
     String(body?.password ?? ""),
     clientAddress(request.headers),
+    process.env,
+    body?.code,
   );
+  if ("pending" in result) {
+    return Response.json({
+      ok: true,
+      accepted: true,
+      needsCode: true,
+    }, { status: 202 });
+  }
+  const staff = result.staff;
   if (!staff) {
     return Response.json({ error: "Desk credentials were not recognized." }, { status: 401 });
   }

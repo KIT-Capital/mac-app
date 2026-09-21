@@ -10,10 +10,12 @@ import { useStore } from "@/lib/store";
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signUp } = useStore();
+  const { signUp, signIn } = useStore();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [awaitingCode, setAwaitingCode] = useState(false);
   const [adult, setAdult] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const [error, setError] = useState("");
@@ -22,6 +24,37 @@ export default function SignupPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
+    if (awaitingCode) {
+      setBusy(true);
+      const verified = await fetch("/api/collector-session/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+        cache: "no-store",
+        credentials: "include",
+      }).catch(() => null);
+      if (!verified?.ok) {
+        setError("That code could not be used.");
+        setBusy(false);
+        return;
+      }
+      const result = await verified.json().catch(() => null) as { redirect?: string } | null;
+      const redirect = result?.redirect || "/collection/setup";
+      if (redirect === "/collection") {
+        signIn({ email: email.trim(), role: "collector" });
+      } else {
+        signUp({
+          name,
+          email,
+          phone: phone || "+1 (212) 555-0100",
+          member: false,
+        });
+      }
+      setBusy(false);
+      router.push(redirect);
+      return;
+    }
     if (!name || !email.includes("@")) {
       setError("Please enter your name and a valid email address.");
       return;
@@ -39,7 +72,6 @@ export default function SignupPage() {
       return;
     }
     setBusy(true);
-    setError("");
     setNotice("");
     const registration = await fetch("/api/collector-session", {
       method: "POST",
@@ -57,7 +89,8 @@ export default function SignupPage() {
       | { mode?: "browser" | "live"; accepted?: boolean }
       | null;
     if (access?.mode === "live" && access.accepted) {
-      setNotice("Check your email to verify your account and continue.");
+      setAwaitingCode(true);
+      setNotice("Check your email for a sign-in code. It lasts 15 minutes and works once.");
       setBusy(false);
       return;
     }
@@ -95,6 +128,31 @@ export default function SignupPage() {
         {notice ? (
           <div className="rounded-xl border border-mac-gold/40 bg-mac-card px-5 py-6 text-center">
             <p className="text-sm leading-relaxed text-mac-fg">{notice}</p>
+            {awaitingCode ? (
+              <form onSubmit={onSubmit} className="mt-6 space-y-4 text-left">
+                <label htmlFor="reg-code" className="block text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
+                  Sign-in code
+                  <input
+                    id="reg-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-mac-line bg-mac-bg px-3 py-3 text-[15px] tracking-[0.3em] text-mac-fg"
+                    placeholder="000000"
+                    required
+                  />
+                </label>
+                {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-mac-gold text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase"
+                >
+                  {busy ? "Please wait…" : "Confirm code"}
+                </button>
+              </form>
+            ) : null}
             <Link
               href="/login"
               className="mt-6 inline-block text-[12px] font-medium text-mac-gold underline underline-offset-4"
