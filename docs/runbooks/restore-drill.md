@@ -120,3 +120,5 @@ Report line:
 ```
 
 The preview was discarded after the check. Development, staging, production, and ci were still present. This run does not satisfy the pass rule (zero missing and zero mismatch).
+
+Later the same day, the owner approved removing those development test rows. Twelve stored agreement files, six send records, two stored photos, and one preview link were deleted. They belonged to test addresses created on 2026-09-20. Development then had no stored agreement file and no stored photo, so a new drill cannot pass until a real stored file and a real stored photo exist. Staging and production were not changed.
