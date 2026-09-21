@@ -47,9 +47,10 @@ test.describe("desk", () => {
     await expect(page.getByText("MAC00001-21")).toBeVisible();
     await expect(page.getByText("jonathan.hale@mechartcap.com")).toBeVisible();
     await expect(page.getByText("admin@mechartcap.com")).toHaveCount(0);
-    await page.getByRole("link", { name: "Repo Agreements" }).click();
+    await page.getByRole("link", { name: "Repos" }).click();
     await page.getByRole("tab", { name: "Book" }).click();
     await expect(page.getByText("Jonathan Hale · MAC00001-21")).toBeVisible();
+    await expect(page.getByText("Desk · Repos")).toBeVisible();
   });
 
   test("desk client pieces show Hale member ID and locked custody", async ({ page }) => {
@@ -641,6 +642,8 @@ test.describe("desk", () => {
     await expect(page.getByText(/How the desk works/i)).toBeVisible();
     await expect(page.getByText(/Staff only/i)).toBeVisible();
     await expect(page.getByText(/Collectors never get a desk link/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Repos" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Front of the app" })).toBeVisible();
     await expect(page.getByText(/\bloan\b/i)).toHaveCount(0);
   });
 

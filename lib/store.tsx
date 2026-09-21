@@ -61,6 +61,7 @@ import {
   heldWatchIds,
   LIVE_WATCH_CONFLICT,
   deskToday,
+  piecesFinallyAcceptedForRepo,
   validateRecordedEndKind,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
@@ -832,6 +833,9 @@ function transitionRequest(
       })).then(() => ({ ok: false, error: "REQUEST_EXPIRED" } as OperationAck));
     }
     return Promise.resolve({ ok: false, error: "REQUEST_EXPIRED" });
+  }
+  if (action === "executeMac" && !piecesFinallyAcceptedForRepo(current.appraisalAttempts, row.watchIds, id)) {
+    return Promise.resolve({ ok: false, error: "INSPECTION_INCOMPLETE" });
   }
   const expectedStatus = row.status;
   const expectedVersion = row.version ?? 1;

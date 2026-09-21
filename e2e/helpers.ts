@@ -93,7 +93,7 @@ export async function openCollectorAgreements(page: Page) {
 }
 
 export async function openDeskAgreements(page: Page) {
-  await page.getByRole("link", { name: "Repo Agreements" }).click();
+  await page.getByRole("link", { name: "Repos" }).click();
   await expect(page.getByRole("tab", { name: "Queue" })).toBeVisible();
 }
 

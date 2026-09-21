@@ -31,7 +31,7 @@ const LINKS = [
   { href: "/admin/catalog", label: "Timepiece Catalog", icon: BookOpen },
   { href: "/admin/members", label: "Members", icon: Users },
   { href: "/admin/assets", label: "Client Assets", icon: FileSpreadsheet },
-  { href: "/admin/agreements", label: "Repo Agreements", icon: FileText },
+  { href: "/admin/agreements", label: "Repos", icon: FileText },
   { href: "/admin/photos", label: "Photo Vault", icon: Camera },
   { href: "/admin/mail", label: "Outbound Mail", icon: Mail },
   { href: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
@@ -92,7 +92,7 @@ export function AdminChrome({
             className="mt-2 flex items-center gap-2 rounded-md px-2 py-2 text-[11px] tracking-[0.08em] text-white/60 uppercase hover:bg-white/5 hover:text-white"
           >
             <Smartphone className="h-3.5 w-3.5" />
-            Collector app
+            Front of the app
           </Link>
           <button
             type="button"

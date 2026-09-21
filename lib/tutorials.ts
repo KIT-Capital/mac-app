@@ -61,7 +61,7 @@ export const DESK_TUTORIAL = {
       body: "Collectors send pieces as Reviewing. Staff move them to Appraised and enter the valuation. The collector cannot edit that value after Appraise.",
     },
     {
-      title: "Repo agreements",
+      title: "Repos",
       body: "Every live agreement uses the same six labels: open, past due, bought back, in liquidation, liquidated, renewed. Open and past due are derived from the term. Desk staff record one current end. Only the desk Renew control closes a live repo at that month’s scheduled repurchase dollars and opens the successor.",
     },
     {
@@ -73,8 +73,8 @@ export const DESK_TUTORIAL = {
       body: "Desk roles are admin, appraiser, and super admin. Admins and appraisers add or disable admin accounts. Only a super admin adds appraisers or super admins, and only the master account edits other super admins. Forced password rotation opens only the password page until the new password is set.",
     },
     {
-      title: "Collector app",
-      body: "Use Collector app at the bottom of this wall to see the member screens. Collectors never get a desk link in their own navigation. Reopen this tutorial from Tutorial in the desk menu.",
+      title: "Front of the app",
+      body: "Use Front of the app at the bottom of this wall to see the member screens. Collectors never get a desk link in their own navigation. Reopen this tutorial from Tutorial in the desk menu.",
     },
   ] satisfies TutorialStep[],
 } as const satisfies Tutorial;
