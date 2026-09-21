@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-label="MB&amp;F">
-  <circle cx="40" cy="40" r="36" fill="none" stroke="currentColor" stroke-width="3"/>
-  <text x="40" y="48" text-anchor="middle" font-family="Geist, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" fill="currentColor">MB&amp;F</text>
+  <circle cx="40" cy="40" r="36" fill="none" stroke="#4E7A96" stroke-width="3"/>
+  <text x="40" y="48" text-anchor="middle" font-family="Geist, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" fill="#C5CDD4">MB&amp;F</text>
 </svg>

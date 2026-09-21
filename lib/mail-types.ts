@@ -29,6 +29,7 @@ export type MailRequest = {
   amount?: string;
   termMonths?: number;
   delivery?: string;
+  brandPreset?: "mac" | "mbf";
 };
 
 export type OutboxItem = {

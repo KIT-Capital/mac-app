@@ -19,7 +19,7 @@ import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
-import { agreementDocumentSends, agreementDocuments, agreementSignatures, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
+import { agreementDocumentSends, agreementDocuments, agreementSignatures, deskSettings, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
 
 type QueryDb = Pick<Database, "select" | "insert" | "update">;
 
@@ -35,6 +35,15 @@ type LiveAgreementRow = typeof liveAgreements.$inferSelect;
 
 /** Which step of a request a PDF records (KTD11). `legacy` is the Stage 4 path. */
 export type DocumentStage = "proposal" | "collector_signed" | "executed";
+
+export async function deskBrandPreset(db: QueryDb) {
+  const [row] = await db
+    .select({ brandPreset: deskSettings.brandPreset })
+    .from(deskSettings)
+    .where(eq(deskSettings.id, "default"))
+    .limit(1);
+  return row?.brandPreset === "mbf" ? "mbf" : "mac";
+}
 
 type FrozenSnapshot = NonNullable<ReturnType<typeof buildAgreementSnapshot>["value"]>;
 
@@ -273,7 +282,9 @@ export async function buildAgreementDocument(
   const { snapshot, building, objectKey, documentId } = prepared;
 
   try {
-    const pdf = await renderAgreementSnapshotPdf(snapshot.value);
+    const pdf = await renderAgreementSnapshotPdf(snapshot.value, {
+      brandPreset: await deskBrandPreset(db),
+    });
     if (!pdf.ok || !pdf.bytes) {
       throw new Error(pdf.errors[0] ?? "CONTRACT_PDF_FAILED");
     }
@@ -435,7 +446,7 @@ export async function renderStageDocument(
     const pdf = await renderAgreementSnapshotPdf({
       ...(row.snapshot as FrozenSnapshot),
       snapshotHash: row.snapshotHash,
-    });
+    }, { brandPreset: await deskBrandPreset(db) });
     if (!pdf.ok || !pdf.bytes) {
       throw new Error(pdf.errors[0] ?? "CONTRACT_PDF_FAILED");
     }
