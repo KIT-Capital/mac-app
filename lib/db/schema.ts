@@ -251,11 +251,32 @@ export const deskSettings = pgTable(
   ],
 );
 
+/** Accepted manufacturers. Collectors see a row only when retail_visible is true. */
+export const catalogBrands = pgTable(
+  "catalog_brands",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    tier: integer("tier").notNull(),
+    slug: text("slug").notNull(),
+    logoAssetKey: text("logo_asset_key"),
+    retailVisible: boolean("retail_visible").notNull().default(false),
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("catalog_brands_slug_uidx").on(table.slug),
+    check("catalog_brands_tier_check", sql`${table.tier} in (1, 2)`),
+  ],
+);
+
 /** Shared desk appraisal references. Empty is a valid live catalog. */
 export const catalogReferences = pgTable(
   "catalog_references",
   {
     id: text("id").primaryKey(),
+    brandId: text("brand_id").references(() => catalogBrands.id),
     brand: text("brand").notNull(),
     model: text("model").notNull(),
     reference: text("reference").notNull().default(""),
@@ -265,14 +286,28 @@ export const catalogReferences = pgTable(
     typicalHighCents: integer("typical_high_cents").notNull(),
     financeable: boolean("financeable").notNull().default(false),
     notes: text("notes").notNull().default(""),
+    retailVisible: boolean("retail_visible").notNull().default(false),
+    photoObjectKey: text("photo_object_key"),
+    photoSourceUrl: text("photo_source_url").notNull().default(""),
+    photoLicense: text("photo_license").notNull().default(""),
+    photoAttribution: text("photo_attribution").notNull().default(""),
+    marketSourceUrls: jsonb("market_source_urls").notNull().default(sql`'[]'::jsonb`),
+    marketRetrievedOn: timestamp("market_retrieved_on", { withTimezone: true }),
+    lastEditedByStaffId: text("last_edited_by_staff_id").references(() => staffAccounts.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("catalog_references_brand_id_idx").on(table.brandId),
     check("catalog_references_values_check", sql`
       ${table.typicalLowCents} >= 0
       and ${table.typicalHighCents} >= ${table.typicalLowCents}
       and ${table.typicalHighCents} <= 2147483647
+    `),
+    check("catalog_references_retail_photo_check", sql`
+      ${table.retailVisible} = false
+      or ${table.photoObjectKey} is not null
+      or length(trim(${table.photoSourceUrl})) > 0
     `),
   ],
 );

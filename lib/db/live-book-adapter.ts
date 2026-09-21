@@ -16,6 +16,7 @@ import type {
   ApplicationPurchaseShares,
   AppSettings,
   AppState,
+  CatalogBrand,
   CatalogEntry,
   ManagedUser,
   PhotoKind,
@@ -24,6 +25,7 @@ import type {
   Timepiece,
 } from "@/lib/types";
 import type { Database } from "./client";
+import { discloseCatalog } from "./catalog";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
 import {
@@ -32,6 +34,7 @@ import {
   appraisalAttempts,
   agreementShells,
   applications,
+  catalogBrands,
   catalogReferences,
   deskSettings,
   liveAgreementEnds,
@@ -54,12 +57,23 @@ export type LiveBookRows = {
   attemptPhotos?: Row[];
   settings?: Row[];
   catalog?: Row[];
+  brands?: Row[];
   shells?: Row[];
   returnedAgreementIds?: string[];
 };
 export type LiveBookState = Pick<
   AppState,
-  "timepieces" | "agreements" | "users" | "photos" | "appraisalAttempts" | "appraisalAttemptPhotos" | "profiles" | "settings" | "catalog" | "shells"
+  | "timepieces"
+  | "agreements"
+  | "users"
+  | "photos"
+  | "appraisalAttempts"
+  | "appraisalAttemptPhotos"
+  | "profiles"
+  | "settings"
+  | "catalog"
+  | "brands"
+  | "shells"
 > & { applicationPurchaseShares: ApplicationPurchaseShares };
 
 const ALLOWED_KINDS = new Set(PHOTO_KINDS);
@@ -164,9 +178,22 @@ function settings(rows: Row[]): AppSettings {
   };
 }
 
+function brands(rows: Row[]): CatalogBrand[] {
+  return rows.map((row) => ({
+    id: text(row, "id"),
+    name: text(row, "name"),
+    tier: row.tier === 2 ? 2 : 1,
+    slug: text(row, "slug"),
+    logoAssetKey: text(row, "logoAssetKey") || null,
+    retailVisible: Boolean(row.retailVisible),
+    sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : 0,
+  }));
+}
+
 function catalog(rows: Row[]): CatalogEntry[] {
   return rows.map((row) => ({
     id: text(row, "id"),
+    brandId: text(row, "brandId"),
     brand: text(row, "brand"),
     model: text(row, "model"),
     reference: text(row, "reference"),
@@ -180,6 +207,20 @@ function catalog(rows: Row[]): CatalogEntry[] {
     ) ?? 0,
     financeable: Boolean(row.financeable),
     notes: text(row, "notes"),
+    retailVisible: Boolean(row.retailVisible),
+    photoObjectKey: text(row, "photoObjectKey") || null,
+    photoSourceUrl: text(row, "photoSourceUrl"),
+    photoLicense: text(row, "photoLicense"),
+    photoAttribution: text(row, "photoAttribution"),
+    marketSourceUrls: Array.isArray(row.marketSourceUrls)
+      ? row.marketSourceUrls.map((url) => String(url))
+      : [],
+    marketRetrievedOn: row.marketRetrievedOn instanceof Date
+      ? row.marketRetrievedOn.toISOString().slice(0, 10)
+      : typeof row.marketRetrievedOn === "string"
+        ? row.marketRetrievedOn.slice(0, 10)
+        : null,
+    lastEditedByStaffId: text(row, "lastEditedByStaffId") || null,
   }));
 }
 
@@ -482,6 +523,11 @@ export function mapLiveBookRows(
   const authoritativeSettings = settings(rows.settings ?? []);
   const authoritativeShells = shells(rows.shells ?? []);
   const openShell = authoritativeShells.find((shell) => shell.status === "open");
+  const disclosed = discloseCatalog(
+    brands(rows.brands ?? []),
+    catalog(rows.catalog ?? []),
+    !customerId,
+  );
   return {
     timepieces: mappedPieces,
     agreements: mappedAgreements,
@@ -499,7 +545,8 @@ export function mapLiveBookRows(
           // a collector must see it before their first application.
           requiredPhotoKinds: authoritativeSettings.requiredPhotoKinds,
         },
-    catalog: catalog(rows.catalog ?? []),
+    catalog: disclosed.catalog,
+    brands: disclosed.brands,
     shells: discloseDeskTerms ? authoritativeShells : [],
     applicationPurchaseShares: applicationPurchaseShares(
       authoritativeSettings,
@@ -510,12 +557,13 @@ export function mapLiveBookRows(
 
 export async function readLiveBookState(db: Database, actor: Actor): Promise<LiveBookState> {
   return db.transaction(async (tx) => {
-    const [customerRows, settingRows, catalogRows, shellRows, applicationRows] = await Promise.all([
+    const [customerRows, settingRows, catalogRows, brandRows, shellRows, applicationRows] = await Promise.all([
       actor.role === "collector"
         ? tx.select().from(customers).where(eq(customers.id, actor.customerId))
         : tx.select().from(customers),
       tx.select().from(deskSettings),
       tx.select().from(catalogReferences),
+      tx.select().from(catalogBrands),
       tx.select().from(agreementShells),
       actor.role === "collector"
         ? tx.select({ id: applications.id })
@@ -537,6 +585,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
         attemptPhotos: [],
         settings: settingRows,
         catalog: catalogRows,
+        brands: brandRows,
         shells: shellRows,
       }, actor.role === "collector" ? actor.customerId : undefined, actor.role !== "collector" || applicationRows.length > 0);
     }
@@ -576,6 +625,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       attemptPhotos: attemptPhotoRows,
       settings: settingRows,
       catalog: catalogRows,
+      brands: brandRows,
       shells: shellRows,
       returnedAgreementIds: [...new Set(returnRows.map((row) => row.agreementId))],
     }, actor.role === "collector" ? actor.customerId : undefined,

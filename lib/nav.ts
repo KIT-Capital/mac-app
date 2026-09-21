@@ -9,6 +9,7 @@ import {
   Star,
   UserRound,
   UsersRound,
+  Watch,
 } from "lucide-react";
 import { COLLECTOR_TUTORIAL } from "@/lib/tutorials";
 
@@ -29,6 +30,7 @@ export const COLLECTOR_GUIDE = {
 export const COLLECTOR_LINKS = [
   ...COLLECTOR_PRIMARY,
   COLLECTOR_GUIDE,
+  { href: "/brands", label: "Brands we cover", icon: Watch },
   { href: "/profile/preferences", label: "Preferences", icon: SlidersHorizontal },
   { href: "/profile/membership", label: "Membership", icon: Star },
   { href: "/profile/partners", label: "Partners", icon: UsersRound },

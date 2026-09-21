@@ -19,13 +19,13 @@ describe("catalogValuation", () => {
     assert.equal(valuation.financeable, false);
   });
 
-  it("defaults known tier-one brands to eligible without a catalog match", () => {
+  it("keeps unmatched brands ineligible, including former tier-one names", () => {
     const valuation = catalogValuation(
       { brand: "Audemars Piguet", model: "Royal Oak Selfwinding" },
       [],
     );
 
-    assert.equal(valuation.financeable, true);
+    assert.equal(valuation.financeable, false);
   });
 
   it("keeps unmatched non-tier brands ineligible", () => {
@@ -77,17 +77,8 @@ describe("catalogValuation", () => {
     assert.deepEqual(valuation, {
       valueLow: 40000,
       valueHigh: 55000,
-      financeable: true,
+      financeable: false,
     });
-  });
-
-  it("matches tier-one fallback eligibility without case sensitivity", () => {
-    const valuation = catalogValuation(
-      { brand: "  ROLEX ", model: "Daytona" },
-      [],
-    );
-
-    assert.equal(valuation.financeable, true);
   });
 
   it("prefills the appraiser's advisory range from a catalog match", () => {

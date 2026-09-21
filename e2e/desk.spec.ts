@@ -12,6 +12,7 @@ import {
   openDeskAgreements,
   openDeskBook,
   openDeskReview,
+  openMenu,
   sendForAppraisal,
   signHaleCollectorRequest,
   signIn,
@@ -487,15 +488,29 @@ test.describe("desk", () => {
     await signInAppraiser(page);
     await page.getByRole("link", { name: "Timepiece Catalog" }).click();
     await page.getByLabel("Brand").fill("F.P. Journe");
-    await page.getByLabel("Model").fill("Chronomètre Bleu");
-    await page.getByLabel("Reference").fill("CB");
+    await page.getByLabel("Model").fill("e2e Catalogue");
+    await page.getByLabel("Reference").fill("CB-E2E");
+    await page.getByLabel("Photo source").fill("https://example.com/journe.jpg");
     const eligibility = page.getByRole("checkbox", { name: /Eligible for sale-and-repurchase/i });
     await expect(eligibility).not.toBeChecked();
     await eligibility.check();
+    await page.getByRole("checkbox", { name: /Show this model to collectors/i }).check();
     await page.getByRole("button", { name: "Add Reference" }).click();
-    const row = page.getByRole("row").filter({ hasText: "Chronomètre Bleu" });
+    const row = page.getByRole("row").filter({ hasText: "e2e Catalogue" });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Yes", { exact: true })).toBeVisible();
+    await expect(row.getByText("Yes", { exact: true }).first()).toBeVisible();
+    await page.getByTestId("brand-retail-f-p-journe").check();
+    await signOutFromMenu(page);
+    await signInHale(page);
+    await openMenu(page);
+    await page.getByRole("link", { name: "Brands we cover" }).click();
+    await expect(page.getByRole("link", { name: "F.P. Journe" })).toBeVisible();
+    await expect(page.getByText(/\$\d/)).toHaveCount(0);
+    await page.getByRole("link", { name: "F.P. Journe" }).click();
+    await expect(page.getByText("e2e Catalogue")).toBeVisible();
+    await expect(page.getByText(/\$\d/)).toHaveCount(0);
+    await signOutFromMenu(page);
+    await signInAppraiser(page);
     await page.getByRole("link", { name: "Configure" }).click();
     await page.getByLabel("Company name").fill("Mechanical Art Capital LLC");
     await page.getByRole("button", { name: "Save Configuration" }).click();

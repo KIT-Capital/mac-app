@@ -11,5 +11,7 @@ describe("collector navigation", () => {
     assert.equal(COLLECTOR_PRIMARY.length, 5);
     assert.equal(COLLECTOR_PRIMARY.some(({ href }) => href === COLLECTOR_GUIDE.href), false);
     assert.equal(COLLECTOR_LINKS.includes(COLLECTOR_GUIDE), true);
+    assert.equal(COLLECTOR_LINKS.some(({ href }) => href === "/brands"), true);
+    assert.equal(COLLECTOR_PRIMARY.some(({ href }) => href === "/brands"), false);
   });
 });

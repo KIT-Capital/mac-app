@@ -11,11 +11,13 @@ import {
 import { usePathname } from "next/navigation";
 import {
   DEMO_CATALOG,
+  DEMO_CATALOG_BRANDS,
   DEMO_SETTINGS,
   DEMO_SHELLS,
   DEMO_USERS,
   photosFromWatches,
 } from "@/lib/admin-seed";
+import { catalogPhotoError, hydrateCatalogBrand, hydrateCatalogEntry, mergeById } from "@/lib/catalog-retail.mjs";
 import { isReservedDeskEmail } from "@/lib/auth";
 import { maxPurchaseAmount } from "@/lib/catalog";
 import {
@@ -77,6 +79,7 @@ import type {
   AgreementShell,
   AppSettings,
   AppState,
+  CatalogBrand,
   CatalogEntry,
   ManagedUser,
   PhotoKind,
@@ -146,6 +149,10 @@ type Store = AppState & {
   upsertUser: (user: ManagedUser) => Promise<OperationAck>;
   removeUser: (id: string) => Promise<OperationAck>;
   upsertCatalog: (entry: CatalogEntry) => Promise<OperationAck>;
+  upsertBrand: (brand: CatalogBrand) => Promise<OperationAck>;
+  sparkleCatalog: (input: { kind: "brand" | "model"; id: string; query?: string }) => Promise<
+    OperationAck & { suggestion?: Record<string, unknown> }
+  >;
   removeCatalog: (id: string) => Promise<OperationAck>;
   upsertShell: (shell: AgreementShell) => Promise<OperationAck>;
   removeShell: (id: string) => Promise<OperationAck>;
@@ -190,6 +197,7 @@ function emptyState(): AppState {
     agreements: [],
     users: DEMO_USERS,
     catalog: DEMO_CATALOG,
+    brands: DEMO_CATALOG_BRANDS,
     shells: DEMO_SHELLS,
     photos: [],
     appraisalAttempts: [],
@@ -269,6 +277,7 @@ const DESK_DATA_ACTIONS = new Set([
   "settings.update",
   "catalog.upsert",
   "catalog.remove",
+  "brand.upsert",
   "shell.upsert",
   "shell.remove",
 ]);
@@ -283,6 +292,7 @@ type BookState = Pick<
   | "appraisalAttemptPhotos"
   | "profiles"
   | "catalog"
+  | "brands"
   | "shells"
   | "settings"
   | "applicationPurchaseShares"
@@ -397,6 +407,7 @@ function mergeBook(
   return {
     ...mergedBook,
     catalog: desk.catalog,
+    brands: desk.brands,
     shells: desk.shells,
     settings: mergeLiveSettings(
       desk.settings,
@@ -917,6 +928,7 @@ function demoState(): AppState {
     agreements: DEMO_AGREEMENTS,
     users: DEMO_USERS,
     catalog: DEMO_CATALOG,
+    brands: DEMO_CATALOG_BRANDS,
     shells: DEMO_SHELLS,
     photos: photosFromWatches(DEMO_TIMEPIECES),
     appraisalAttempts: [],
@@ -1016,7 +1028,12 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
     timepieces,
     agreements: state.agreements ?? [],
     users: state.users?.length ? state.users : DEMO_USERS,
-    catalog: state.catalog?.length ? state.catalog : seedDeskDefaults ? DEMO_CATALOG : [],
+    catalog: seedDeskDefaults
+      ? mergeById(DEMO_CATALOG, (state.catalog ?? []).map(hydrateCatalogEntry))
+      : (state.catalog ?? []).map(hydrateCatalogEntry),
+    brands: seedDeskDefaults
+      ? mergeById(DEMO_CATALOG_BRANDS, (state.brands ?? []).map(hydrateCatalogBrand))
+      : (state.brands ?? []).map(hydrateCatalogBrand),
     shells: state.shells?.length ? state.shells : seedDeskDefaults ? DEMO_SHELLS : [],
     photos: state.photos?.length ? state.photos : photosFromWatches(timepieces),
     appraisalAttempts: state.appraisalAttempts ?? [],
@@ -1801,13 +1818,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
       upsertCatalog: async (entry) => {
         if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
+        const photoError = catalogPhotoError(entry);
+        if (photoError) return { ok: false, error: photoError };
+        const next = hydrateCatalogEntry(entry);
         return updateStore((prev) => {
-          const exists = prev.catalog.some((c) => c.id === entry.id);
+          const exists = prev.catalog.some((c) => c.id === next.id);
           return {
             ...prev,
-            catalog: exists ? prev.catalog.map((c) => (c.id === entry.id ? entry : c)) : [entry, ...prev.catalog],
+            catalog: exists ? prev.catalog.map((c) => (c.id === next.id ? next : c)) : [next, ...prev.catalog],
           };
-        }, { operation: { action: "catalog.upsert", entry }, deferLive: true });
+        }, { operation: { action: "catalog.upsert", entry: next }, deferLive: true });
+      },
+      upsertBrand: async (brand) => {
+        if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
+        const next = hydrateCatalogBrand(brand);
+        return updateStore((prev) => {
+          const current = prev.brands ?? [];
+          const exists = current.some((row) => row.id === next.id);
+          return {
+            ...prev,
+            brands: exists ? current.map((row) => (row.id === next.id ? next : row)) : [next, ...current],
+          };
+        }, { operation: { action: "brand.upsert", brand: next }, deferLive: true });
+      },
+      sparkleCatalog: async (input) => {
+        if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
+        try {
+          const response = await fetch("/api/desk/sparkle", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(input),
+          });
+          const body = await response.json().catch(() => ({})) as {
+            error?: string;
+            suggestion?: Record<string, unknown>;
+          };
+          if (!response.ok) {
+            return { ok: false, error: typeof body.error === "string" ? body.error : "SPARKLE_UNAVAILABLE" };
+          }
+          return { ok: true, suggestion: body.suggestion };
+        } catch {
+          return { ok: false, error: "SPARKLE_UNAVAILABLE" };
+        }
       },
       removeCatalog: async (id) => {
         if (!canEditAppraisal(state.user)) return { ok: false, error: "ROLE_FORBIDDEN" };
