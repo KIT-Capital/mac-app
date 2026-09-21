@@ -72,6 +72,7 @@ describe("live-book adapter mapping", () => {
       delivery: "Desk arranges intake",
       ownerName: "Jonathan Hale",
       email: "jonathan.hale@mechartcap.com",
+      partyKind: "collector",
       // A legacy row is mapped once on the way out (KTD21): it was already on
       // the book with live members from the day it was created.
       status: "executed",

@@ -27,6 +27,15 @@ export function visibleAgreements(user: Profile | null, agreements: Agreement[])
   return agreementsForCollector(agreements, user?.email);
 }
 
+export function pieceInActivatedRepo(agreements: Agreement[], timepieceId: string) {
+  return agreements.some((agreement) =>
+    Boolean(agreement.executedOn)
+    && agreement.status === "executed"
+    && !agreement.bookEnd
+    && agreement.watchIds.includes(timepieceId),
+  );
+}
+
 export function ownedCounts(email: string | null | undefined, timepieces: Timepiece[], agreements: Agreement[]) {
   return {
     pieces: piecesForCollector(timepieces, email).length,

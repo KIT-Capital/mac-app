@@ -121,4 +121,20 @@ describe("Stage 2 records isolation", { skip }, () => {
       { message: "COLLECTOR_NOT_FOUND" },
     );
   });
+
+  it("lets a dealer own pieces the same way a collector does", async () => {
+    const dealer = await registerCollector(db, {
+      email: `dealer.${suffix}@mac.test`,
+      name: "47th Street Books",
+      role: "dealer",
+    });
+    createdCustomerIds.push(dealer.id);
+    const actor = toCollectorActor(dealer);
+    assert.equal(actor.role, "dealer");
+    const piece = await createTimepiece(db, actor, dealer.id, {
+      brand: "Rolex",
+      model: "Submariner",
+    });
+    assert.equal((await listTimepieces(db, actor, dealer.id))[0].id, piece.id);
+  });
 });

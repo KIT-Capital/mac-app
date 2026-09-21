@@ -9,6 +9,7 @@ import {
 } from "./appraisal-attempts";
 import type { Database } from "./client";
 import type { Actor } from "./records";
+import { isRetailActor } from "./records";
 import {
   appraisalAttempts,
   livePreviews,
@@ -67,7 +68,7 @@ function validatePart(part: UploadPart) {
 }
 
 function actorPieceWhere(actor: Actor, timepieceId: string) {
-  return actor.role === "collector"
+  return isRetailActor(actor)
     ? and(eq(timepieces.id, timepieceId), eq(timepieces.customerId, actor.customerId))
     : eq(timepieces.id, timepieceId);
 }
@@ -93,7 +94,7 @@ async function scopedPiece(db: Database, actor: Actor, timepieceId: string) {
 }
 
 async function scopedPhoto(db: Database, actor: Actor, photoId: string) {
-  const where = actor.role === "collector"
+  const where = isRetailActor(actor)
     ? and(eq(photoObjects.id, photoId), eq(photoObjects.customerId, actor.customerId))
     : eq(photoObjects.id, photoId);
   const [row] = await db.select().from(photoObjects).where(where).limit(1);
@@ -159,7 +160,7 @@ async function lockPhotoPiece(
   timepieceId: string,
 ) {
   await lockTimepieceRow(tx, timepieceId);
-  if (actor.role === "collector") {
+  if (isRetailActor(actor)) {
     await assertRetailPieceEditable(tx as unknown as Database, timepieceId);
   }
 }
@@ -247,7 +248,7 @@ export async function requestPhotoUpload(
         piece.id,
         input.kind,
       );
-      if (actor.role === "collector") {
+      if (isRetailActor(actor)) {
         const [attempt] = await tx
           .select({ id: appraisalAttempts.id })
           .from(appraisalAttempts)

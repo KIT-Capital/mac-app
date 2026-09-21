@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { isReservedDeskEmail } from "@/lib/auth";
+import type { RetailRole } from "@/lib/types";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
@@ -14,6 +15,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [partyKind, setPartyKind] = useState<RetailRole>("collector");
   const [code, setCode] = useState("");
   const [awaitingCode, setAwaitingCode] = useState(false);
   const [adult, setAdult] = useState(false);
@@ -49,6 +51,7 @@ export default function SignupPage() {
           email,
           phone: phone || "+1 (212) 555-0100",
           member: false,
+          role: partyKind,
         });
       }
       setBusy(false);
@@ -76,7 +79,7 @@ export default function SignupPage() {
     const registration = await fetch("/api/collector-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "register", name, email, phone }),
+      body: JSON.stringify({ action: "register", name, email, phone, role: partyKind }),
       cache: "no-store",
       credentials: "include",
     }).catch(() => null);
@@ -104,6 +107,7 @@ export default function SignupPage() {
       email,
       phone: phone || "+1 (212) 555-0100",
       member: false,
+      role: partyKind,
     });
     await sendAppEmail({ kind: "welcome", name, email, phone });
     setBusy(false);
@@ -204,6 +208,38 @@ export default function SignupPage() {
               placeholder="+1 (212) 555-0100"
             />
           </div>
+
+          <fieldset className="space-y-3 rounded-xl border border-mac-line bg-mac-card p-3">
+            <legend className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
+              How you use MAC
+            </legend>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="party-kind"
+                checked={partyKind === "collector"}
+                onChange={() => setPartyKind("collector")}
+                className="mt-1 accent-mac-gold"
+              />
+              <span className="text-[13px] text-mac-muted">
+                <span className="block text-mac-fg">Collector</span>
+                I own watches as a consumer and may sell a collection to MAC with the option to buy it back.
+              </span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="party-kind"
+                checked={partyKind === "dealer"}
+                onChange={() => setPartyKind("dealer")}
+                className="mt-1 accent-mac-gold"
+              />
+              <span className="text-[13px] text-mac-muted">
+                <span className="block text-mac-fg">Watch business</span>
+                I run a shop or wholesale book and raise cash against a collection. This is not a loan.
+              </span>
+            </label>
+          </fieldset>
 
           <div className="space-y-3 pt-2 text-[13px] text-mac-muted">
             <label className="flex items-start gap-3 cursor-pointer">

@@ -14,6 +14,7 @@ import { normalizeRequiredPhotoKinds } from "../timepiece-shots.mjs";
 import type { Database } from "./client";
 import { dollarsToCents } from "./money.mjs";
 import type { Actor } from "./records";
+import { isRetailActor } from "./records";
 import {
   appraisalAttemptPhotos,
   appraisalAttempts,
@@ -53,7 +54,7 @@ function constraintName(error: unknown) {
 }
 
 function requireRetailOwner(actor: Actor) {
-  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  if (!isRetailActor(actor)) throw new Error("COLLECTOR_REQUIRED");
   return actor;
 }
 
@@ -67,7 +68,7 @@ function requireAppraiser(actor: Actor) {
 }
 
 async function lockPiece(db: Database, actor: Actor, timepieceId: string) {
-  const where = actor.role === "collector"
+  const where = isRetailActor(actor)
     ? and(eq(timepieces.id, timepieceId), eq(timepieces.customerId, actor.customerId))
     : eq(timepieces.id, timepieceId);
   const [piece] = await db

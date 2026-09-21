@@ -10,11 +10,13 @@ export function WatchCard({
   word,
   decisionsUsed,
   expired = false,
+  inActivatedRepo = false,
 }: {
   watch: Timepiece;
   word: AppraisalStateWord;
   decisionsUsed: number;
   expired?: boolean;
+  inActivatedRepo?: boolean;
 }) {
   return (
     <Link href={`/collection/${watch.id}`} className="block">
@@ -27,7 +29,7 @@ export function WatchCard({
         />
       </div>
       <p className="mt-2 flex items-center gap-1 text-[10px] tracking-[0.12em] text-mac-faint uppercase">
-        {expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[word]}
+        {inActivatedRepo ? "In an activated repo" : expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[word]}
         {!expired && word === "accepted" ? <Check className="h-3 w-3" strokeWidth={2.5} /> : null}
         {word === "not_accepted" ? <XCircle className="h-3 w-3" /> : null}
         {word === "with_mac" ? <Clock className="h-3 w-3" /> : null}

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import type { DeskRole, RetailRole, WatchStatus } from "../types";
+import { isRetailRole } from "../roles.mjs";
 import { isReservedDeskEmail } from "../desk-identities.mjs";
 import type { Database } from "./client";
 import {
@@ -16,13 +17,17 @@ import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import { customers, timepieces } from "./schema";
 
 /**
- * Server actors. The retail side stays `collector` until unit U-party converts
- * every `role === "collector"` scoping site (photos, documents, adapter,
- * mutations) to a retail test; only then does `dealer` become an Actor.
+ * Server actors. Retail is collector or dealer; desk never shares an email.
  */
 export type Actor =
-  | { role: Extract<RetailRole, "collector">; customerId: string; email: string }
+  | { role: RetailRole; customerId: string; email: string }
   | { role: DeskRole; email: string; staffId?: string; isMaster?: boolean };
+
+export function isRetailActor(
+  actor: Actor,
+): actor is Extract<Actor, { role: RetailRole; customerId: string }> {
+  return isRetailRole(actor.role);
+}
 
 const DEFAULT_PREFERENCES = {
   appearance: "dark",
@@ -37,6 +42,7 @@ export type RegisterCollectorInput = {
   email: string;
   name: string;
   phone?: string;
+  role?: RetailRole;
 };
 
 export type TimepieceInput = {
@@ -80,8 +86,20 @@ function constraintName(error: unknown) {
   return null;
 }
 
+function retailRoleOf(customer: { role?: string | null }): RetailRole {
+  return isRetailRole(customer.role) ? customer.role : "collector";
+}
+
 function collectorActor(customer: typeof customers.$inferSelect): Actor {
-  return { role: "collector", customerId: customer.id, email: customer.email };
+  return { role: retailRoleOf(customer), customerId: customer.id, email: customer.email };
+}
+
+export function toRetailActor(customer: typeof customers.$inferSelect): Actor {
+  return collectorActor(customer);
+}
+
+function requestedRetailRole(role?: string | null): RetailRole {
+  return isRetailRole(role) ? role : "collector";
 }
 
 export async function registerCollector(db: Database, input: RegisterCollectorInput) {
@@ -92,6 +110,7 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
   if (isReservedDeskEmail(email)) {
     throw new Error("RESERVED_DESK_EMAIL");
   }
+  const role = requestedRetailRole(input.role);
   try {
     return await db.transaction(async (tx) => {
       const memberId = await allocateMemberIdIn(tx);
@@ -101,9 +120,9 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
           id: randomUUID(),
           tenantId: DEFAULT_TENANT_ID,
           email,
-          name: input.name.trim() || "Collector",
+          name: input.name.trim() || (role === "dealer" ? "Dealer" : "Collector"),
           phone: input.phone?.trim() ?? "",
-          role: "collector",
+          role,
           memberId,
           preferences: DEFAULT_PREFERENCES,
         })
@@ -158,6 +177,7 @@ export async function registerVerifiedCollector(
   const email = normalizeEmail(input.email);
   const name = input.name.trim();
   const phone = input.phone?.trim() ?? "";
+  const role = requestedRetailRole(input.role);
   if (!email.includes("@")) throw new Error("INVALID_EMAIL");
   if (isReservedDeskEmail(email)) throw new Error("RESERVED_DESK_EMAIL");
   if (!name) throw new Error("NAME_REQUIRED");
@@ -172,7 +192,7 @@ export async function registerVerifiedCollector(
         email,
         name,
         phone,
-        role: "collector",
+        role,
         memberId,
         preferences: DEFAULT_PREFERENCES,
       })

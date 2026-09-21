@@ -10,6 +10,7 @@ import { previewClientIp } from "@/lib/contract/pdf-request-policy.mjs";
 import { allowMailRequest } from "@/lib/mail-rate.mjs";
 import { getDb } from "@/lib/db/client";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
+import { isRetailActor } from "@/lib/db/records";
 import { liveBookErrorResponse } from "@/lib/live-book-errors.mjs";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { requestActor } from "@/lib/server/request-actor";
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
       liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
       customerId: url.searchParams.get("customerId") ?? undefined,
     }, documentStore());
-    const sends = context.actor.role === "collector"
+    const sends = isRetailActor(context.actor)
       ? []
       : await listAgreementDocumentSends(getDb(), context.actor, {
         liveAgreementId: url.searchParams.get("liveAgreementId") ?? undefined,
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
     const body = input as Record<string, unknown>;
     const action = String(body.action ?? "build");
     if (action === "email") {
-      if (context.actor.role !== "collector") {
+      if (!isRetailActor(context.actor)) {
         return json({ mode: "live", error: "DOCUMENT_NOT_FOUND" }, 404);
       }
       if (Object.keys(body).some((key) => !["action", "documentId", "recipientKind", "address", "confirmAddress"].includes(key))) {

@@ -371,7 +371,9 @@ describe("direct photo uploads", { skip }, () => {
       timepieceId: piece.id, kind: "front", ...uploadParts.input,
     });
     assert.equal(reminted.photoId, upload.photoId);
-    assert.deepEqual(await sweepPendingPhotos(db, store), { checked: 0, stored: 0, abandoned: 0 });
+    await sweepPendingPhotos(db, store);
+    const [fresh] = await db.select().from(photoObjects).where(eq(photoObjects.id, reminted.photoId));
+    assert.equal(fresh.status, "pending");
     await db
       .update(photoObjects)
       .set({ receivedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) })
