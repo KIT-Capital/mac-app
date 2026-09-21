@@ -1666,7 +1666,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const agreement = current.agreements.find((item) => item.id === id);
         if (!agreement) return { ok: false, error: "AGREEMENT_NOT_FOUND" };
         if (agreement.scale) return { ok: false, error: "AGREEMENT_SCALE_FROZEN" };
-        const openShell = current.shells.find((shell) => shell.status === "open");
+        const openShell = current.shells.find((shell) => (
+          shell.status === "open" && shell.termMonths === agreement.termMonths
+        ));
         const scale = agreementScaleFromDesk(current.settings, openShell, agreement.termMonths);
         if (!assertScenario60Floors(scale).ok) return { ok: false, error: "AGREEMENT_SCALE_INVALID" };
         const acknowledgement = await updateStore((prev) => ({
@@ -1674,7 +1676,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           agreements: prev.agreements.map((item) => (
             item.id === id ? { ...item, scale } : item
           )),
-        }), { operation: { action: "agreement.freezeScale", id, scale } });
+        }), { operation: { action: "agreement.freezeScale", id, scale }, deferLive: true });
         if (!acknowledgement.ok) return { ok: false, error: acknowledgement.error ?? "LIVE_BOOK_WRITE_FAILED" };
         return { ok: true };
       },
