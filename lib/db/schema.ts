@@ -76,6 +76,7 @@ export const customers = pgTable(
       "customers_member_id_check",
       sql`${table.memberId} is null or ${table.memberId} ~ '^[A-Z]{2,8}[0-9]{5}-[0-9]{2}$'`,
     ),
+    check("customers_role_check", sql`${table.role} in ('collector', 'dealer')`),
   ],
 );
 
@@ -672,6 +673,8 @@ export const liveAgreements = pgTable(
     ownerName: text("owner_name").notNull(),
     email: text("email").notNull(),
     status: text("status").notNull().default("pending_signature"),
+    /** Frozen collector/dealer tag at apply (and at renew for the successor). */
+    partyKind: text("party_kind").notNull().default("collector"),
     agreementCode: text("agreement_code"),
     createdOn: text("created_on").notNull(),
     signedOn: text("signed_on"),
@@ -720,6 +723,7 @@ export const liveAgreements = pgTable(
       )`,
     ),
     check("live_agreements_version_check", sql`${table.version} >= 1`),
+    check("live_agreements_party_kind_check", sql`${table.partyKind} in ('collector', 'dealer')`),
     // The term clock is computed from this day, so it has to be one. The
     // backfill closes any row it cannot date; writes are held to the same bar.
     // The pair is deliberate. The pattern fixes the shape, since a bare

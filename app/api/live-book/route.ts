@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db/client";
 import { readLiveBookState } from "@/lib/db/live-book-adapter";
 import { executeLiveBookOperation } from "@/lib/db/live-book-mutations";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
+import { isRetailActor } from "@/lib/db/records";
 import { liveBookErrorResponse } from "@/lib/live-book-errors.mjs";
 import { refuseCrossSiteMutation } from "@/lib/request-origin.mjs";
 import { requestActor } from "@/lib/server/request-actor";
@@ -41,9 +42,9 @@ async function liveContext() {
   if (!config.ok) return { mode: "error" as const, error: config.errors[0] };
   const resolved = await requestActor();
   if ("error" in resolved) return { mode: "unauthorized" as const, error: resolved.error };
-  const viewer = resolved.actor.role === "collector"
+  const viewer = isRetailActor(resolved.actor)
     ? {
-        role: "collector" as const,
+        role: resolved.actor.role,
         customerId: resolved.actor.customerId,
         email: resolved.actor.email,
       }

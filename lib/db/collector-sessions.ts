@@ -4,6 +4,7 @@ import { and, eq, gt, isNull, like, lt, sql } from "drizzle-orm";
 import { generateAccessCode, hashAccessCode, normalizeAccessCode } from "../access-code.mjs";
 import { hashRateLimitKey, rateWindowStart } from "../access-rate-limit.mjs";
 import { hashStaffPassword, parseStaffPasswordHash } from "../staff-password.mjs";
+import { isRetailRole } from "../roles.mjs";
 import type { Database } from "./client";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
@@ -30,6 +31,7 @@ type RegistrationPayload = {
   name: string;
   email: string;
   phone: string;
+  role?: "collector" | "dealer";
 };
 
 type CreateTokenInput = {
@@ -173,7 +175,7 @@ export async function redeemCollectorAccessToken(
           email: registration.email,
           name: registration.name,
           phone: registration.phone,
-          role: "collector",
+          role: isRetailRole(registration.role) ? registration.role : "collector",
           memberId,
           preferences: DEFAULT_PREFERENCES,
         })

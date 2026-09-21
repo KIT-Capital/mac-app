@@ -201,6 +201,8 @@ export type Agreement = {
   delivery: string;
   ownerName: string;
   email: string;
+  /** Collector or dealer at apply/renew. Does not follow later profile edits. */
+  partyKind?: RetailRole;
   status: AgreementStatus;
   createdAt: string;
   signedAt?: string;

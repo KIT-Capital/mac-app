@@ -3,6 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { REQUEST_STATES, deskToday, isRequestExpired } from "@/lib/contract/repo-book.mjs";
 import type { Database } from "./client";
 import type { Actor } from "./records";
+import { isRetailActor } from "./records";
 import { agreementEvents, liveAgreementMembers, liveAgreements } from "./schema";
 
 type QueryDb = Pick<Database, "select" | "insert" | "update">;
@@ -53,13 +54,12 @@ export async function recordAgreementEvent(db: QueryDb, input: AgreementEventInp
  * request and never a desk-internal row (KTD22); the Desk reads everything.
  */
 export async function listAgreementEvents(db: QueryDb, actor: Actor, agreementId: string) {
-  const retail = actor.role === "collector";
-  const where = retail
+  const where = isRetailActor(actor)
     ? and(eq(liveAgreements.id, agreementId), eq(liveAgreements.customerId, actor.customerId))
     : eq(liveAgreements.id, agreementId);
   const [agreement] = await db.select({ id: liveAgreements.id }).from(liveAgreements).where(where).limit(1);
   if (!agreement) throw new Error("AGREEMENT_NOT_FOUND");
-  const scope = retail
+  const scope = isRetailActor(actor)
     ? and(eq(agreementEvents.agreementId, agreementId), eq(agreementEvents.internal, false))
     : eq(agreementEvents.agreementId, agreementId);
   return db

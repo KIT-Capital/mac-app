@@ -57,7 +57,8 @@ import {
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import type { Actor } from "./records";
-import { deskActor } from "./records";
+import { deskActor, isRetailActor } from "./records";
+import { isRetailRole } from "../roles.mjs";
 import {
   agreements as preparedAgreements,
   agreementShells,
@@ -114,6 +115,7 @@ export type RequestProjection = {
   delivery: string;
   ownerName: string;
   email: string;
+  partyKind: "collector" | "dealer";
   status: string;
   createdAt: string;
   agreementCode?: string;
@@ -321,6 +323,7 @@ function projectRequestRow(
     delivery: row.delivery,
     ownerName: row.ownerName,
     email: row.email,
+    partyKind: isRetailRole(row.partyKind) ? row.partyKind : "collector",
     status: row.status,
     createdAt: row.createdOn,
     version: row.version,
@@ -407,7 +410,7 @@ async function closeIfExpiredBeforeMove(db: Database, actor: Actor, id: string, 
 }
 
 function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
-  const collector = actor.role === "collector";
+  const collector = isRetailActor(actor);
   const status = collector
     ? timepiece.status === "reviewing" ? "reviewing" : "not_evaluated"
     : timepiece.status === "appraised" || timepiece.status === "reviewing" ? timepiece.status : "not_evaluated";
@@ -1060,7 +1063,7 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "profile.update") {
-    if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+    if (!isRetailActor(actor)) throw new Error("COLLECTOR_REQUIRED");
     const patch = operation.patch as Record<string, unknown>;
     await db.update(customers).set({
       name: typeof patch.name === "string" ? patch.name.trim() : undefined,
@@ -1068,6 +1071,7 @@ async function executeLiveBookOperationCore(
       avatar: typeof patch.avatar === "string" ? patch.avatar : undefined,
       onboardingComplete: typeof patch.onboardingComplete === "boolean" ? patch.onboardingComplete : undefined,
       preferences: patch.preferences && typeof patch.preferences === "object" ? patch.preferences : undefined,
+      role: isRetailRole(patch.role) ? patch.role : undefined,
       updatedAt: new Date(),
     }).where(eq(customers.id, actor.customerId));
     return;
@@ -1089,6 +1093,7 @@ async function executeLiveBookOperationCore(
         phone: typeof patch.phone === "string" ? patch.phone.trim() : undefined,
         status: nextStatus,
         member: typeof patch.member === "boolean" ? patch.member : undefined,
+        role: isRetailRole(patch.role) ? patch.role : undefined,
         updatedAt: new Date(),
       }).where(eq(customers.id, id));
       if (nextStatus && nextStatus !== "active") {
@@ -1128,7 +1133,7 @@ async function executeLiveBookOperationCore(
       email,
       name: String(customer.name),
       phone: String(customer.phone),
-      role: "collector",
+      role: isRetailRole(customer.role) ? customer.role : "collector",
       status: "invited",
       member: Boolean(customer.member),
       memberId,
@@ -1153,7 +1158,7 @@ async function executeLiveBookOperationCore(
   }
 
   if (action === "timepiece.create") {
-    if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+    if (!isRetailActor(actor)) throw new Error("COLLECTOR_REQUIRED");
     const timepiece = operation.timepiece as Record<string, unknown>;
     const values = pieceValues(timepiece, actor);
     if (!values.brand || !values.model) throw new Error("TIMEPIECE_IDENTITY_REQUIRED");
@@ -1179,7 +1184,7 @@ async function executeLiveBookOperationCore(
     if (isDesk(actor) && patchNeedsAppraisal(patch)) requireAppraiser(actor);
     const id = String(operation.id);
     const current = await lockedOwnedPiece(db, actor, id);
-    if (actor.role === "collector") {
+    if (isRetailActor(actor)) {
       await assertRetailPieceEditable(db, current.id);
     }
     // Moving a piece off `appraised` erases an appraiser's recorded decision,
@@ -1220,9 +1225,9 @@ async function executeLiveBookOperationCore(
 
   if (action === "timepiece.remove") {
     const id = String(operation.id);
-    if (actor.role === "collector") await lockedOwnedPiece(db, actor, id);
+    if (isRetailActor(actor)) await lockedOwnedPiece(db, actor, id);
     else await ownedPiece(db, actor, id);
-    if (actor.role === "collector") {
+    if (isRetailActor(actor)) {
       const [openReview] = await db
         .select({ id: appraisalAttempts.id })
         .from(appraisalAttempts)
@@ -1373,6 +1378,10 @@ async function executeLiveBookOperationCore(
         set: { kind: "renewed", endedOn: planned.end.date, amountCents: endCents },
       });
       await tx.update(liveAgreementMembers).set({ status: "released" }).where(eq(liveAgreementMembers.agreementId, agreement.id));
+      const [owner] = await tx.select({ role: customers.role, name: customers.name })
+        .from(customers)
+        .where(eq(customers.id, agreement.customerId))
+        .limit(1);
       await tx.insert(liveAgreements).values({
         id: successorId,
         tenantId: DEFAULT_TENANT_ID,
@@ -1382,6 +1391,7 @@ async function executeLiveBookOperationCore(
         delivery: planned.successor.delivery,
         ownerName: planned.successor.ownerName,
         email: agreement.email,
+        partyKind: isRetailRole(owner?.role) ? owner.role : "collector",
         // A renewal succeeds a repo that was already on the book, so the
         // successor goes on it too, dated from the day the old one closed.
         status: "executed",
@@ -1403,7 +1413,7 @@ async function executeLiveBookOperationCore(
   if (action === "preview.upsert") {
     const timepieceId = String(operation.timepieceId);
     await lockedOwnedPiece(db, actor, timepieceId);
-    if (actor.role === "collector") await assertRetailPieceEditable(db, timepieceId);
+    if (isRetailActor(actor)) await assertRetailPieceEditable(db, timepieceId);
     const [existing] = await db
       .select({
         timepieceId: livePreviews.timepieceId,
@@ -1490,7 +1500,7 @@ async function consumeRequestThrottle(
   actor: Actor,
   action: "request.submit" | "request.withdraw",
 ) {
-  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  if (!isRetailActor(actor)) throw new Error("COLLECTOR_REQUIRED");
   const throttle = await consumeAccessRateLimit(db, {
     scope: action,
     key: actor.customerId,
@@ -1512,7 +1522,7 @@ async function submitRequest(
   operation: Operation & Record<string, unknown>,
   context: OperationContext,
 ): Promise<RequestSubmitResult> {
-  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  if (!isRetailActor(actor)) throw new Error("COLLECTOR_REQUIRED");
   const id = String(operation.id);
   const watchIds = [...(operation.watchIds as string[])].sort();
   const termMonths = Number(operation.termMonths);
@@ -1625,6 +1635,7 @@ async function submitRequest(
     delivery: String(operation.delivery),
     ownerName: owner.name,
     email: owner.email,
+    partyKind: isRetailRole(owner.role) ? owner.role : "collector",
     status: "submitted",
     version: 1,
     lastActionAt: now,
@@ -1848,7 +1859,7 @@ async function signCollectorRequest(
   operation: Operation & Record<string, unknown>,
   context: OperationContext,
 ): Promise<RequestSubmitResult> {
-  if (actor.role !== "collector") throw new Error("COLLECTOR_REQUIRED");
+  if (!isRetailActor(actor)) throw new Error("COLLECTOR_REQUIRED");
   const agreement = await ownedAgreement(db, actor, String(operation.id));
   if (operation.expectedStatus !== agreement.status || operation.expectedVersion !== agreement.version) {
     throw new Error("AGREEMENT_STATE_CONFLICT");

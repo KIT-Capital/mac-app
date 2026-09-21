@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { pieceInActivatedRepo } from "./owners";
+import type { Agreement } from "./types";
+
+function agreement(overrides: Partial<Agreement> = {}): Agreement {
+  return {
+    id: "agr-1",
+    watchIds: ["w1"],
+    amount: 1000,
+    termMonths: 12,
+    delivery: "Insured courier",
+    ownerName: "A",
+    email: "a@example.com",
+    status: "executed",
+    createdAt: "2026-09-01",
+    executedOn: "2026-09-01",
+    ...overrides,
+  };
+}
+
+describe("pieceInActivatedRepo", () => {
+  it("flags only executed, open pieces that list the watch", () => {
+    assert.equal(pieceInActivatedRepo([agreement()], "w1"), true);
+    assert.equal(pieceInActivatedRepo([agreement({ executedOn: undefined })], "w1"), false);
+    assert.equal(pieceInActivatedRepo([agreement({ status: "submitted" })], "w1"), false);
+    assert.equal(
+      pieceInActivatedRepo(
+        [agreement({ bookEnd: { kind: "bought_back", date: "2026-09-20", amount: 1 } })],
+        "w1",
+      ),
+      false,
+    );
+    assert.equal(pieceInActivatedRepo([agreement({ watchIds: ["other"] })], "w1"), false);
+  });
+});

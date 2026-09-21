@@ -698,11 +698,14 @@ describe("live-book operation repository", { skip }, () => {
       () => executeLiveBookOperation(db, a.actor, operation),
       { message: "DESK_REQUIRED" },
     );
+    await db.update(customers).set({ role: "dealer" }).where(eq(customers.id, a.customer.id));
     // Super admins and appraisers hold the former admin verbs.
     await executeLiveBookOperation(db, deskActor("super_admin", "rc@mechartcap.com"), operation);
     const state = await readLiveBookState(db, a.actor);
     assert.equal(state.agreements.find((row) => row.id === repoId)?.bookEnd?.kind, "renewed");
+    assert.equal(state.agreements.find((row) => row.id === repoId)?.partyKind, "collector");
     assert.deepEqual(state.agreements.find((row) => row.id === operation.successorId)?.watchIds, [piece.id]);
+    assert.equal(state.agreements.find((row) => row.id === operation.successorId)?.partyKind, "dealer");
     assert.equal(state.agreements.find((row) => row.id === operation.successorId)?.scale?.purchaseShare, 0.6);
   });
 
@@ -1153,6 +1156,8 @@ describe("repo requests", { skip }, () => {
     assert.equal(row.termMonths, 12);
     assert.equal(row.delivery, "Insured courier");
     assert.equal(row.createdOn, deskToday());
+    assert.equal(row.partyKind, "collector");
+    assert.equal(result.agreement.partyKind, "collector");
     assert.match(row.agreementCode ?? "", /^MAC-[A-Z0-9]{6}$/);
     assert.equal(Object.keys(row.pieceCaps as Record<string, number>).length, 3);
     assert.equal((row.scale as { purchaseShare: number }).purchaseShare, 0.6);
@@ -1197,6 +1202,21 @@ describe("repo requests", { skip }, () => {
     // The job is idempotent: a second run leaves the stored row alone.
     for (const job of result.afterCommit) await job();
     assert.equal((await documentsOf(id)).length, 1);
+  });
+
+  it("snapshots a dealer tag on apply", async () => {
+    const customer = await registerCollector(db, {
+      email: `dealer-submit.${suffix}@mac.test`,
+      name: "47th Street Books",
+      role: "dealer",
+    });
+    customerIds.push(customer.id);
+    const owner = { customer, actor: toCollectorActor(customer) };
+    const piece = await acceptedPiece(owner);
+    const id = `dealer-submit-${suffix}`;
+    const result = await submit(owner, id, [piece.id], 60_000);
+    assert.equal(result.agreement.partyKind, "dealer");
+    assert.equal((await agreementRow(id))?.partyKind, "dealer");
   });
 
   it("refuses a fractional, sub-floor, or over-cap amount and leaves no row", async () => {
@@ -2155,7 +2175,8 @@ describe("repo request concurrency", { skip }, () => {
         "id" text primary key, "tenant_id" text not null default 'tenant-mac',
         "customer_id" text not null, "amount_cents" integer not null,
         "term_months" integer not null, "delivery" text not null default '',
-        "owner_name" text not null, "email" text not null, "status" text not null,
+        "owner_name" text not null, "email" text not null, "party_kind" text not null default 'collector',
+        "status" text not null,
         "agreement_code" text, "created_on" text not null, "signed_on" text,
         "executed_on" text, "delivered_on" text, "version" integer not null default 1,
         "last_action_at" timestamptz not null default now(), "close_reason" text,

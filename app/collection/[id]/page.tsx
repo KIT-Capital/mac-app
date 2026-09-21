@@ -17,6 +17,7 @@ import {
 } from "@/lib/appraisal-words";
 import { appraisalView, deskToday, heldWatchIds, isAppraisalCurrent, missingEvidenceKinds } from "@/lib/contract/repo-book.mjs";
 import { nextId } from "@/lib/ids";
+import { pieceInActivatedRepo } from "@/lib/owners";
 import { useOwnedAssets } from "@/lib/ownership";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
@@ -50,6 +51,7 @@ export default function WatchDetailPage() {
   const [sending, setSending] = useState(false);
   const watch = timepieces.find((w) => w.id === params.id);
   const onLiveRepo = watch ? heldWatchIds(agreements).has(watch.id) : false;
+  const activated = watch ? pieceInActivatedRepo(agreements, watch.id) : false;
 
   if (!watch) {
     return (
@@ -142,7 +144,7 @@ export default function WatchDetailPage() {
               {view.word === "accepted" ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
               {view.word === "not_accepted" ? <XCircle className="h-3 w-3" /> : null}
               {view.word === "with_mac" ? <Clock className="h-3 w-3" /> : null}
-              {expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[view.word]}
+              {activated ? "In an activated repo" : expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[view.word]}
             </span>
           </div>
         </div>
@@ -170,7 +172,7 @@ export default function WatchDetailPage() {
               data-testid="appraisal-state"
               className="mt-1 text-[22px] font-bold text-mac-fg"
             >
-              {expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[view.word]}
+              {activated ? "In an activated repo" : expired ? "Appraisal expired — send again" : APPRAISAL_WORDS[view.word]}
             </p>
             {view.decisionsUsed > 0 ? (
               <p className="mt-1 text-[12px] text-mac-faint">

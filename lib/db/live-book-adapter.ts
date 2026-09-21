@@ -3,6 +3,7 @@ import { legacyAgreementToRequest } from "@/lib/contract/legacy-agreement.mjs";
 import { appraisalView } from "@/lib/contract/repo-book.mjs";
 import { applicationPurchaseShares } from "@/lib/contract/repo-scale.mjs";
 import { ownerKey } from "@/lib/owners";
+import { isRetailRole } from "@/lib/roles.mjs";
 import { mergePreferences } from "@/lib/preferences";
 import { DEFAULT_SETTINGS } from "@/lib/theme";
 import { PHOTO_KINDS, TIMEPIECE_SHOTS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
@@ -29,6 +30,7 @@ import type { Database } from "./client";
 import { discloseCatalog } from "./catalog";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
+import { isRetailActor } from "./records";
 import {
   customers,
   appraisalAttemptPhotos,
@@ -286,7 +288,7 @@ function profile(row: Row): Profile {
     phone: text(row, "phone"),
     member: Boolean(row.member),
     avatar: text(row, "avatar"),
-    role: "collector",
+    role: isRetailRole(row.role) ? row.role : "collector",
     onboardingComplete: Boolean(row.onboardingComplete),
     applicationSubmitted: Boolean(row.applicationSubmitted),
     promoCode: typeof row.promoCode === "string" ? row.promoCode : null,
@@ -300,7 +302,7 @@ function managedUser(row: Row): ManagedUser {
     name: text(row, "name", text(row, "email")),
     email: ownerKey(text(row, "email")),
     phone: text(row, "phone"),
-    role: "collector",
+    role: isRetailRole(row.role) ? row.role : "collector",
     status:
       text(row, "status") === "suspended"
         ? "suspended"
@@ -453,6 +455,7 @@ export function mapLiveBookRows(
       delivery: text(row, "delivery"),
       ownerName: text(row, "ownerName"),
       email: ownerKey(text(row, "email")),
+      partyKind: isRetailRole(row.partyKind) ? row.partyKind : "collector",
       status: agreementStatus(row.status),
       createdAt: text(row, "createdOn"),
     };
@@ -559,14 +562,14 @@ export function mapLiveBookRows(
 export async function readLiveBookState(db: Database, actor: Actor): Promise<LiveBookState> {
   return db.transaction(async (tx) => {
     const [customerRows, settingRows, catalogRows, brandRows, shellRows, applicationRows] = await Promise.all([
-      actor.role === "collector"
+      isRetailActor(actor)
         ? tx.select().from(customers).where(eq(customers.id, actor.customerId))
         : tx.select().from(customers).where(eq(customers.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(deskSettings),
       tx.select().from(catalogReferences).where(eq(catalogReferences.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(catalogBrands).where(eq(catalogBrands.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(agreementShells),
-      actor.role === "collector"
+      isRetailActor(actor)
         ? tx.select({ id: applications.id })
             .from(applications)
             .where(eq(applications.customerId, actor.customerId))
@@ -588,7 +591,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
         catalog: catalogRows,
         brands: brandRows,
         shells: shellRows,
-      }, actor.role === "collector" ? actor.customerId : undefined, actor.role !== "collector" || applicationRows.length > 0);
+      }, isRetailActor(actor) ? actor.customerId : undefined, !isRetailActor(actor) || applicationRows.length > 0);
     }
     const [pieceRows, agreementRows] = await Promise.all([
       tx.select().from(timepieces).where(inArray(timepieces.customerId, customerIds)),
@@ -629,7 +632,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       brands: brandRows,
       shells: shellRows,
       returnedAgreementIds: [...new Set(returnRows.map((row) => row.agreementId))],
-    }, actor.role === "collector" ? actor.customerId : undefined,
-    actor.role !== "collector" || applicationRows.length > 0 || agreementRows.length > 0);
+    }, isRetailActor(actor) ? actor.customerId : undefined,
+    !isRetailActor(actor) || applicationRows.length > 0 || agreementRows.length > 0);
   });
 }

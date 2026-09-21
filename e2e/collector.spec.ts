@@ -65,6 +65,8 @@ test.describe("collector app", () => {
     await page.goto("/signup");
     await page.getByLabel("Full Legal Name").fill("Ada Locke");
     await page.getByLabel("Email Address").fill("ada@example.com");
+    await expect(page.getByText("Watch business")).toBeVisible();
+    await page.getByRole("radio", { name: /Watch business/i }).check();
     await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
     await page.getByRole("checkbox", { name: /privacy policy/i }).check();
     await page.getByRole("button", { name: "Create Account" }).click();
@@ -90,6 +92,7 @@ test.describe("collector app", () => {
     await expect(page.getByText("Nautilus")).toBeVisible();
     await expect(page.getByText("Royal Oak Selfwinding")).toBeVisible();
     await expect(page.getByText("Logical One")).toBeVisible();
+    await expect(page.getByText("In an activated repo").first()).toBeVisible();
     await expect(page.getByRole("img", { name: /Richard Mille|Nautilus|Royal Oak|Logical One/ }).first()).toBeVisible();
   });
 

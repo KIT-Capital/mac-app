@@ -64,7 +64,7 @@ import {
   validateRecordedEndKind,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
-import { canEditAppraisal, canInspect, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { canEditAppraisal, canInspect, isDeskRole, isRetailRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
 import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
@@ -944,6 +944,15 @@ function assignedRole(requested?: Profile["role"]): Profile["role"] {
   return "collector";
 }
 
+function snapshotPartyKind(state: AppState, email: string) {
+  const key = profileKey(email);
+  const fromUser = profileKey(state.user?.email ?? "") === key ? state.user?.role : undefined;
+  const fromManaged = state.users.find((item) => profileKey(item.email) === key)?.role;
+  const fromProfile = state.profiles[key]?.role;
+  const role = fromManaged ?? fromProfile ?? fromUser;
+  return isRetailRole(role) ? role : "collector";
+}
+
 function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
   const role = assignedRole(patch?.role);
   const preferences = mergePreferences(patch?.preferences);
@@ -1157,7 +1166,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         updateStore((prev) => {
           if (!prev.user) return prev;
           const nextEmail = (storeMode === "live" ? prev.user.email : (patch.email ?? prev.user.email)).trim();
-          if (prev.user.role === "collector" && isReservedDeskEmail(nextEmail)) {
+          if (isRetailRole(prev.user.role) && isReservedDeskEmail(nextEmail)) {
             return prev;
           }
           const nextUser = {
@@ -1410,6 +1419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           delivery: input.delivery,
           ownerName: user.name,
           email: user.email,
+          partyKind: snapshotPartyKind(current, user.email),
           createdAt: today,
           // A request reserves its pieces from the moment it exists; the term
           // clock only starts once MAC executes (KTD7).
@@ -1688,6 +1698,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           delivery: planned.successor.delivery,
           ownerName: planned.successor.ownerName,
           email: planned.successor.email,
+          partyKind: snapshotPartyKind(current, planned.successor.email),
           // The pieces never left MAC, so a successor opens executed (KTD21).
           status: planned.successor.status,
           createdAt: planned.successor.createdAt,

@@ -6,12 +6,13 @@ import { ScreenHeader } from "@/components/screen-header";
 import { WatchCard } from "@/components/watch-card";
 import { WatchPhoto } from "@/components/watch-photo";
 import { appraisalView, deskToday, isAppraisalCurrent } from "@/lib/contract/repo-book.mjs";
+import { pieceInActivatedRepo } from "@/lib/owners";
 import { useOwnedAssets } from "@/lib/ownership";
 import { useStore } from "@/lib/store";
 
 export default function CollectionPage() {
   const { user, appraisalAttempts } = useStore();
-  const { timepieces } = useOwnedAssets();
+  const { timepieces, agreements } = useOwnedAssets();
   const empty = timepieces.length === 0;
 
   return (
@@ -74,6 +75,7 @@ export default function CollectionPage() {
                   word={view.word}
                   decisionsUsed={view.decisionsUsed}
                   expired={expired}
+                  inActivatedRepo={pieceInActivatedRepo(agreements, watch.id)}
                 />
               );
             })}

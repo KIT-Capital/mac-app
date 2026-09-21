@@ -19,6 +19,7 @@ import { DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
+import { isRetailActor } from "./records";
 import { agreementDocumentSends, agreementDocuments, agreementSignatures, deskSettings, liveAgreementMembers, liveAgreements, timepieces } from "./schema";
 
 type QueryDb = Pick<Database, "select" | "insert" | "update">;
@@ -64,7 +65,7 @@ function snapshotHash(value: unknown) {
 }
 
 function actorMeta(actor: Actor) {
-  if (actor.role === "collector") {
+  if (isRetailActor(actor)) {
     return { createdByKind: "collector", createdById: actor.customerId };
   }
   return { createdByKind: "desk", createdById: actor.email };
@@ -103,7 +104,7 @@ function appEnv(env: NodeJS.ProcessEnv) {
 }
 
 async function scopedAgreement(db: QueryDb, actor: Actor, liveAgreementId: string) {
-  const where = actor.role === "collector"
+  const where = isRetailActor(actor)
     ? and(eq(liveAgreements.id, liveAgreementId), eq(liveAgreements.customerId, actor.customerId))
     : eq(liveAgreements.id, liveAgreementId);
   const [row] = await db.select().from(liveAgreements).where(where).limit(1);
@@ -112,7 +113,7 @@ async function scopedAgreement(db: QueryDb, actor: Actor, liveAgreementId: strin
 }
 
 async function scopedDocument(db: QueryDb, actor: Actor, documentId: string) {
-  const where = actor.role === "collector"
+  const where = isRetailActor(actor)
     ? and(eq(agreementDocuments.id, documentId), eq(agreementDocuments.customerId, actor.customerId))
     : eq(agreementDocuments.id, documentId);
   const [row] = await db.select().from(agreementDocuments).where(where).limit(1);
@@ -577,7 +578,7 @@ export async function listAgreementDocuments(
   env: NodeJS.ProcessEnv = process.env,
 ) {
   const clauses: SQL[] = [];
-  if (actor.role === "collector") {
+  if (isRetailActor(actor)) {
     clauses.push(eq(agreementDocuments.customerId, actor.customerId));
   } else if (filter.customerId) {
     clauses.push(eq(agreementDocuments.customerId, filter.customerId));
@@ -702,7 +703,7 @@ export async function listAgreementDocumentSends(
   actor: Actor,
   filter: { liveAgreementId?: string; documentId?: string } = {},
 ) {
-  if (actor.role === "collector") return [];
+  if (isRetailActor(actor)) return [];
   const docs = await listAgreementDocuments(db as Database, actor, {
     liveAgreementId: filter.liveAgreementId,
   });
@@ -934,7 +935,7 @@ export async function sendAgreementDocument(
     now?: Date;
   } = {},
 ) {
-  if (actor.role !== "collector") throw new Error("DOCUMENT_NOT_FOUND");
+  if (!isRetailActor(actor)) throw new Error("DOCUMENT_NOT_FOUND");
   const row = await scopedDocument(db, actor, input.documentId);
   const reconciled = await reconcileBuilding(db, store, row);
   if (reconciled.status !== "stored" || !reconciled.objectKey || !reconciled.checksum || reconciled.bytes == null) {

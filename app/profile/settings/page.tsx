@@ -7,6 +7,8 @@ import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { isReservedDeskEmail } from "@/lib/auth";
+import { isRetailRole } from "@/lib/roles.mjs";
+import type { RetailRole } from "@/lib/types";
 import { readImagePreview } from "@/lib/image";
 import { useStore } from "@/lib/store";
 
@@ -15,18 +17,21 @@ export default function SettingsPage() {
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
+  const [partyKind, setPartyKind] = useState<RetailRole>(
+    isRetailRole(user?.role) ? user.role : "collector",
+  );
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [portraitError, setPortraitError] = useState("");
 
   function onSave(e: FormEvent) {
     e.preventDefault();
-    if (user?.role === "collector" && isReservedDeskEmail(email)) {
+    if (isRetailRole(user?.role) && isReservedDeskEmail(email)) {
       setError("That address is reserved.");
       setSaved(false);
       return;
     }
-    updateProfile({ name, email, phone });
+    updateProfile({ name, email, phone, role: partyKind });
     setError("");
     setSaved(true);
   }
@@ -84,6 +89,39 @@ export default function SettingsPage() {
         <Field label="Verified Phone">
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
+        {isRetailRole(user?.role) ? (
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
+              How you use MAC
+            </legend>
+            <label className="flex items-start gap-3 cursor-pointer text-[13px] text-mac-muted">
+              <input
+                type="radio"
+                name="party-kind"
+                checked={partyKind === "collector"}
+                onChange={() => setPartyKind("collector")}
+                className="mt-1 accent-mac-gold"
+              />
+              <span>
+                <span className="block text-mac-fg">Collector</span>
+                Consumer collection. Changing this does not rewrite a repo already signed.
+              </span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer text-[13px] text-mac-muted">
+              <input
+                type="radio"
+                name="party-kind"
+                checked={partyKind === "dealer"}
+                onChange={() => setPartyKind("dealer")}
+                className="mt-1 accent-mac-gold"
+              />
+              <span>
+                <span className="block text-mac-fg">Watch business</span>
+                Shop or wholesale book raising cash against a collection. Not a loan.
+              </span>
+            </label>
+          </fieldset>
+        ) : null}
         <p className="text-[12px] text-mac-muted">
           Appearance, notices, and contact method live on{" "}
           <Link href="/profile/preferences" className="underline underline-offset-2">

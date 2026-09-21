@@ -185,6 +185,15 @@ export default function AdminAccessPage() {
         <Field label="Phone">
           <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} className="w-full bg-transparent py-1 text-[16px] outline-none" />
         </Field>
+        <Field label="Party">
+          <NativeSelect
+            value={draft.role === "dealer" ? "dealer" : "collector"}
+            onChange={(e) => setDraft({ ...draft, role: e.target.value as "collector" | "dealer" })}
+          >
+            <option className="bg-black" value="collector">Collector</option>
+            <option className="bg-black" value="dealer">Watch business</option>
+          </NativeSelect>
+        </Field>
         <Field label="Status">
           <NativeSelect value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as UserStatus })}>
             <option className="bg-black" value="active">Active</option>
