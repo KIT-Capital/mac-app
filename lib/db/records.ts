@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { DeskRole, RetailRole, WatchStatus } from "../types";
 import { isRetailRole } from "../roles.mjs";
 import { isReservedDeskEmail } from "../desk-identities.mjs";
@@ -14,7 +14,16 @@ import {
 import { centsToDollars, dollarsToCents } from "./money.mjs";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
+import { normalizeCollectorPhone, phoneDigits } from "../phone.mjs";
 import { customers, timepieces } from "./schema";
+
+const PHONE_DIGITS_SQL = sql`(
+  CASE
+    WHEN length(regexp_replace(${customers.phone}, '[^0-9]', '', 'g')) = 10
+    THEN '1' || regexp_replace(${customers.phone}, '[^0-9]', '', 'g')
+    ELSE regexp_replace(${customers.phone}, '[^0-9]', '', 'g')
+  END
+)`;
 
 /**
  * Server actors. Retail is collector or dealer; desk never shares an email.
@@ -142,6 +151,22 @@ export async function findCustomerByEmail(db: Database, emailInput: string) {
   if (!email.includes("@")) return null;
   const [row] = await db.select().from(customers).where(customerEmailOnDefaultTenant(email)).limit(1);
   return row ?? null;
+}
+
+export async function findCustomerByPhone(db: Database, phoneInput: string) {
+  let digits: string;
+  try {
+    digits = phoneDigits(normalizeCollectorPhone(phoneInput));
+  } catch {
+    return null;
+  }
+  if (!digits) return null;
+  const rows = await db.select().from(customers).where(and(
+    eq(customers.tenantId, DEFAULT_TENANT_ID),
+    sql`${PHONE_DIGITS_SQL} = ${digits}`,
+  )).limit(2);
+  if (rows.length !== 1) return null;
+  return rows[0];
 }
 
 export async function activateInvitedCollector(

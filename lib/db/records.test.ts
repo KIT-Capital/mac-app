@@ -7,6 +7,7 @@ import {
   activateInvitedCollector,
   deskActor,
   findCustomerByEmail,
+  findCustomerByPhone,
   getCustomer,
   getTimepiece,
   listTimepieces,
@@ -80,10 +81,11 @@ describe("Stage 2 records isolation", { skip }, () => {
 
   it("registers a verified email once without overwriting the existing collector", async () => {
     const email = `verified.${suffix}@mac.test`;
+    const phone = `+1 212 555 ${String(suffix).slice(-4)}`;
     const first = await registerVerifiedCollector(db, {
       email,
       name: "Verified Collector",
-      phone: "+1 212 555 0100",
+      phone,
     });
     createdCustomerIds.push(first.id);
 
@@ -96,6 +98,8 @@ describe("Stage 2 records isolation", { skip }, () => {
     assert.equal(replay.id, first.id);
     assert.equal(replay.name, "Verified Collector");
     assert.equal((await findCustomerByEmail(db, email))?.id, first.id);
+    assert.equal((await findCustomerByPhone(db, phone))?.id, first.id);
+    assert.equal(await findCustomerByPhone(db, "+1 999 555 0100"), null);
   });
 
   it("does not verify registration over a suspended collector", async () => {

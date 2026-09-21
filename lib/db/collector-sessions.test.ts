@@ -14,7 +14,10 @@ import {
   consumeDeskLoginCode,
   completeDeskSetPassword,
   createCollectorAccessToken,
+  createSmsLoginChallenge,
+  issueCollectorSessionForCustomer,
   redeemCollectorAccessToken,
+  redeemSmsLoginChallenge,
   resolveCollectorSession,
   revokeCollectorSession,
   sweepCollectorAccessRows,
@@ -99,6 +102,109 @@ describe("collector access rows", { skip }, () => {
 
     await revokeCollectorSession(db, first.sessionId);
     assert.equal(await resolveCollectorSession(db, first.sessionId), null);
+  });
+
+  it("opens a collector session from an approved SMS code on the same person", async () => {
+    const owner = await registerCollector(db, {
+      name: "sms-login",
+      email: `sms-login.${suffix}@mac.test`,
+      phone: "+1 (212) 555-0147",
+    });
+    customerIds.push(owner.id);
+    const issued = await issueCollectorSessionForCustomer(db, owner.id);
+    sessionIds.push(issued.sessionId);
+    assert.equal(issued.customer.id, owner.id);
+    assert.equal(issued.redirectPath, "/collection");
+    assert.equal((await resolveCollectorSession(db, issued.sessionId))?.customer.email, owner.email);
+
+    const challenge = await createSmsLoginChallenge(db, {
+      secret: SECRET,
+      customerId: owner.id,
+      phone: "+12125550147",
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(challenge.id);
+
+    const previous = {
+      MAC_LIVE_BOOK: process.env.MAC_LIVE_BOOK,
+      APP_ENV: process.env.APP_ENV,
+      COLLECTOR_SESSION_SECRET: process.env.COLLECTOR_SESSION_SECRET,
+      COLLECTOR_MAGIC_LINK_ORIGIN: process.env.COLLECTOR_MAGIC_LINK_ORIGIN,
+      RESEND_API_KEY: process.env.RESEND_API_KEY,
+      TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
+      TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+      TWILIO_VERIFY_SERVICE_SID: process.env.TWILIO_VERIFY_SERVICE_SID,
+    };
+    const originalFetch = globalThis.fetch;
+    Object.assign(process.env, {
+      MAC_LIVE_BOOK: "1",
+      COLLECTOR_SESSION_SECRET: SECRET,
+      COLLECTOR_MAGIC_LINK_ORIGIN: "http://localhost:43173",
+      RESEND_API_KEY: "test-api-key",
+      TWILIO_ACCOUNT_SID: "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      TWILIO_AUTH_TOKEN: "test-token",
+      TWILIO_VERIFY_SERVICE_SID: "VAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    globalThis.fetch = (async () => ({
+      ok: true,
+      json: async () => ({ status: "approved" }),
+    })) as typeof fetch;
+    try {
+      const response = await verifyPost(new Request(
+        "https://mechart.app/api/collector-session/verify",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "sec-fetch-site": "same-origin",
+          },
+          body: JSON.stringify({ phone: "212 555 0147", code: "424242" }),
+        },
+      ));
+      assert.equal(response.status, 200);
+      const body = await response.json() as { email?: string; redirect?: string };
+      assert.equal(body.email, owner.email);
+      assert.equal(body.redirect, "/collection");
+      const cookie = response.headers.get("set-cookie") ?? "";
+      const signedSession = /mac_collector=([^;]+)/.exec(cookie)?.[1];
+      assert.ok(signedSession);
+      sessionIds.push(openCollectorSessionId(signedSession, SECRET));
+    } finally {
+      globalThis.fetch = originalFetch;
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  it("keeps the SMS session on the person recorded when the text was requested", async () => {
+    const original = await registerCollector(db, {
+      name: "sms-original",
+      email: `sms-original.${suffix}@mac.test`,
+      phone: "+1 212 555 0188",
+    });
+    const other = await registerCollector(db, {
+      name: "sms-other",
+      email: `sms-other.${suffix}@mac.test`,
+      phone: "+1 212 555 0189",
+    });
+    customerIds.push(original.id, other.id);
+    const challenge = await createSmsLoginChallenge(db, {
+      secret: SECRET,
+      customerId: original.id,
+      phone: "+12125550188",
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(challenge.id);
+    await db.update(customers).set({ phone: "+1 212 555 0189" }).where(eq(customers.id, original.id));
+    await db.update(customers).set({ phone: "+1 212 555 0188" }).where(eq(customers.id, other.id));
+    const redeemed = await redeemSmsLoginChallenge(db, {
+      secret: SECRET,
+      phone: "+12125550188",
+    });
+    sessionIds.push(redeemed.sessionId);
+    assert.equal(redeemed.customer.id, original.id);
   });
 
   it("registers once and treats an existing registration email as login", async () => {

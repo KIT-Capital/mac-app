@@ -7,8 +7,11 @@
 Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
 
 - **Collector** — browser mode accepts a valid non-desk email without a password.
-  Live mode emails a six-digit one-time code and creates no session until that
-  code is confirmed. There is no collector password and no social login.
+  Live mode sends a six-digit one-time code to email, or to a phone via Twilio
+  Verify when those keys are set, and creates no session until that code is
+  confirmed. There is no collector password and no social login. Copy does not
+  promise a Mechanical Art Capital from-number. Email codes still work if SMS
+  is unset.
 - **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). Live-book authorization adds a signed, HttpOnly, session-only `mac_collector` cookie after collector Sign In or development live registration and clears it on Sign Out. A new browser session still starts at splash / Sign In.
 - **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first. The login form always shows the password box; there is no hidden “MAC desk staff” reveal.
 ### Verified collector access
@@ -30,13 +33,15 @@ after confirmation.
 
 Access codes are six digits. Neon stores only an HMAC-SHA256 of `email:code`
 with `COLLECTOR_SESSION_SECRET`, a 15-minute expiry, and a consumed time. JSON
-`POST /api/collector-session/verify` with `{ email, code }` consumes the code
-once and creates a 30-day revocable session row in the same transaction. The
-HttpOnly, Secure, SameSite=Lax `mac_collector` cookie contains only a signed
-opaque session-row id. Expired, consumed, and missing codes show the same retry
-message. Codes are never logged or stored in plaintext. Access mail is never
-retained in the generic desk outbox, including send failures. WorkOS and Neon Auth
-remain disabled.
+`POST /api/collector-session/verify` with `{ email, code }` consumes the email
+code once and creates a 30-day revocable session row in the same transaction.
+`{ phone, code }` checks Twilio Verify against that number, then opens a session
+on the matching person row. The HttpOnly, Secure, SameSite=Lax `mac_collector`
+cookie contains only a signed opaque session-row id. Expired, consumed, and
+missing codes show the same retry message. Codes are never logged or stored in
+plaintext. Access mail is never retained in the generic desk outbox, including
+send failures. SMS codes stay in Twilio Verify; the app does not hash them.
+WorkOS and Neon Auth remain disabled.
 
 An invited collector may request the same non-enumerating login code. Successful
 verification atomically activates that exact customer ID and email before issuing

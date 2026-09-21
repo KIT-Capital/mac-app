@@ -35,26 +35,41 @@ export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
   let token = "";
   let email = "";
+  let phone = "";
   if (contentType.includes("application/json")) {
-    const body = (await request.json().catch(() => null)) as { email?: string; code?: string; token?: string } | null;
+    const body = (await request.json().catch(() => null)) as {
+      email?: string;
+      phone?: string;
+      code?: string;
+      token?: string;
+    } | null;
     token = String(body?.code ?? body?.token ?? "");
     email = String(body?.email ?? "");
+    phone = String(body?.phone ?? "");
   } else {
     const form = await request.formData();
     token = String(form.get("token") ?? "");
     email = String(form.get("email") ?? "");
+    phone = String(form.get("phone") ?? "");
   }
   const wantsJson = contentType.includes("application/json");
-  if (!token || (/^\d{6}$/.test(token.replace(/\s+/g, "")) && !email.trim())) {
+  const hasIdentity = Boolean(email.trim() || phone.trim());
+  if (!token || (/^\d{6}$/.test(token.replace(/\s+/g, "")) && !hasIdentity)) {
     if (wantsJson) return Response.json({ error: "ACCESS_TOKEN_INVALID" }, { status: 400 });
     return invalidRedirect(request);
   }
   try {
-    const verified = await verifyCollectorAccess(token, email, clientAddress(request.headers));
+    const verified = await verifyCollectorAccess(
+      token,
+      email,
+      clientAddress(request.headers),
+      phone,
+    );
     if (wantsJson) {
       const response = NextResponse.json({
         ok: true,
         redirect: verified.redirectUrl.pathname,
+        email: verified.email,
       });
       response.cookies.set(
         COLLECTOR_COOKIE,

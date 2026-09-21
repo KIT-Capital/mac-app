@@ -8,17 +8,26 @@ import { getDb } from "@/lib/db/client";
 import {
   consumeAccessRateLimit,
   createCollectorAccessToken,
+  createSmsLoginChallenge,
   markCollectorAccessTokenSent,
   redeemCollectorAccessToken,
+  redeemSmsLoginChallenge,
   resolveCollectorSession,
   revokeCollectorSession,
 } from "@/lib/db/collector-sessions";
 import { findStaffByEmail } from "@/lib/db/staff-accounts";
 import {
   findCustomerByEmail,
+  findCustomerByPhone,
 } from "@/lib/db/records";
 import { evaluateLiveBookConfig } from "@/lib/env/live-book-flag.mjs";
 import { dispatchCollectorAccessMail } from "@/lib/mail";
+import { normalizeCollectorPhone } from "@/lib/phone.mjs";
+import {
+  checkTwilioSmsVerification,
+  readTwilioVerifyConfig,
+  startTwilioSmsVerification,
+} from "@/lib/twilio-verify.mjs";
 
 export async function requestCollectorAccess(input: unknown, address: string) {
   const db = getDb();
@@ -34,6 +43,7 @@ export async function requestCollectorAccess(input: unknown, address: string) {
         now: Date;
       }) => consumeAccessRateLimit(db, limit),
       findCustomerByEmail: (email: string) => findCustomerByEmail(db, email),
+      findCustomerByPhone: (phone: string) => findCustomerByPhone(db, phone),
       findStaffByEmail: (email: string) => findStaffByEmail(db, email),
       createAccessToken: (token: Parameters<typeof createCollectorAccessToken>[1]) =>
         createCollectorAccessToken(db, {
@@ -41,6 +51,13 @@ export async function requestCollectorAccess(input: unknown, address: string) {
           secret: String(process.env.COLLECTOR_SESSION_SECRET ?? ""),
         }),
       sendAccessEmail: dispatchCollectorAccessMail,
+      startSmsVerification: (phone: string) => startTwilioSmsVerification(phone, process.env),
+      createSmsChallenge: (challenge: { customerId: string; phone: string; expiresAt: Date }) =>
+        createSmsLoginChallenge(db, {
+          ...challenge,
+          secret: String(process.env.COLLECTOR_SESSION_SECRET ?? ""),
+        }),
+      smsConfigured: () => Boolean(readTwilioVerifyConfig(process.env)),
       markAccessTokenSent: (id: string, sent: boolean) =>
         markCollectorAccessTokenSent(db, id, sent),
     },
@@ -48,12 +65,58 @@ export async function requestCollectorAccess(input: unknown, address: string) {
   );
 }
 
-export async function verifyCollectorAccess(token: string, email?: string, address = "unknown") {
+export async function verifyCollectorAccess(
+  token: string,
+  email?: string,
+  address = "unknown",
+  phone?: string,
+) {
   const config = evaluateLiveBookConfig(process.env);
   if (!config.enabled) throw new Error("COLLECTOR_LIVE_BOOK_DISABLED");
   if (!config.ok) throw new Error(config.errors[0]);
   const db = getDb();
   const now = new Date();
+  const phoneValue = String(phone ?? "").trim();
+  if (phoneValue) {
+    let normalized;
+    try {
+      normalized = normalizeCollectorPhone(phoneValue);
+    } catch {
+      throw new Error("ACCESS_TOKEN_INVALID");
+    }
+    const [phoneLimit, addressLimit] = await Promise.all([
+      consumeAccessRateLimit(db, {
+        scope: "collector-code-verify-phone",
+        key: normalized,
+        limit: 8,
+        windowMs: 15 * 60_000,
+        now,
+      }),
+      consumeAccessRateLimit(db, {
+        scope: "collector-code-verify-address",
+        key: address,
+        limit: 20,
+        windowMs: 15 * 60_000,
+        now,
+      }),
+    ]);
+    if (!phoneLimit.allowed || !addressLimit.allowed) {
+      throw new Error("ACCESS_TOKEN_INVALID");
+    }
+    const approved = await checkTwilioSmsVerification(normalized, token, process.env);
+    if (!approved) throw new Error("ACCESS_TOKEN_INVALID");
+    const issued = await redeemSmsLoginChallenge(db, {
+      secret: config.secret,
+      phone: normalized,
+      now,
+    });
+    return {
+      sessionToken: sealCollectorSessionId(issued.sessionId, config.secret),
+      redirectUrl: new URL(issued.redirectPath, config.origin),
+      secureCookie: config.origin.startsWith("https://"),
+      email: issued.customer.email,
+    };
+  }
   const emailKey = String(email ?? "").trim().toLowerCase() || "missing";
   const [emailLimit, addressLimit] = await Promise.all([
     consumeAccessRateLimit(db, {
@@ -85,6 +148,7 @@ export async function verifyCollectorAccess(token: string, email?: string, addre
     sessionToken: sealCollectorSessionId(redeemed.sessionId, config.secret),
     redirectUrl: new URL(redeemed.redirectPath, config.origin),
     secureCookie: config.origin.startsWith("https://"),
+    email: redeemed.customer.email,
   };
 }
 

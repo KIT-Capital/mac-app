@@ -154,13 +154,20 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   `{ ok: true, mode: "browser" }` without Neon, mail, or cookie work.
 - Enabled mode runs in development, staging, and production and requires both collector security settings
   plus `RESEND_API_KEY`; preview delivery is refused for identity verification.
-  `action: "login"` accepts an email; valid-format known and unknown emails both
-  receive the same generic `202` response, but only known customers receive mail.
+  `action: "login"` accepts an email or a phone; valid-format known and unknown
+  identities both receive the same generic `202` response, including a
+  deployment-wide `sms` flag so the login page can send people back to email
+  when Twilio Verify is unset. Only a known customer receives email, and only a
+  known customer with Twilio Verify configured receives an SMS. Live collector
+  access does not require Twilio keys; email codes still work if SMS is unset. Copy does not promise a MAC-branded
+  from-number.
 - `action: "register"` accepts bounded `name`, normalized `email`, and `phone`.
   The details stay in the hashed-token row and no customer exists before confirmation.
 - Live mail sends a six-digit code, not a clickable URL. JSON
   `POST /api/collector-session/verify` with `{ email, code }` consumes the code
-  once and creates the revocable session row. Login redirects to `/collection`;
+  once and creates the revocable session row. `{ phone, code }` asks Twilio
+  Verify to confirm the SMS code, then opens a session on that person.
+  Login redirects to `/collection`;
   registration creates or reuses the customer, then redirects to
   `/collection/setup`. Expired, consumed, and missing codes share one retry
   message.
@@ -169,12 +176,12 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - Origin for desk first-password links uses only `COLLECTOR_MAGIC_LINK_ORIGIN`,
   never request host headers. Access codes and links are sent through Resend and
   are never retained in the generic desk outbox, whether delivery succeeds or fails.
-- Code requests use Postgres windows: three per email and ten per forwarded
-  address per hour. A limited email still receives the generic accepted response
-  and creates no token. Registration also has a hard global 100-per-hour cap.
+- Code requests use Postgres windows: three per email or phone and ten per forwarded
+  address per hour. A limited identity still receives the generic accepted response
+  and creates no token or SMS. Registration also has a hard global 100-per-hour cap.
 - Login and signup use this request path. Browser mode preserves the prototype
-  local flow. Live mode stops after the generic check-email response and shows a
-  code field; only verification creates a session or registration customer.
+  local flow. Live mode stops after the generic check-email or check-phone response
+  and shows a code field; only verification creates a session or registration customer.
 - `DELETE /api/collector-session` revokes the row and clears `mac_collector`.
   Verification clears `mac_desk`; desk login revokes and clears `mac_collector`.
 

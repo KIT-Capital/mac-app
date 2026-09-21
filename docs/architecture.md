@@ -24,7 +24,8 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Verified collector access** — signed email verification and
   `mac_collector` session primitives exist behind default-off `MAC_LIVE_BOOK`.
   Enabled use runs in development, staging, and production with an HTTPS origin
-  outside development; login and signup request a verification link.
+  outside development; login and signup request a verification code by email, or
+  by SMS when Twilio Verify keys are set.
 - **Internal mail routing** — `MAC_INTERNAL_EMAIL` is the single recipient for
   MAC desk aliases during the prototype. Collector copies remain addressed to
   collectors and the public From address remains `info@mechartcap.com`.
