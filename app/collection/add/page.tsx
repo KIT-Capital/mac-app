@@ -19,6 +19,7 @@ import {
   isDesk,
 } from "@/lib/catalog";
 import { pickerBrandNames, pickerModelsForBrand } from "@/lib/catalog-retail.mjs";
+import { catalogIdForSelection, assertVideoDuration, MAX_VIDEO_SECONDS } from "@/lib/client-pieces";
 import { nextId } from "@/lib/ids";
 import { fetchWithTimeout } from "@/lib/fetch-timeout.mjs";
 import { readImageFile, type ImageReadResult } from "@/lib/image";
@@ -90,7 +91,12 @@ function AddFormEditor() {
   const [submitting, setSubmitting] = useState(false);
   const [hasBox, setHasBox] = useState(() => Boolean(existing));
   const [hasPapers, setHasPapers] = useState(() => Boolean(existing));
-  const [videoName, setVideoName] = useState("");
+  const [videoName, setVideoName] = useState(existing?.videoName ?? "");
+  const [videoDurationSeconds, setVideoDurationSeconds] = useState<number | null>(
+    existing?.videoDurationSeconds ?? null,
+  );
+  const [videoBusy, setVideoBusy] = useState(false);
+  const videoGeneration = useRef(0);
   const deskPicker = isDesk(user);
   const brandNames = pickerBrandNames(brands ?? [], catalog ?? [], deskPicker);
   const [brand, setBrand] = useState(() => {
@@ -142,6 +148,8 @@ function AddFormEditor() {
         brand: resolvedBrand || "Untitled manufacturer",
         model: model || "Untitled model",
         reference,
+        serial: existing?.serial ?? null,
+        catalogId: missingBrand ? null : catalogIdForSelection(catalog ?? [], resolvedBrand, model, reference),
         images: packedShots.map((shot) => shot.url),
         photoKinds: packedShots.map((shot) => shot.kind),
         status: existing?.status ?? "not_evaluated",
@@ -161,6 +169,8 @@ function AddFormEditor() {
         band,
         bandMaterial,
         complication,
+        videoName: videoName || null,
+        videoDurationSeconds,
       }) satisfies Timepiece,
     [
       band,
@@ -180,6 +190,9 @@ function AddFormEditor() {
       reference,
       resolvedBrand,
       catalog,
+      missingBrand,
+      videoName,
+      videoDurationSeconds,
       user?.email,
     ]
   );
@@ -438,6 +451,7 @@ function AddFormEditor() {
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
+    if (videoBusy) return;
     // Intake only records the piece. A submission is created on the detail
     // screen by `appraisal.submit`, which freezes the evidence (KTD1).
     await submit(existing?.status ?? "not_evaluated");
@@ -536,12 +550,60 @@ function AddFormEditor() {
           {settings.allowVideo ? (
             <label className="block cursor-pointer text-[14px] text-mac-fg">
               + Upload video
-              {videoName ? <span className="ml-2 text-[12px] text-mac-faint">{videoName}</span> : null}
+              {videoName ? (
+                <span className="ml-2 text-[12px] text-mac-faint">
+                  {videoName}
+                  {videoDurationSeconds ? ` · ${Math.round(videoDurationSeconds)}s` : ""}
+                </span>
+              ) : (
+                <span className="ml-2 text-[12px] text-mac-faint">up to {MAX_VIDEO_SECONDS} seconds</span>
+              )}
               <input
                 type="file"
                 accept="video/*"
                 className="sr-only"
-                onChange={(e) => setVideoName(e.target.files?.[0]?.name || "")}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  videoGeneration.current += 1;
+                  const generation = videoGeneration.current;
+                  if (!file) {
+                    setVideoBusy(false);
+                    setVideoName("");
+                    setVideoDurationSeconds(null);
+                    return;
+                  }
+                  setVideoBusy(true);
+                  setVideoName("");
+                  setVideoDurationSeconds(null);
+                  const url = URL.createObjectURL(file);
+                  const node = document.createElement("video");
+                  node.preload = "metadata";
+                  node.onloadedmetadata = () => {
+                    URL.revokeObjectURL(url);
+                    if (generation !== videoGeneration.current) return;
+                    try {
+                      const seconds = assertVideoDuration(node.duration);
+                      setVideoName(file.name);
+                      setVideoDurationSeconds(seconds);
+                      setError("");
+                    } catch {
+                      setVideoName("");
+                      setVideoDurationSeconds(null);
+                      setError(`Use a clip of ${MAX_VIDEO_SECONDS} seconds or less.`);
+                    } finally {
+                      setVideoBusy(false);
+                    }
+                  };
+                  node.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    if (generation !== videoGeneration.current) return;
+                    setVideoBusy(false);
+                    setVideoName("");
+                    setVideoDurationSeconds(null);
+                    setError("That video could not be read.");
+                  };
+                  node.src = url;
+                }}
               />
             </label>
           ) : null}
@@ -729,7 +791,7 @@ function AddFormEditor() {
         <div className="grid grid-cols-2 gap-3 border-t border-mac-line bg-mac-bg px-5 py-4">
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || videoBusy}
             className={`mac-tap flex h-12 items-center justify-center text-[12px] font-semibold tracking-[0.18em] uppercase ${
               light ? "bg-black text-white" : "bg-white text-black"
             }`}

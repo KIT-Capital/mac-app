@@ -421,15 +421,62 @@ async function closeIfExpiredBeforeMove(db: Database, actor: Actor, id: string, 
   }
 }
 
+async function catalogRowForLink(db: Database, catalogId: string) {
+  const [row] = await db
+    .select({
+      tenantId: catalogReferences.tenantId,
+      brand: catalogReferences.brand,
+      model: catalogReferences.model,
+    })
+    .from(catalogReferences)
+    .where(eq(catalogReferences.id, catalogId))
+    .limit(1);
+  if (!row || row.tenantId !== DEFAULT_TENANT_ID) throw new Error("CATALOG_NOT_FOUND");
+  return row;
+}
+
+function catalogMatchesPiece(
+  row: { brand: string; model: string },
+  brand: string,
+  model: string,
+) {
+  return (
+    row.brand.trim().toLowerCase() === brand.trim().toLowerCase()
+    && row.model.trim().toLowerCase() === model.trim().toLowerCase()
+  );
+}
+
+async function assertCatalogLink(
+  db: Database,
+  catalogId: string | null,
+  brand: string,
+  model: string,
+) {
+  if (!catalogId) return;
+  const row = await catalogRowForLink(db, catalogId);
+  if (!catalogMatchesPiece(row, brand, model)) throw new Error("CATALOG_MISMATCH");
+}
+
 function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
   const collector = isRetailActor(actor);
   const status = collector
     ? timepiece.status === "reviewing" ? "reviewing" : "not_evaluated"
     : timepiece.status === "appraised" || timepiece.status === "reviewing" ? timepiece.status : "not_evaluated";
+  const videoName = String(timepiece.videoName ?? "").trim() || null;
+  let videoDurationSeconds: number | null = null;
+  if (videoName) {
+    const seconds = Number(timepiece.videoDurationSeconds);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 60) throw new Error("VIDEO_TOO_LONG");
+    videoDurationSeconds = Math.round(seconds);
+  }
   return {
     brand: String(timepiece.brand ?? "").trim(),
     model: String(timepiece.model ?? "").trim(),
     reference: String(timepiece.reference ?? "").trim() || null,
+    serial: String(timepiece.serial ?? "").trim() || null,
+    catalogId: String(timepiece.catalogId ?? "").trim() || null,
+    videoName,
+    videoDurationSeconds,
     status,
     financeable: collector ? false : Boolean(timepiece.financeable),
     condition: String(timepiece.condition ?? ""),
@@ -1174,6 +1221,7 @@ async function executeLiveBookOperationCore(
     const timepiece = operation.timepiece as Record<string, unknown>;
     const values = pieceValues(timepiece, actor);
     if (!values.brand || !values.model) throw new Error("TIMEPIECE_IDENTITY_REQUIRED");
+    await assertCatalogLink(db, values.catalogId, values.brand, values.model);
     const [existing] = await db.select({ id: timepieces.id })
       .from(timepieces)
       .where(eq(timepieces.id, String(timepiece.id)))
@@ -1223,6 +1271,17 @@ async function executeLiveBookOperationCore(
     const update: Record<string, unknown> = { updatedAt: new Date() };
     for (const key of Object.keys(patch)) {
       if (key in values) update[key] = values[key as keyof typeof values];
+    }
+    const nextBrand = String(update.brand ?? current.brand);
+    const nextModel = String(update.model ?? current.model);
+    const explicitCatalog = patch.catalogId !== undefined;
+    const nextCatalogId = explicitCatalog ? values.catalogId : current.catalogId;
+    if (nextCatalogId) {
+      const row = await catalogRowForLink(db, nextCatalogId);
+      if (!catalogMatchesPiece(row, nextBrand, nextModel)) {
+        if (explicitCatalog) throw new Error("CATALOG_MISMATCH");
+        update.catalogId = null;
+      }
     }
     if (isDesk(actor)) {
       if (patch.valueLow !== undefined) update.valueLowCents = dollarsToCents(Number(patch.valueLow));

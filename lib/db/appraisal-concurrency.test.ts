@@ -31,6 +31,7 @@ describe("appraisal decision concurrency", { skip }, () => {
         "id" text primary key, "tenant_id" text not null default 'tenant-mac',
         "customer_id" text not null, "brand" text not null,
         "model" text not null, "reference" text, "serial" text,
+        "catalog_id" text, "video_name" text, "video_duration_seconds" integer,
         "status" text not null default 'not_evaluated',
         "financeable" boolean not null default false, "condition" text not null default '',
         "box_papers" text not null default '', "case_metal" text not null default '',

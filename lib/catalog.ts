@@ -109,16 +109,18 @@ export function isDesk(user: { role?: string } | null) {
   return isDeskRole(user?.role);
 }
 
-export function catalogMatch(
-  watch: { brand: string; model: string; reference?: string },
-  catalog: {
+export function catalogMatch<
+  T extends {
     brand: string;
     model: string;
     reference: string;
     typicalLow: number;
     typicalHigh: number;
     financeable?: boolean;
-  }[],
+  },
+>(
+  watch: { brand: string; model: string; reference?: string },
+  catalog: T[],
 ) {
   const ref = (watch.reference || "").trim().toLowerCase();
   const brand = watch.brand.trim().toLowerCase();

@@ -189,7 +189,7 @@ Email, SMS login codes (Twilio Verify), and WhatsApp for **retail** notices plus
 
 ## Desk stores
 
-Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Catalog brands, models, retail checkmarks, and Sparkle shipped 2026-09-21 (U13). Tenant stamp `tenant_id` plus MAC member-ID allocation shipped as U-tenant. Member ID display, the Desk members list, and repo populate-from-profile shipped with this unit. Analytics and per-tenant brand rows besides the two presets remain later units of that plan.
+Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Catalog brands, models, retail checkmarks, and Sparkle shipped 2026-09-21 (U13). Tenant stamp `tenant_id` plus MAC member-ID allocation shipped as U-tenant. Member ID display, the Desk members list, and repo populate-from-profile shipped as U-members. Client timepiece catalog links, locked/in-request flags, serial, and a 60-second video clip shipped with this unit. Analytics and per-tenant brand rows besides the two presets remain later units of that plan.
 
 ```mermaid
 flowchart LR
@@ -209,7 +209,7 @@ flowchart LR
 
 - **Catalog** — reusable brands and models. Only an appraiser or super admin adds or edits rows; admins read. **MAC Sparkle** asks a pricing source (Exa, then Firecrawl, then Apify) for a **guess** on the one brand or model being edited: candidate models, a market range with sources, and photo provenance. The appraiser saves or ignores. Last edited recorded. No retail Sparkle. Collector `/brands` shows only retail-checked rows that have a photo.
 - **Members** — collectors and dealers. Member ID `{PREFIX}{#####}-{YY}`. Feeds analysis and agreement forms.
-- **Client timepieces** — named to a member. Informational range + appraiser-entered value + up to three attempt snapshots + physical-inspection finalization. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
+- **Client timepieces** — named to a member. Informational range + appraiser-entered value + up to three attempt snapshots + physical-inspection finalization. Optional catalog link and a 60-second video clip. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
 - **Repos** — assembled from **free** pieces. MAC purchase and activation require final inspected acceptance for every included piece. Whole-collection table. Heart of the Desk.
 - **Analytics** — graphs and exports. Not the official ledger. Never label a close **paid off**.
 

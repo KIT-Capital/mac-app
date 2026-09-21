@@ -465,6 +465,52 @@ describe("live-book operation repository", { skip }, () => {
     assert.deepEqual(untouched.timepieces.map((row) => row.id), [existing.id]);
   });
 
+  it("links a piece only to this tenant's matching catalog row", async () => {
+    const a = await collector("catalog-link");
+    await db.insert(catalogReferences).values({
+      id: `cat-u5-${suffix}`,
+      brand: "Rolex",
+      model: "Daytona",
+      typicalLowCents: 0,
+      typicalHighCents: 0,
+    });
+    await assert.rejects(
+      () => executeLiveBookOperation(db, a.actor, {
+        action: "timepiece.create",
+        timepiece: {
+          id: `piece-cat-miss-${suffix}`,
+          brand: "Cartier",
+          model: "Tank",
+          catalogId: `cat-u5-${suffix}`,
+        },
+      }),
+      { message: "CATALOG_MISMATCH" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, a.actor, {
+        action: "timepiece.create",
+        timepiece: {
+          id: `piece-cat-gone-${suffix}`,
+          brand: "Rolex",
+          model: "Daytona",
+          catalogId: `cat-missing-${suffix}`,
+        },
+      }),
+      { message: "CATALOG_NOT_FOUND" },
+    );
+    await executeLiveBookOperation(db, a.actor, {
+      action: "timepiece.create",
+      timepiece: {
+        id: `piece-cat-ok-${suffix}`,
+        brand: "rolex",
+        model: "daytona",
+        catalogId: `cat-u5-${suffix}`,
+      },
+    });
+    const own = await readLiveBookState(db, a.actor);
+    assert.equal(own.timepieces[0].catalogId, `cat-u5-${suffix}`);
+  });
+
   it("keeps valuation and end controls on the desk", async () => {
     const a = await collector("desk-control");
     const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Crash" });
