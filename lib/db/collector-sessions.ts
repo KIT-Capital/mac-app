@@ -60,8 +60,14 @@ function digestFor(input: { secret: string; email?: string; token: string }) {
   }
 }
 
+type SessionTx = {
+  select: Database["select"];
+  update: Database["update"];
+  insert: Database["insert"];
+};
+
 async function openRetailSession(
-  tx: Database,
+  tx: SessionTx,
   customerId: string,
   now: Date,
   sessionId?: string,
@@ -191,7 +197,7 @@ export async function redeemSmsLoginChallenge(
       ))
       .returning();
     if (!access?.customerId) throw new Error("ACCESS_TOKEN_INVALID");
-    return openRetailSession(tx as Database, access.customerId, now, input.sessionId);
+    return openRetailSession(tx, access.customerId, now, input.sessionId);
   });
 }
 
@@ -340,7 +346,7 @@ export async function issueCollectorSessionForCustomer(
 ) {
   const now = options.now ?? new Date();
   return db.transaction((tx) =>
-    openRetailSession(tx as Database, customerId, now, options.sessionId),
+    openRetailSession(tx, customerId, now, options.sessionId),
   );
 }
 
