@@ -61,6 +61,9 @@
 }
 
 :root {
+  --brand-primary: #0e2a44;
+  --brand-accent: #fcb040;
+  --brand-soft: #e8d5c0;
   --mac-bg: #10141d;
   --mac-card: #161b24;
   --mac-fg: #ffffff;
@@ -101,6 +104,12 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 10%);
   --sidebar-ring: var(--brand-accent);
+}
+
+html[data-brand="mbf"] {
+  --brand-primary: #4e7a96;
+  --brand-accent: #c5cdd4;
+  --brand-soft: #d8dde2;
 }
 
 .dark {

@@ -46,7 +46,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geist.variable} dark h-full antialiased`}
-      data-brand="mac"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: brandBootstrapScript() }} />

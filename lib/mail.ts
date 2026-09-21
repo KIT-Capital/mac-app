@@ -165,11 +165,13 @@ export async function dispatchCollectorAccessMail(
 function composeMail(request: MailRequest): ComposedMail[] {
   const desk = DEFAULT_SETTINGS.financingEmail;
   const greeting = request.name.split(" ")[0] || request.name;
+  const brandedLetter = (fields: Parameters<typeof letter>[0]) =>
+    letter({ ...fields, brandPreset: request.brandPreset });
 
   switch (request.kind) {
     case "inquiry":
       return [
-        letter({
+        brandedLetter({
           kind: "inquiry",
           to: [desk],
           replyTo: request.email,
@@ -183,7 +185,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
           ],
           body: request.message || "No message.",
         }),
-        letter({
+        brandedLetter({
           kind: "inquiry",
           to: [request.email],
           subject: "We received your Mechanical Art Capital inquiry",
@@ -199,7 +201,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
       ];
     case "welcome":
       return [
-        letter({
+        brandedLetter({
           kind: "welcome",
           to: [request.email],
           subject: "Your Mechanical Art Capital collection is open",
@@ -213,7 +215,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
       ];
     case "invite":
       return [
-        letter({
+        brandedLetter({
           kind: "invite",
           to: [request.email],
           subject: `You are invited to Mechanical Art Capital as ${request.role || "collector"}`,
@@ -227,7 +229,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
       ];
     case "appraisal":
       return [
-        letter({
+        brandedLetter({
           kind: "appraisal",
           to: [desk, request.email],
           replyTo: request.email,
@@ -243,7 +245,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
       ];
     case "repurchase":
       return [
-        letter({
+        brandedLetter({
           kind: "repurchase",
           to: [desk, request.email],
           replyTo: request.email,
@@ -274,7 +276,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
         delivery: request.delivery,
         termMonths: request.termMonths,
         deskEmail: desk,
-      }).map((notice) => noticeToLetter(request.kind, notice));
+      }).map((notice) => noticeToLetter(request.kind, notice, request.brandPreset));
     case "request_declined":
       return (
         request.message === "collector"
@@ -293,10 +295,10 @@ function composeMail(request: MailRequest): ComposedMail[] {
             termMonths: request.termMonths,
             deskEmail: desk,
           })
-      ).map((notice) => noticeToLetter(request.kind, notice));
+      ).map((notice) => noticeToLetter(request.kind, notice, request.brandPreset));
     case "membership":
       return [
-        letter({
+        brandedLetter({
           kind: "membership",
           to: [request.email],
           subject: "Monthly appraisal membership is active",
@@ -310,7 +312,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
       ];
     case "test":
       return [
-        letter({
+        brandedLetter({
           kind: "test",
           to: [request.email],
           subject: "Mechanical Art Capital Resend test",
@@ -333,7 +335,7 @@ function noticeToLetter(kind: MailKind, notice: {
   intro: string;
   rows?: string[][];
   body?: string;
-}) {
+}, brandPreset?: "mac" | "mbf") {
   const rows = (notice.rows ?? [])
     .filter((row) => row.length >= 2)
     .map((row) => [String(row[0]), String(row[1])] as [string, string]);
@@ -346,6 +348,7 @@ function noticeToLetter(kind: MailKind, notice: {
     intro: notice.intro,
     rows,
     body: notice.body,
+    brandPreset,
   });
 }
 
@@ -358,6 +361,7 @@ function letter({
   intro,
   rows,
   body,
+  brandPreset,
 }: {
   kind: MailKind;
   to: string[];
@@ -367,8 +371,9 @@ function letter({
   intro: string;
   rows?: [string, string][];
   body?: string;
+  brandPreset?: "mac" | "mbf";
 }): ComposedMail {
-  const brand = brandFromSettings({});
+  const brand = brandFromSettings({ brandPreset });
   const safeHeading = escapeHtml(heading);
   const safeIntro = escapeHtml(intro);
   const safeBody = body ? escapeHtml(body).replaceAll("\n", "<br />") : "";

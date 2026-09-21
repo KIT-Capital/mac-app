@@ -57,8 +57,9 @@ export function brandFromSettings(settings: { brandPreset?: string } | null | un
 }
 
 export function brandBootstrapScript(presetId: string = "mac") {
-  const preset = brandFromSettings({ brandPreset: presetId });
-  return `(function(){var r=document.documentElement;r.setAttribute("data-brand",${JSON.stringify(preset.id)});r.style.setProperty("--brand-primary",${JSON.stringify(preset.palette.primary)});r.style.setProperty("--brand-accent",${JSON.stringify(preset.palette.accent)});r.style.setProperty("--brand-soft",${JSON.stringify(preset.palette.soft)});})();`;
+  const mac = BRAND_PRESETS.mac.palette;
+  const mbf = BRAND_PRESETS.mbf.palette;
+  return `(function(){var r=document.documentElement;var id=${JSON.stringify(presetId)};try{var s=JSON.parse(localStorage.getItem("mac-app-state-v4")||"{}");var p=s.settings&&s.settings.brandPreset;if(p==="mac"||p==="mbf")id=p;}catch(e){}var pal={mac:{p:${JSON.stringify(mac.primary)},a:${JSON.stringify(mac.accent)},s:${JSON.stringify(mac.soft)}},mbf:{p:${JSON.stringify(mbf.primary)},a:${JSON.stringify(mbf.accent)},s:${JSON.stringify(mbf.soft)}}};var c=pal[id]||pal.mac;r.setAttribute("data-brand",id==="mbf"?"mbf":"mac");r.style.setProperty("--brand-primary",c.p);r.style.setProperty("--brand-accent",c.a);r.style.setProperty("--brand-soft",c.s);})();`;
 }
 
 /** Settings the desk persists server-side. The browser store and the Desk

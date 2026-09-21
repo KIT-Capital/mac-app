@@ -50,6 +50,32 @@ describe("mail delivery boundaries", () => {
     );
   });
 
+  it("puts the selected brand name in letter chrome", async () => {
+    const env = { MAC_INTERNAL_EMAIL: INTERNAL_EMAIL };
+    const mac = await dispatchMail(
+      {
+        kind: "inquiry",
+        name: "Collector",
+        email: "collector@example.com",
+        message: "Please contact me about my collection.",
+      },
+      { env },
+    );
+    const mbf = await dispatchMail(
+      {
+        kind: "inquiry",
+        name: "Collector",
+        email: "collector@example.com",
+        message: "Please contact me about my collection.",
+        brandPreset: "mbf",
+      },
+      { env },
+    );
+    assert.match(mac.messages[0].html, /MECHANICAL ART CAPITAL/);
+    assert.match(mbf.messages[0].html, /MB&amp;F/);
+    assert.doesNotMatch(mbf.messages[0].html, /MECHANICAL ART CAPITAL/);
+  });
+
   it("fails access requests when Resend returns an error and retains no token", async () => {
     const accessUrl =
       "https://development.example.com/api/collector-session/verify?token=failed-token-marker";

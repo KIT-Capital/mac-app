@@ -27,6 +27,7 @@ import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS } from "@/lib/theme";
 import type { Database } from "./client";
 import {
   type DocumentStore,
+  deskBrandPreset,
   insertStageDocumentRow,
   liveAgreementHasDocuments,
   recoverCurrentStageDocument,
@@ -321,7 +322,7 @@ function noticeMail(
   context: OperationContext,
   message = "",
 ) {
-  return () => dispatchMail({
+  return async () => dispatchMail({
     kind,
     name: agreement.ownerName,
     email: agreement.email,
@@ -330,6 +331,7 @@ function noticeMail(
     delivery: agreement.delivery,
     termMonths: agreement.termMonths,
     message,
+    brandPreset: await deskBrandPreset(context.rootDb),
   }, { env: context.env, sendEmail: context.sendEmail });
 }
 
