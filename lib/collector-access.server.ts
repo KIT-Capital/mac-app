@@ -8,9 +8,10 @@ import { getDb } from "@/lib/db/client";
 import {
   consumeAccessRateLimit,
   createCollectorAccessToken,
-  issueCollectorSessionForCustomer,
+  createSmsLoginChallenge,
   markCollectorAccessTokenSent,
   redeemCollectorAccessToken,
+  redeemSmsLoginChallenge,
   resolveCollectorSession,
   revokeCollectorSession,
 } from "@/lib/db/collector-sessions";
@@ -24,6 +25,7 @@ import { dispatchCollectorAccessMail } from "@/lib/mail";
 import { normalizeCollectorPhone } from "@/lib/phone.mjs";
 import {
   checkTwilioSmsVerification,
+  readTwilioVerifyConfig,
   startTwilioSmsVerification,
 } from "@/lib/twilio-verify.mjs";
 
@@ -50,6 +52,12 @@ export async function requestCollectorAccess(input: unknown, address: string) {
         }),
       sendAccessEmail: dispatchCollectorAccessMail,
       startSmsVerification: (phone: string) => startTwilioSmsVerification(phone, process.env),
+      createSmsChallenge: (challenge: { customerId: string; phone: string; expiresAt: Date }) =>
+        createSmsLoginChallenge(db, {
+          ...challenge,
+          secret: String(process.env.COLLECTOR_SESSION_SECRET ?? ""),
+        }),
+      smsConfigured: () => Boolean(readTwilioVerifyConfig(process.env)),
       markAccessTokenSent: (id: string, sent: boolean) =>
         markCollectorAccessTokenSent(db, id, sent),
     },
@@ -97,9 +105,11 @@ export async function verifyCollectorAccess(
     }
     const approved = await checkTwilioSmsVerification(normalized, token, process.env);
     if (!approved) throw new Error("ACCESS_TOKEN_INVALID");
-    const customer = await findCustomerByPhone(db, normalized);
-    if (!customer) throw new Error("ACCESS_TOKEN_INVALID");
-    const issued = await issueCollectorSessionForCustomer(db, customer.id, { now });
+    const issued = await redeemSmsLoginChallenge(db, {
+      secret: config.secret,
+      phone: normalized,
+      now,
+    });
     return {
       sessionToken: sealCollectorSessionId(issued.sessionId, config.secret),
       redirectUrl: new URL(issued.redirectPath, config.origin),

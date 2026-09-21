@@ -155,10 +155,11 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - Enabled mode runs in development, staging, and production and requires both collector security settings
   plus `RESEND_API_KEY`; preview delivery is refused for identity verification.
   `action: "login"` accepts an email or a phone; valid-format known and unknown
-  identities both receive the same generic `202` response. Only a known customer
-  receives email, and only a known customer with Twilio Verify configured
-  receives an SMS. Live collector access does not require Twilio keys; email
-  codes still work if SMS is unset. Copy does not promise a MAC-branded
+  identities both receive the same generic `202` response, including a
+  deployment-wide `sms` flag so the login page can send people back to email
+  when Twilio Verify is unset. Only a known customer receives email, and only a
+  known customer with Twilio Verify configured receives an SMS. Live collector
+  access does not require Twilio keys; email codes still work if SMS is unset. Copy does not promise a MAC-branded
   from-number.
 - `action: "register"` accepts bounded `name`, normalized `email`, and `phone`.
   The details stay in the hashed-token row and no customer exists before confirmation.

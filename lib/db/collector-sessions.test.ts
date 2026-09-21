@@ -14,8 +14,10 @@ import {
   consumeDeskLoginCode,
   completeDeskSetPassword,
   createCollectorAccessToken,
+  createSmsLoginChallenge,
   issueCollectorSessionForCustomer,
   redeemCollectorAccessToken,
+  redeemSmsLoginChallenge,
   resolveCollectorSession,
   revokeCollectorSession,
   sweepCollectorAccessRows,
@@ -115,6 +117,14 @@ describe("collector access rows", { skip }, () => {
     assert.equal(issued.redirectPath, "/collection");
     assert.equal((await resolveCollectorSession(db, issued.sessionId))?.customer.email, owner.email);
 
+    const challenge = await createSmsLoginChallenge(db, {
+      secret: SECRET,
+      customerId: owner.id,
+      phone: "+12125550147",
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(challenge.id);
+
     const previous = {
       MAC_LIVE_BOOK: process.env.MAC_LIVE_BOOK,
       APP_ENV: process.env.APP_ENV,
@@ -166,6 +176,35 @@ describe("collector access rows", { skip }, () => {
         else process.env[key] = value;
       }
     }
+  });
+
+  it("keeps the SMS session on the person recorded when the text was requested", async () => {
+    const original = await registerCollector(db, {
+      name: "sms-original",
+      email: `sms-original.${suffix}@mac.test`,
+      phone: "+1 212 555 0188",
+    });
+    const other = await registerCollector(db, {
+      name: "sms-other",
+      email: `sms-other.${suffix}@mac.test`,
+      phone: "+1 212 555 0189",
+    });
+    customerIds.push(original.id, other.id);
+    const challenge = await createSmsLoginChallenge(db, {
+      secret: SECRET,
+      customerId: original.id,
+      phone: "+12125550188",
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(challenge.id);
+    await db.update(customers).set({ phone: "+1 212 555 0189" }).where(eq(customers.id, original.id));
+    await db.update(customers).set({ phone: "+1 212 555 0188" }).where(eq(customers.id, other.id));
+    const redeemed = await redeemSmsLoginChallenge(db, {
+      secret: SECRET,
+      phone: "+12125550188",
+    });
+    sessionIds.push(redeemed.sessionId);
+    assert.equal(redeemed.customer.id, original.id);
   });
 
   it("registers once and treats an existing registration email as login", async () => {

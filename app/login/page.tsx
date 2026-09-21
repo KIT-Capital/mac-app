@@ -114,7 +114,7 @@ export default function LoginPage() {
         credentials: "include",
       }).catch(() => null);
       const accessResult = (await access?.json().catch(() => null)) as
-        | { mode?: "browser" | "live"; accepted?: boolean }
+        | { mode?: "browser" | "live"; accepted?: boolean; sms?: boolean }
         | null;
       if (!access?.ok) {
         setError("Collector access could not start.");
@@ -122,6 +122,11 @@ export default function LoginPage() {
         return;
       }
       if (accessResult?.mode === "live" && accessResult.accepted) {
+        if (accessResult.sms === false) {
+          setError("Text codes are not available. Use email.");
+          setBusy(false);
+          return;
+        }
         setAwaitingCode(true);
         setNotice(LOGIN_SMS_NOTICE);
         setBusy(false);

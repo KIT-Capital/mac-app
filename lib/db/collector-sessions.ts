@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, gt, isNull, like, lt, sql } from "drizzle-orm";
 import { generateAccessCode, hashAccessCode, normalizeAccessCode } from "../access-code.mjs";
 import { hashRateLimitKey, rateWindowStart } from "../access-rate-limit.mjs";
@@ -48,12 +48,62 @@ function linkHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function smsLoginHash(secret: string, phone: string) {
+  return createHmac("sha256", secret).update(`sms-login:${phone}`).digest("hex");
+}
+
 function digestFor(input: { secret: string; email?: string; token: string }) {
   try {
     return hashAccessCode(input.secret, input.email, normalizeAccessCode(input.token));
   } catch {
     return linkHash(input.token);
   }
+}
+
+async function openRetailSession(
+  tx: Database,
+  customerId: string,
+  now: Date,
+  sessionId?: string,
+) {
+  let [customer] = await tx
+    .select()
+    .from(customers)
+    .where(and(
+      eq(customers.id, customerId),
+      eq(customers.tenantId, DEFAULT_TENANT_ID),
+    ))
+    .for("update")
+    .limit(1);
+  if (!customer || !["active", "invited"].includes(customer.status)) {
+    throw new Error("ACCESS_TOKEN_INVALID");
+  }
+  if (customer.status === "invited") {
+    const invited = customer;
+    [customer] = await tx.update(customers).set({
+      status: "active",
+      updatedAt: now,
+    }).where(and(
+      eq(customers.id, invited.id),
+      customerEmailOnDefaultTenant(invited.email),
+      eq(customers.status, "invited"),
+    )).returning();
+    if (!customer) {
+      [customer] = await tx.select().from(customers).where(and(
+        eq(customers.id, invited.id),
+        customerEmailOnDefaultTenant(invited.email),
+        eq(customers.status, "active"),
+      )).limit(1);
+    }
+    if (!customer) throw new Error("ACCESS_TOKEN_INVALID");
+  }
+  const id = sessionId ?? randomUUID();
+  await tx.insert(collectorSessions).values({
+    id,
+    customerId: customer.id,
+    expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
+  });
+  return { customer, sessionId: id, redirectPath: "/collection" as const };
 }
 
 export async function createCollectorAccessToken(db: Database, input: CreateTokenInput) {
@@ -88,6 +138,61 @@ export async function createCollectorAccessToken(db: Database, input: CreateToke
     expiresAt: input.expiresAt,
   });
   return { id, token, expiresAt: input.expiresAt };
+}
+
+export async function createSmsLoginChallenge(
+  db: Database,
+  input: { secret: string; customerId: string; phone: string; expiresAt: Date },
+) {
+  const customerId = String(input.customerId ?? "").trim();
+  const phone = String(input.phone ?? "").trim();
+  if (!customerId || !phone) throw new Error("COLLECTOR_PHONE_INVALID");
+  const tokenHash = smsLoginHash(input.secret, phone);
+  const id = randomUUID();
+  await db.delete(collectorAccessTokens).where(eq(collectorAccessTokens.tokenHash, tokenHash));
+  await db.insert(collectorAccessTokens).values({
+    id,
+    tokenHash,
+    customerId,
+    purpose: "login",
+    expiresAt: input.expiresAt,
+  });
+  return { id, expiresAt: input.expiresAt };
+}
+
+export async function redeemSmsLoginChallenge(
+  db: Database,
+  input: { secret: string; phone: string; now?: Date; sessionId?: string },
+) {
+  const now = input.now ?? new Date();
+  const tokenHash = smsLoginHash(input.secret, input.phone);
+  return db.transaction(async (tx) => {
+    const [candidate] = await tx
+      .select()
+      .from(collectorAccessTokens)
+      .where(and(
+        eq(collectorAccessTokens.tokenHash, tokenHash),
+        eq(collectorAccessTokens.purpose, "login"),
+        isNull(collectorAccessTokens.consumedAt),
+        gt(collectorAccessTokens.expiresAt, now),
+      ))
+      .limit(1);
+    if (!candidate?.customerId) throw new Error("ACCESS_TOKEN_INVALID");
+    const [access] = await tx
+      .update(collectorAccessTokens)
+      .set({
+        consumedAt: now,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(collectorAccessTokens.id, candidate.id),
+        isNull(collectorAccessTokens.consumedAt),
+        gt(collectorAccessTokens.expiresAt, now),
+      ))
+      .returning();
+    if (!access?.customerId) throw new Error("ACCESS_TOKEN_INVALID");
+    return openRetailSession(tx as Database, access.customerId, now, input.sessionId);
+  });
 }
 
 export async function markCollectorAccessTokenSent(
@@ -234,46 +339,9 @@ export async function issueCollectorSessionForCustomer(
   options: { now?: Date; sessionId?: string } = {},
 ) {
   const now = options.now ?? new Date();
-  return db.transaction(async (tx) => {
-    let [customer] = await tx
-      .select()
-      .from(customers)
-      .where(and(
-        eq(customers.id, customerId),
-        eq(customers.tenantId, DEFAULT_TENANT_ID),
-      ))
-      .for("update")
-      .limit(1);
-    if (!customer || !["active", "invited"].includes(customer.status)) {
-      throw new Error("ACCESS_TOKEN_INVALID");
-    }
-    if (customer.status === "invited") {
-      const invited = customer;
-      [customer] = await tx.update(customers).set({
-        status: "active",
-        updatedAt: now,
-      }).where(and(
-        eq(customers.id, invited.id),
-        customerEmailOnDefaultTenant(invited.email),
-        eq(customers.status, "invited"),
-      )).returning();
-      if (!customer) {
-        [customer] = await tx.select().from(customers).where(and(
-          eq(customers.id, invited.id),
-          customerEmailOnDefaultTenant(invited.email),
-          eq(customers.status, "active"),
-        )).limit(1);
-      }
-      if (!customer) throw new Error("ACCESS_TOKEN_INVALID");
-    }
-    const sessionId = options.sessionId ?? randomUUID();
-    await tx.insert(collectorSessions).values({
-      id: sessionId,
-      customerId: customer.id,
-      expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
-    });
-    return { customer, sessionId, redirectPath: "/collection" as const };
-  });
+  return db.transaction((tx) =>
+    openRetailSession(tx as Database, customerId, now, options.sessionId),
+  );
 }
 
 export async function consumeDeskLoginCode(
