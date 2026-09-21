@@ -2163,11 +2163,15 @@ async function executeMacRequest(
   ));
   if (!reserved.length) throw new Error("INSPECTION_INCOMPLETE");
   for (const member of reserved) {
-    const [attempt] = await db.select({ finalizedAt: appraisalAttempts.finalizedAt })
+    const [attempt] = await db.select({
+      finalizedAt: appraisalAttempts.finalizedAt,
+      status: appraisalAttempts.status,
+    })
       .from(appraisalAttempts)
       .where(and(
         eq(appraisalAttempts.timepieceId, member.timepieceId),
         eq(appraisalAttempts.finalizedAgreementId, agreement.id),
+        eq(appraisalAttempts.status, "accepted"),
       ))
       .limit(1);
     if (!attempt?.finalizedAt) throw new Error("INSPECTION_INCOMPLETE");
