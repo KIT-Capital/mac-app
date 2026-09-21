@@ -1,4 +1,5 @@
 import { isDesk } from "@/lib/catalog";
+import { isRetailRole } from "@/lib/roles.mjs";
 import type { Agreement, Profile, Timepiece } from "@/lib/types";
 
 export function ownerKey(email?: string | null) {
@@ -34,6 +35,18 @@ export function pieceInActivatedRepo(agreements: Agreement[], timepieceId: strin
     && !agreement.bookEnd
     && agreement.watchIds.includes(timepieceId),
   );
+}
+
+export function memberIdForEmail(users: { email: string; memberId?: string | null; role?: string }[], email?: string | null) {
+  const key = ownerKey(email);
+  if (!key) return null;
+  const row = users.find((user) => ownerKey(user.email) === key);
+  if (!row || !isRetailRole(row.role)) return null;
+  return row.memberId || null;
+}
+
+export function retailMembers<T extends { role: string }>(users: T[]) {
+  return users.filter((user) => isRetailRole(user.role));
 }
 
 export function ownedCounts(email: string | null | undefined, timepieces: Timepiece[], agreements: Agreement[]) {

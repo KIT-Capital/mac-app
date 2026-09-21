@@ -108,6 +108,14 @@ test.describe("collector app", () => {
     await expect(page.getByRole("img", { name: /Richard Mille|Nautilus|Royal Oak|Logical One/ }).first()).toBeVisible();
   });
 
+  test("Hale profile and repo show the MAC member ID", async ({ page }) => {
+    await signInHale(page);
+    await page.goto("/profile");
+    await expect(page.getByText("Member MAC00001-21")).toBeVisible();
+    await page.goto("/agreements/agr-31419");
+    await expect(page.getByText("Member MAC00001-21")).toBeVisible();
+  });
+
   test("a leftover saved user on this device still opens splash", async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem(

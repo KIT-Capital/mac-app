@@ -203,6 +203,8 @@ export type Agreement = {
   email: string;
   /** Collector or dealer at apply/renew. Does not follow later profile edits. */
   partyKind?: RetailRole;
+  /** Member ID of the retail party at apply. Desk people never have one. */
+  memberId?: string | null;
   status: AgreementStatus;
   createdAt: string;
   signedAt?: string;
@@ -261,6 +263,8 @@ export type Profile = {
   email: string;
   phone: string;
   member: boolean;
+  /** `{PREFIX}{#####}-{YY}` for retail people. Desk staff never have one. */
+  memberId?: string | null;
   avatar: string;
   role: Role;
   onboardingComplete: boolean;
@@ -277,6 +281,7 @@ export type ManagedUser = {
   role: Role;
   status: UserStatus;
   member: boolean;
+  memberId?: string | null;
   lastActive: string;
 };
 

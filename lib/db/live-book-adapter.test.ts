@@ -13,6 +13,7 @@ describe("live-book adapter mapping", () => {
         role: "collector",
         status: "active",
         member: false,
+        memberId: "MAC00001-21",
         avatar: "",
         onboardingComplete: true,
         applicationSubmitted: true,
@@ -64,6 +65,8 @@ describe("live-book adapter mapping", () => {
 
     assert.equal(state.timepieces[0].valueLow, 280000);
     assert.equal(state.timepieces[0].ownerEmail, "jonathan.hale@mechartcap.com");
+    assert.equal(state.users[0].memberId, "MAC00001-21");
+    assert.equal(state.profiles["jonathan.hale@mechartcap.com"].memberId, "MAC00001-21");
     assert.deepEqual(state.agreements[0], {
       id: "agr-31419",
       watchIds: ["rm-011"],
@@ -73,6 +76,7 @@ describe("live-book adapter mapping", () => {
       ownerName: "Jonathan Hale",
       email: "jonathan.hale@mechartcap.com",
       partyKind: "collector",
+      memberId: "MAC00001-21",
       // A legacy row is mapped once on the way out (KTD21): it was already on
       // the book with live members from the day it was created.
       status: "executed",

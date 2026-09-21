@@ -74,6 +74,11 @@ export default function ProfilePage() {
         <h2 className="mt-4 text-center text-[22px] font-medium tracking-tight text-mac-fg">
           {user?.name}
         </h2>
+        {user?.memberId ? (
+          <p className="mt-1 text-center text-[12px] tracking-[0.14em] text-mac-muted uppercase">
+            Member {user.memberId}
+          </p>
+        ) : null}
 
         <div className="mt-6 space-y-2">
           <div className="flex items-center gap-3 bg-mac-card px-4 py-3.5 text-[13px] text-mac-fg">

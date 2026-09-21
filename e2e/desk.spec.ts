@@ -40,6 +40,18 @@ test.describe("desk", () => {
     expect(response.status()).toBe(403);
   });
 
+  test("desk members list shows Hale and hides desk emails", async ({ page }) => {
+    await signInDesk(page);
+    await page.getByRole("link", { name: "Members" }).click();
+    await expect(page.getByText("Jonathan Hale")).toBeVisible();
+    await expect(page.getByText("MAC00001-21")).toBeVisible();
+    await expect(page.getByText("jonathan.hale@mechartcap.com")).toBeVisible();
+    await expect(page.getByText("admin@mechartcap.com")).toHaveCount(0);
+    await page.getByRole("link", { name: "Repo Agreements" }).click();
+    await page.getByRole("tab", { name: "Book" }).click();
+    await expect(page.getByText("Jonathan Hale · MAC00001-21")).toBeVisible();
+  });
+
   test("live-book import requires a desk session and does not change the store", async ({ request }) => {
     const response = await request.post("/api/desk/live-book-import", {
       headers: sameOrigin,

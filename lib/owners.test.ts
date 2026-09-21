@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { pieceInActivatedRepo } from "./owners";
-import type { Agreement } from "./types";
+import { memberIdForEmail, ownedCounts, pieceInActivatedRepo, retailMembers } from "./owners";
+import type { Agreement, Timepiece } from "./types";
 
 function agreement(overrides: Partial<Agreement> = {}): Agreement {
   return {
@@ -18,6 +18,32 @@ function agreement(overrides: Partial<Agreement> = {}): Agreement {
     ...overrides,
   };
 }
+
+describe("retail members", () => {
+  it("shows member IDs only for collectors and dealers", () => {
+    const users = [
+      { email: "admin@mechartcap.com", role: "admin", memberId: "MAC00099-26" },
+      { email: "jonathan.hale@mechartcap.com", role: "collector", memberId: "MAC00001-21" },
+      { email: "books@example.com", role: "dealer", memberId: "MAC00002-26" },
+    ];
+    assert.deepEqual(
+      retailMembers(users).map((row) => row.email),
+      ["jonathan.hale@mechartcap.com", "books@example.com"],
+    );
+    assert.equal(memberIdForEmail(users, "jonathan.hale@mechartcap.com"), "MAC00001-21");
+    assert.equal(memberIdForEmail(users, "admin@mechartcap.com"), null);
+  });
+
+  it("counts pieces and repos without regard to email casing", () => {
+    const counts = ownedCounts(
+      "Jonathan.Hale@mechartcap.com",
+      [{ ownerEmail: "jonathan.hale@mechartcap.com" } as Timepiece],
+      [agreement({ email: "JONATHAN.HALE@MECHARTCAP.COM" })],
+    );
+    assert.equal(counts.pieces, 1);
+    assert.equal(counts.agreements, 1);
+  });
+});
 
 describe("pieceInActivatedRepo", () => {
   it("flags only executed, open pieces that list the watch", () => {

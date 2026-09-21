@@ -266,6 +266,9 @@ export default function DeskRequestPage() {
         </p>
         <h2 className="mt-1 text-lg font-semibold text-white">{agreement.ownerName}</h2>
         <p className="text-[13px] text-white/60">{agreement.email}</p>
+        {agreement.memberId ? (
+          <p className="text-[12px] tracking-[0.12em] text-white/45 uppercase">Member {agreement.memberId}</p>
+        ) : null}
         <p className="mt-3 text-[13px] text-white/80">
           Sale amount {money(agreement.amount)}
           {cap ? ` · Cap ${money(cap)}` : ""}
