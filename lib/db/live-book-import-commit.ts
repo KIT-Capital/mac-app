@@ -119,7 +119,12 @@ export async function commitLiveBookImport(
         })
         .onConflictDoUpdate({
           target: customers.id,
-          set: { email: person.email, name: person.name, updatedAt: new Date() },
+          set: {
+            email: person.email,
+            name: person.name,
+            memberId,
+            updatedAt: new Date(),
+          },
         });
     }
 
