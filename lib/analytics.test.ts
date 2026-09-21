@@ -25,6 +25,9 @@ describe("operations analytics", () => {
     assert.equal(facts.pieces.free, 2);
     assert.equal(facts.members.total, 1);
     assert.equal(facts.members.collectors, 1);
+    assert.equal(facts.partyMix.find((row) => row.label === "collector")?.count, 1);
+    assert.equal(facts.partyMix.find((row) => row.label === "dealer")?.count, 0);
+    assert.equal(facts.series.find((row) => row.month === "2025-10")?.activeUsd, 200000);
     assert.equal(facts.members.vintage[0]?.label, "21");
     assert.equal(facts.members.newThisYear, 0);
     assert.match(analyticsCsv(facts.tables.active), new RegExp(OPERATIONS_LEDGER_DISCLAIMER));
@@ -56,8 +59,19 @@ describe("operations analytics", () => {
       amount: 80000,
       bookEnd: { kind: "bought_back", date: "2026-08-10", amount: 90000 },
     };
+    const closed: Agreement = {
+      id: "agr-closed",
+      watchIds: [],
+      amount: 10000,
+      termMonths: 12,
+      delivery: "",
+      ownerName: "Jonathan Hale",
+      email: "jonathan.hale@mechartcap.com",
+      status: "closed",
+      createdAt: TODAY,
+    };
     const facts = deriveOperationsAnalytics(
-      { agreements: [liquidating, draft, bought], users: DEMO_USERS, timepieces: DEMO_TIMEPIECES },
+      { agreements: [liquidating, draft, bought, closed], users: DEMO_USERS, timepieces: DEMO_TIMEPIECES },
       TODAY,
     );
     assert.equal(facts.activeCount, 1);
@@ -67,5 +81,9 @@ describe("operations analytics", () => {
     assert.equal(facts.trailing.boughtBack.count, 1);
     assert.equal(facts.trailing.boughtBack.amount, 80000);
     assert.equal(facts.bookMix.find((row) => row.label === "in liquidation")?.count, 1);
+    assert.equal(facts.series.find((row) => row.month === "2026-07")?.activeUsd, 280000);
+    assert.equal(facts.series.find((row) => row.month === "2026-08")?.activeUsd, 200000);
+    assert.equal(facts.series.find((row) => row.month === "2025-12")?.activeUsd, 200000);
+    assert.equal(facts.partyMix.find((row) => row.label === "collector")?.count, 1);
   });
 });

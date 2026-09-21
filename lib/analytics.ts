@@ -1,10 +1,12 @@
 import { pieceCustody, type PieceCustody } from "@/lib/client-pieces";
 import {
   BOOK_LABELS,
+  REQUEST_STATES,
   addCalendarMonths,
   bookLabel,
   deskToday,
   isLiveBookLabel,
+  isRequestExpired,
 } from "@/lib/contract/repo-book.mjs";
 import { retailMembers } from "@/lib/owners";
 import { parseMemberId } from "@/lib/tenant.mjs";
@@ -74,7 +76,12 @@ function partyKind(agreement: Agreement) {
 }
 
 function liveOn(agreement: Agreement, day: string) {
-  return Boolean(agreement.executedOn) && isLiveBookLabel(bookLabel(agreement, day));
+  if (!agreement.executedOn || agreement.executedOn > day) return false;
+  const end = agreement.bookEnd;
+  if (end?.date && end.kind && end.date <= day) {
+    return isLiveBookLabel(BOOK_LABELS[end.kind as keyof typeof BOOK_LABELS] ?? null);
+  }
+  return isLiveBookLabel(bookLabel({ ...agreement, bookEnd: undefined }, day));
 }
 
 export function deriveOperationsAnalytics(
@@ -84,7 +91,11 @@ export function deriveOperationsAnalytics(
   const agreements = input.agreements ?? [];
   const executed = agreements.filter((row) => Boolean(row.executedOn));
   const active = executed.filter((row) => liveOn(row, today));
-  const drafts = agreements.filter((row) => !row.executedOn);
+  const drafts = agreements.filter((row) =>
+    !row.executedOn
+    && REQUEST_STATES.includes(row.status)
+    && !isRequestExpired(row, today)
+  );
   const windowStart = addCalendarMonths(today, -12);
   const trailingRows = (kind: "bought_back" | "liquidated" | "renewed") =>
     executed.filter((row) => row.bookEnd?.kind === kind && inWindow(row.bookEnd.date, windowStart, today));
@@ -114,9 +125,10 @@ export function deriveOperationsAnalytics(
   const bookMix = bookLabels.map((label) =>
     mix(label, executed.filter((row) => bookLabel(row, today) === label)),
   );
-  const partyMix = (["collector", "dealer"] as const).map((kind) =>
-    mix(kind, executed.filter((row) => partyKind(row) === kind)),
-  );
+  const partyMix: MixRow[] = [
+    { label: "collector", count: members.filter((row) => row.role === "collector").length, amount: 0 },
+    { label: "dealer", count: members.filter((row) => row.role === "dealer").length, amount: 0 },
+  ];
 
   const series = monthKeys(today, 12).map((month) => {
     const end = monthEnd(month);
