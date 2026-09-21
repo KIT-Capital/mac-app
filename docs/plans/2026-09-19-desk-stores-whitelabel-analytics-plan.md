@@ -60,9 +60,9 @@ Reusable reference for “this model shows up again and again.”
 | Financeable flag, notes | As today |
 
 - **Only an appraiser or super admin may add or edit a catalog row.** Admin may read. (Aligns with roles-plan appraisal ACL.)
-- **MAC Sparkle** (gold control, appraiser only). Owner rules, 2026-09-19:
-  - Sparkle prices **only the range** (low / high). It never writes a chosen appraised price, a financeable flag, or any repo number.
-  - It researches **only the timepiece the appraiser is editing right now** — one row, on click. No bulk repricing, no nightly job.
+- **MAC Sparkle** (gold control, appraiser only). Owner rules, 2026-09-19, widened 2026-09-21:
+  - Sparkle suggests **models, a market range, and photo provenance**. It never writes a chosen appraised price, a financeable flag, or any repo number, and it never writes catalog rows itself.
+  - It researches **only the brand or model the appraiser is editing right now** — one row, on click. No bulk repricing, no nightly job.
   - Sparkle numbers are **suggestions**: an educated guess of today’s market band with sources and a retrieved-at stamp. The appraiser may accept, edit, or ignore. Nothing changes until the appraiser saves. Ranges stay hand-editable at all times.
   - Sources are pluggable behind one server adapter: **Exa** first (`EXA_API_KEY` in Doppler, never in git); **Radar** as the owner named it (confirm the exact vendor/API before wiring); WatchCharts API v3 and similar watch-price data providers are candidates. The adapter returns one shape (range, currency, sources, retrieved-at) so vendors can be added or swapped without touching the Desk UI.
   - If the source is down, the button fails visibly; the last saved range stays.
@@ -92,6 +92,8 @@ Watches registered to a member ID. Similar to catalog **plus**:
 Retail sees appraisal copy. Desk sees the same appraiser-entered dollars as liquidation value. The range is FYI for both planes: entering a value below or above it produces a warning only and never blocks or changes the value.
 
 ##### Appraisal attempts and physical inspection
+
+> **Superseded 2026-09-21.** Appraisal attempts, inspection, and MAC-signs-last shipped in `docs/plans/2026-09-19-001-feat-appraisal-and-repo-request-flow-plan.md` (decision `0005`). The “U-appraise-acl still missing” and “`agreement.signCollector` still activates” notes below are historical. Sparkle suggestions now cover models, range, and photo provenance — still one row, on click, suggestion only, appraiser only. The six book labels apply only after `executedOn`.
 
 - Retail submits an unlocked timepiece for appraisal with its current information, current photo references, and **notes to the appraiser** (maximum 256 characters). Submission creates a frozen review snapshot and locks retail edits while review is pending.
 - Each timepiece may receive at most **three completed appraisal attempts**. A completed appraiser decision — **Accept** or **Does not meet appraisal criteria** — consumes one attempt. Saving an unfinished review, or returning it for better information, does not. The cap counts **completed decisions, never snapshot rows**: a returned submission still writes its own permanent snapshot, so a piece may legitimately hold more than three snapshots while holding at most three decisions.
@@ -203,4 +205,4 @@ Remove “Collector app” as the professional desk exit if roles-plan Desk menu
 
 ## Owner confirmation
 
-**Approved 2026-09-19** together with the roles plan. Appraisal lifecycle amendment approved 2026-09-19: the range is FYI only; appraisal value is unrestricted; Accept/Refuse decisions; three completed decisions (not three snapshots); frozen submission evidence on retention-pinned object keys; only an Accept is provisional and a refusal is final on record; one audited reopen path limited to the newest attempt; final inspected acceptance before MAC purchase or repo activation; U-appraise-acl and U-mac-sign are hard prerequisites. Settled: Sparkle is per-row, range-only, suggestion-only, appraiser-only; retail Sparkle later; analytics is exportable operations facts, not QuickBooks; `PTK` stays an example until a tenant exists. Open: which vendor “Radar” is — ask before wiring that provider; which appraisal dollar drives the LTV/cash-offer formula remains a separate owner-approved money-math decision.
+**Approved 2026-09-19** together with the roles plan. Appraisal lifecycle amendment approved 2026-09-19: the range is FYI only; appraisal value is unrestricted; Accept/Refuse decisions; three completed decisions (not three snapshots); frozen submission evidence on retention-pinned object keys; only an Accept is provisional and a refusal is final on record; one audited reopen path limited to the newest attempt; final inspected acceptance before MAC purchase or repo activation; U-appraise-acl and U-mac-sign are hard prerequisites. Settled: Sparkle is per-row, suggestion-only, appraiser-only, and covers models, range, and photo provenance; retail Sparkle later; analytics is exportable operations facts, not QuickBooks; `PTK` stays an example until a tenant exists. Open: which vendor “Radar” is — ask before wiring that provider; which appraisal dollar drives the LTV/cash-offer formula remains a separate owner-approved money-math decision.

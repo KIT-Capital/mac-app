@@ -1,6 +1,6 @@
 # Docs index
 
-**Tier: CONTRACT** · Last verified: 2026-09-20
+**Tier: CONTRACT** · Last verified: 2026-09-21
 
 This is a **router, not a summary**. Mechanical Art Capital is a Next.js collector/desk app. Norfolk Kit client-safe tooling is equipped at `bf25a84ca761379ecfc8656793fec1f377f4b28a`. `product-os.lock.json` is **proposed**, not signed or adopted.
 
@@ -24,6 +24,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | Desk catalog vs members vs client pieces vs repos, dashboard, white-label | `workflows.md` · `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md` · `decisions/0004-desk-stores-and-tenant-brand.md` · `design-system.md` |
 | Collector or desk in-app tutorial | `design-reference.md` · `business-logic.md` · `api.md` |
 | Repo operations book (open / past due / ends) | `business-logic.md` · `workflows.md` · `api.md` · `plans/2026-09-16-001-feat-repo-operations-book-plan.md` |
+| Request vs executed repo, book labels after execution | `workflows.md` · `business-logic.md` · `decisions/0005-repo-request-lifecycle.md` |
 | Live book exclusive piece, **renewed**, development cutover | `business-logic.md` · `plans/2026-09-17-001-feat-live-book-cutover-plan.md` |
 | Stored sale-and-repurchase PDFs (live mode) | `business-logic.md` · `api.md` · `plans/2026-09-17-002-feat-immutable-repo-agreements-plan.md` · `superpowers/specs/2026-09-17-immutable-repo-agreements-design.md` |
 | Secrets, env key names | `config-and-env-map.md` |
@@ -50,7 +51,7 @@ This is a **router, not a summary**. Mechanical Art Capital is a Next.js collect
 | `agent-naming.md` | CONTRACT | Persona-first names |
 | `kit-equip-record.md` | REFERENCE | Installed Kit files and source SHA |
 | `setup/` | REFERENCE | Editor operator setup |
-| `decisions/` | CONTRACT | One record per decision |
+| `decisions/` | CONTRACT | One record per decision, including `0005-repo-request-lifecycle.md` |
 | `plans/` | REFERENCE | Living plans, including production persistence |
 | `solutions/` | REFERENCE | Documented solutions (YAML frontmatter: module, tags, problem_type) |
 | `runbooks/` | REFERENCE | Operator drills (restore preview, never a live branch) |

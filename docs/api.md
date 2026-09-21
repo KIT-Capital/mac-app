@@ -1,6 +1,6 @@
 # API
 
-**Tier: CONTRACT** · Last verified: 2026-09-20
+**Tier: CONTRACT** · Last verified: 2026-09-21
 
 There is no tRPC router. Server surface is App Router handlers. Everything else is client state.
 
@@ -37,6 +37,7 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 ## `GET` / `POST` `/api/agreement-documents`
 
 - Flag off returns `{ mode: "browser" }` and opens neither Neon nor R2.
+- Stored documents have four stages: `proposal`, `collector_signed`, `executed`, and `legacy` (rows written before the request model). Stage PDFs are checksummed objects; `GET` never returns bucket, key, or credentials.
 - Live mode requires exactly one valid desk or collector session. Unauthenticated
   is **401** before any ID lookup. Collector reads are scoped by `customer_id`;
   a foreign ID returns the same `DOCUMENT_NOT_FOUND` body as a missing ID.
@@ -97,7 +98,7 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - `commit: false` (default) returns a dry-run report. `commit: true` writes Neon `development` live-book tables in one transaction when the plan is clean.
 - Commit replans under an advisory lock and appends its audit row in the same transaction.
 - In-memory Hale demo requires `confirmLiveImport: true`. Reserved desk emails are not customers. Email or ID collisions fail closed.
-- After the owner live-book flag is on, this handler returns **409** and does not write. The flag stays off in this unit. Path is outside `/admin` so the desk matcher does not truncate the body.
+- After the owner live-book flag is on, this handler returns **409** and does not write. A payload whose agreements include `collector_signed` or `inspecting` is refused even while the flag is off: those mid-flight request states assert a signature, an inspection, or a stored document that does not travel with the browser export. The flag stays off in this unit. Path is outside `/admin` so the desk matcher does not truncate the body.
 
 ## `POST` `/api/desk/live-book-preview`
 
@@ -126,6 +127,18 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   or `super_admin`. Add/reset return a generated temporary password exactly
   once; invite mail never contains it.
 - Every write appends an immutable audit row in the same transaction.
+
+## `POST` `/api/desk/sparkle`
+
+- Desk session required. Appraiser or super admin only (**403** `ROLE_FORBIDDEN`
+  otherwise). Same-origin gated. Body is `{ kind: "brand" | "model", id }`.
+- Always runs `catalog.sparkle` through `executeLiveBookOperation`. The catalog
+  row is loaded by id; client query text is ignored. Missing `staffId` in live
+  mode is **401** `SESSION_INVALID`. An 11th call in the daily window is
+  `THROTTLED`. Missing provider keys return `SPARKLE_UNAVAILABLE` after the
+  throttle is recorded.
+- Browser mode still uses this route because a live-book POST with the flag off
+  returns `{ mode: "browser" }` without running the action.
 
 ## Collector sessions
 
@@ -164,14 +177,14 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - `GET` requires exactly one valid desk or collector session and returns
   `Cache-Control: private, no-store`. Desk reads all rows; a collector session is
   bound to immutable customer ID and email and reads only that customer.
-- Live reads also return server-authoritative desk settings, catalog references,
-  and agreement shells. An absent settings row is represented by Scenario 60 and
+- Live reads also return server-authoritative desk settings, catalog brands, catalog references, and agreement shells. An absent settings row is represented by Scenario 60 and
   application defaults without writing a row. Empty catalog and shell tables are
   returned empty; demo rows are never seeded in live mode. Before a collector has
   an application or repo, custom pricing and shells are withheld and custody is
-  blank; the response exposes only the effective purchase-share cap for each
-  selectable application term so the proposed amount matches server enforcement.
-  The desk always receives the authoritative values.
+  blank; the response still exposes generic Scenario 60 display defaults plus the
+  effective purchase-share cap for each selectable application term so the Apply
+  picker can show a live maximum and buyback table. The desk always receives the
+  authoritative values. Collectors receive only retail-checked brands and models.
 - Live reads include the server-authenticated viewer role and identity. The client
   uses that viewer to replace stale tab identity instead of trusting sessionStorage;
   desk viewers are rebuilt from the trusted desk-role profiles.
@@ -210,10 +223,15 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   appraisal rows but cannot write them. Other Desk roles continue to control
   applicable status, repo ends, and renewal. MAC execute is the only path
   that puts a request on the book.
-- Desk-data actions are `settings.update`, `catalog.upsert`, `catalog.remove`,
-  `shell.upsert`, and `shell.remove`. Catalog writes and appraisal fields require
+- Desk-data actions are `settings.update`, `brand.upsert`, `catalog.upsert`,
+  `catalog.remove`, `catalog.sparkle`, `shell.upsert`, and `shell.remove`.
+  Catalog writes, Sparkle research, and appraisal fields require
   appraiser or super admin; `requiredPhotoKinds` requires super admin; the
   remaining settings and shell actions accept any desk role.
+  `catalog.sparkle` loads the brand or model by id, ignores any client query
+  text, and returns a suggestion (candidate models, market range, photo
+  provenance) without writing rows. Live Sparkle records the daily throttle
+  before research so an unavailable provider still counts toward the cap.
   Settings and shell scale terms below Scenario 60 floors are refused with
   `AGREEMENT_SCALE_INVALID`. Settings and shell mutations append an immutable
   desk audit row in the same transaction. Catalog mutations are audited as money

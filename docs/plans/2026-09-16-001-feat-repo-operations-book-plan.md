@@ -8,6 +8,8 @@ origin: owner brief 2026-09-16 (desk is operations/analytics, not official books
 
 # feat: Add the repo operations book
 
+> **Superseded for book membership and the term clock (2026-09-21).** Decision `0005` and U5 of `docs/plans/2026-09-19-001-feat-appraisal-and-repo-request-flow-plan.md`: a repo is on the book only after `executedOn`; the term clock runs from that date; unexecuted requests are not on the book. Hale was mapped once to executed on the day it was created. Sentences below that start the term at `createdAt`, put a newly created agreement on **open**, or treat unsigned rows as on the book are this unit's original design, not current contract. Current rules live in `docs/workflows.md`, `docs/business-logic.md`, and `docs/decisions/0005-repo-request-lifecycle.md`.
+
 ## Summary
 
 Ship a user-facing repo book on the live browser store. Desk and collector share five labels: **open**, **past due**, **bought back**, **in liquidation**, **liquidated**. Staff record an end with date and amount. Past due is derived when the term date has passed and no end is recorded. Official books stay in QuickBooks and third-party inventory. Signature flags, Scenario 60 pricing, and the downloadable contract PDF stay as they are.
@@ -106,7 +108,7 @@ Skipped. Local store and desk/collector patterns are enough. External loan-servi
 - **Any of the three kinds** may be set from open or past due. No required `in liquidation → liquidated` ladder.
 - **Desk UX stays on the list.** Modal or expand-row on `/admin/agreements`. Two columns: signature (Mark signed) and book (label + Record end). No `/admin/agreements/[id]`.
 - **Collector list chip is the book label only.** Detail shows the book label plus the existing Sign / Executed control.
-- **Unsigned repos are in the book.** Hale stays `pending_signature` and reads **past due**.
+- **Unexecuted requests are not on the book.** Decision `0005` (2026-09-21). Hale was mapped once to executed on the day it was created, so it still reads **past due**.
 - **Signature after an end is allowed.** Axes stay independent (prototype HTML sign remains a flag).
 - **Same piece on two repos stays allowed.** The book is per agreement, not per piece.
 - **Staff and admin both record ends.** Collectors never do.

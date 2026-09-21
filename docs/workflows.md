@@ -1,10 +1,10 @@
 # Users, timepieces, and repos
 
-**Tier: CONTRACT** · Last verified: 2026-09-20
+**Tier: CONTRACT** · Last verified: 2026-09-21
 
 This is the lifecycle map for Mechanical Art Capital. Money math stays in `business-logic.md`. Visual chrome stays in `design-system.md`. Identity implementation that is **not yet in the app** lives in `plans/2026-09-19-roles-identity-repo-parties-plan.md` and is marked **proposed** below. Do not treat proposed boxes as shipped.
 
-Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-lifecycle-language.md` and `0004-desk-stores-and-tenant-brand.md`. Official cash is QuickBooks. Official inventory is the third-party inventory book. This app is the **operations book** only. Desk analytics are derived facts, not Stage 6.
+Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-lifecycle-language.md`, `0004-desk-stores-and-tenant-brand.md`, and `0005-repo-request-lifecycle.md`. Official cash is QuickBooks. Official inventory is the third-party inventory book. This app is the **operations book** only. Desk analytics are derived facts, not Stage 6.
 
 ## How to read the words
 
@@ -12,7 +12,7 @@ Authority: this file, `business-logic.md`, `security.md`, decisions `0003-repo-l
 |---|---|---|
 | Active repo | Book **open**, **past due**, or **in liquidation**, and signature **signed** (activated) | Pieces in it cannot join another active repo |
 | Inactive / closed / done | Book **bought back**, **liquidated**, or **renewed** | Pieces are free unless a renewal moved them to the successor |
-| Activated | Executed: the repo has an **execution date**, MAC last (proposed gate) | The book label and the term clock both start at execution; a request before execution has no book label |
+| Activated | Executed: the repo has an **execution date**, MAC last | The book label and the term clock both start at execution; a request before execution has no book label |
 | Repossessed / bought back | Book **bought back** | Retail copy: the person **buys back the whole collection** at that month’s scheduled dollars |
 | In liquidation (process) | Book **in liquidation** | Staff-toggled. Modeled dollars never flip this |
 | Liquidated (sold off) | Book **liquidated** | Staff-toggled. End of that repo’s life |
@@ -99,7 +99,7 @@ Rules:
 - Only the **newest** attempt may be reopened, and only while no newer submission exists. A fresh retail submission permanently closes earlier attempts to reopening, so a piece never shows two competing current results.
 - Grid cards and the full timepiece view show the current appraisal state and remaining opportunities. A refusal uses the retail phrase **Does not meet appraisal criteria** and a clear refusal icon; do not imply that the timepiece ceased to exist.
 - After a completed decision, the underlying piece becomes editable again unless it is bound to an active repo. Later edits do not rewrite the completed submission snapshot; a new review requires a new submission.
-- Catalog typical range may be copied or suggested by Sparkle. Collector copy = appraisal range. Desk meaning = indicative liquidation band.
+- Catalog typical range, candidate models, and photo provenance may be suggested by Sparkle. Collector copy = appraisal range. Desk meaning = indicative liquidation band. Sparkle never writes the official numbers.
 - LTV / purchase cap math is prototype UI until an owner money-math plan. The appraiser-entered value does not silently change that formula in this documentation unit.
 - After activation, the repo snapshot is frozen. Do not edit those dollars on that repo. Free pieces not on an activated repo may still be appraised.
 - **No partial buyback.** To get optionality, the person opens **several smaller repos**, not one repo they pick apart.
@@ -114,7 +114,7 @@ flowchart TD
   draft[With MAC: pieces reserved, proposal PDF v1]
   checks[Desk confirms or declines - never reprices]
   seller[Your turn: retail signs or declines]
-  mac[MAC signs last - appraiser or super admin proposed]
+  mac[MAC signs last - appraiser or super admin]
   active[Activated: open or later past due]
   buy[Whole-collection buyback]
   liqStart[Staff: in liquidation]
@@ -152,14 +152,14 @@ Signing does not write a book end. A book end does not change the signature flag
 
 **Shipped 2026-09-20 (U6):** The collector picker shows a live offer card (maximum and buyback schedule). Agreements group under Your turn / With MAC / Active / Closed. A confirmed request's only primary action is Sign; an inspection return uses "Accept the inspected amount and sign". Closed requests offer Start again. An Accept older than seven days reads "Appraisal expired — send again" and stays off the picker.
 
-**Proposed:** MAC signs last; desk checklist first; only appraiser or super admin signs for MAC; admin cannot. Software sign is not counsel approval. E-sign vendor still deferred.
+**Shipped 2026-09-20 (U11):** MAC signs last; desk checklist first; only an appraiser or super admin signs for MAC; admin cannot. Software sign is not counsel approval. E-sign vendor still deferred.
 
 ### Book axis
 
 | Label | How it is set | Active for exclusive pieces? |
 |---|---|---|
-| open | Derived: term not ended, no staff end | Yes, if signed |
-| past due | Derived: day after term date, no staff end | Yes, if signed |
+| open | Derived: executed, term not ended, no staff end | Yes, if executed |
+| past due | Derived: executed, day after term date, no staff end | Yes, if executed |
 | in liquidation | Staff end | Yes |
 | bought back | Staff end (paid whole-collection close) | No |
 | liquidated | Staff end | No |
@@ -167,7 +167,7 @@ Signing does not write a book end. A book end does not change the signature flag
 
 Staff may overwrite or clear the current end. There is no end history in this app. Clearing returns open or past due.
 
-**Open** last day of term is still open. **Past due** starts the next calendar day. Term clock is calendar months from `createdAt`, not from `signedAt`.
+**Open** last day of term is still open. **Past due** starts the next calendar day. Unexecuted requests are not on this axis. Term clock is calendar months from `executedOn`.
 
 Renew: close old at that month’s whole-collection dollars, open new 12-month repo with those pieces, optional extra **free** pieces to meet LTV, snapshot the party tag **at renewal**. Does not post cash.
 
@@ -187,9 +187,9 @@ When MAC has signed:
 
 Email, password, SMS (Twilio), WhatsApp for **retail** notices and a Desk inbox. Desk staff are not WhatsApp users. Neon Auth stays off. WorkOS is not the core login (decision `0002` must not be read as permission to enable it).
 
-## Desk stores (proposed)
+## Desk stores
 
-Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md` (approved 2026-09-19; units ship one PR at a time).
+Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Catalog brands, models, retail checkmarks, and Sparkle shipped 2026-09-21 (U13). Members, analytics, and per-tenant brand rows besides the two presets remain later units of that plan.
 
 ```mermaid
 flowchart LR
@@ -207,7 +207,7 @@ flowchart LR
   piece --> dash
 ```
 
-- **Catalog** — reusable model. Only an appraiser or super admin adds or edits rows; admins read. **MAC Sparkle** asks a pricing source (Exa, Radar, or another provider) for a **guess** of today’s market band for the one row being edited; range only; appraiser saves. Last edited recorded. No retail Sparkle yet.
+- **Catalog** — reusable brands and models. Only an appraiser or super admin adds or edits rows; admins read. **MAC Sparkle** asks a pricing source (Exa, then Firecrawl, then Apify) for a **guess** on the one brand or model being edited: candidate models, a market range with sources, and photo provenance. The appraiser saves or ignores. Last edited recorded. No retail Sparkle. Collector `/brands` shows only retail-checked rows that have a photo.
 - **Members** — collectors and dealers. Member ID `{PREFIX}{#####}-{YY}`. Feeds analysis and agreement forms.
 - **Client timepieces** — named to a member. Informational range + appraiser-entered value + up to three attempt snapshots + physical-inspection finalization. Locked when the repo is activated (operations custody). Free again after bought back, liquidated, or if not moved on renew.
 - **Repos** — assembled from **free** pieces. MAC purchase and activation require final inspected acceptance for every included piece. Whole-collection table. Heart of the Desk.

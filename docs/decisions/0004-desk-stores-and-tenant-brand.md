@@ -9,7 +9,7 @@ The Desk manages four operational stores: **catalog**, **members**, **client tim
 
 White-label is the same app with a `tenant_id`. Super Admin of that tenant sets palette, logo, and member-ID prefix. Master super admin creates tenants. Default MAC visual contract in `design-system.md` does not change.
 
-Catalog rows have no serial, one photo, appraiser-edited range, last-edited stamp. **MAC Sparkle** may **suggest** a range for the one row being edited, using pluggable pricing sources (Exa, the owner-named Radar, WatchCharts, or others); it prices only the range, only on click, and the appraiser saves the official numbers. No retail Sparkle yet.
+Catalog rows have no serial, one photo, appraiser-edited range, last-edited stamp. **MAC Sparkle** may **suggest** candidate models, a market range, and photo provenance for the one brand or model being edited, using pluggable pricing sources (Exa first, then Firecrawl, then Apify; the owner-named Radar still needs a vendor confirm); it researches only on click, and the appraiser saves the official numbers. No retail Sparkle.
 
 Member IDs are `{PREFIX}{#####}-{YY}` (e.g. `MAC12345-22`).
 
