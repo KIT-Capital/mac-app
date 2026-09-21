@@ -155,8 +155,11 @@ test.describe("desk", () => {
 
   test("desk login opens overview and client assets", async ({ page }) => {
     await signInDesk(page);
-    await expect(page.getByText("Assets", { exact: true })).toBeVisible();
-    await expect(page.getByText("Buyback scale", { exact: true })).toBeVisible();
+    await expect(page.getByText("Operations analytics — not the official ledger.")).toBeVisible();
+    await expect(page.getByText("$200,000")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "CSV" }).first()).toBeVisible();
+    await expect(page.getByText("paid off")).toHaveCount(0);
     await page.getByRole("link", { name: "Client Assets" }).click();
     await expect(page.getByText("Richard Mille RM 011")).toBeVisible();
     await expect(page.getByText("Audemars Piguet Royal Oak Selfwinding")).toBeVisible();

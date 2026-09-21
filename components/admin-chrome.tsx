@@ -24,7 +24,7 @@ import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/guide", label: "Tutorial", icon: CircleHelp },
   { href: "/admin/config", label: "Configure", icon: Sliders },
   { href: "/admin/access", label: "Access & Roles", icon: Users2 },

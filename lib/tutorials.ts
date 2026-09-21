@@ -45,8 +45,8 @@ export const DESK_TUTORIAL = {
   lead: "The admin wall is the staff console for the repo operations book. MAC buys; the collector may buy back. Cash stays in ABC Bank. Inventory stays in the MAC Vault. This app does not post QuickBooks.",
   steps: [
     {
-      title: "Overview",
-      body: "The first desk screen is a 16:9 summary of assets, catalog references, agreements, and photos. Policy in force is the live desk settings when the live book is on.",
+      title: "Dashboard",
+      body: "The first desk screen is operations analytics: outstanding sale dollars on active repos, drafts, members, and piece custody. Each widget exports CSV or XLSX. That export is not the official ledger.",
     },
     {
       title: "Configure",
