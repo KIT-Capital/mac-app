@@ -109,8 +109,14 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 
 - `POST` verifies the development runtime fixture only in browser-mode
   development, otherwise a live Neon staff row. Unknown and disabled emails share
-  the same **401**. Success sets a session-only `mac_desk` token with key id,
-  role, 12-hour expiry, and forced-rotation flag.
+  the same **401**. When live identity is fully configured, a correct password
+  without a code returns **202** `{ needsCode: true }` and emails a six-digit
+  desk code; a passwordless seeded row returns **202** `{ setup: true }` and
+  emails a first-password link. Success sets a session-only `mac_desk` token with
+  key id, role, 12-hour expiry, and forced-rotation flag.
+- `POST /api/desk-session/first-password` consumes a `desk_set_password` link
+  and writes the first hash in the same transaction. It does not open a desk
+  session; the person then signs in with password plus code.
 - `PATCH` is the forced-password-rotation exception. It accepts current, new,
   and confirmed passwords, writes the hash and audit row transactionally, and
   reissues the token without the rotation flag.
@@ -150,22 +156,23 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   receive the same generic `202` response, but only known customers receive mail.
 - `action: "register"` accepts bounded `name`, normalized `email`, and `phone`.
   The details stay in the hashed-token row and no customer exists before confirmation.
-- The emailed `/verify?token=…` page does not consume the token. Its same-origin
-  form posts to `/api/collector-session/verify`, which atomically consumes the
-  token once and creates the revocable session row. Login redirects to
-  `/collection`; registration creates or reuses the customer, then redirects to
-  `/collection/setup`. Expired, consumed, and missing tokens share one retry page.
+- Live mail sends a six-digit code, not a clickable URL. JSON
+  `POST /api/collector-session/verify` with `{ email, code }` consumes the code
+  once and creates the revocable session row. Login redirects to `/collection`;
+  registration creates or reuses the customer, then redirects to
+  `/collection/setup`. Expired, consumed, and missing codes share one retry
+  message.
 - `mac_collector` is an HttpOnly, Secure, SameSite=Lax session cookie containing
   only a signed opaque session-row id. The row expires after 30 days and can be revoked.
-- Links use only `COLLECTOR_MAGIC_LINK_ORIGIN`, never request host headers.
-  Access links are sent through Resend and are never retained in the generic desk
-  outbox, whether delivery succeeds or fails.
-- Link requests use Postgres windows: three per email and ten per forwarded
+- Origin for desk first-password links uses only `COLLECTOR_MAGIC_LINK_ORIGIN`,
+  never request host headers. Access codes and links are sent through Resend and
+  are never retained in the generic desk outbox, whether delivery succeeds or fails.
+- Code requests use Postgres windows: three per email and ten per forwarded
   address per hour. A limited email still receives the generic accepted response
   and creates no token. Registration also has a hard global 100-per-hour cap.
 - Login and signup use this request path. Browser mode preserves the prototype
-  local flow. Live mode stops after the generic check-email response; only
-  verification creates a session or registration customer.
+  local flow. Live mode stops after the generic check-email response and shows a
+  code field; only verification creates a session or registration customer.
 - `DELETE /api/collector-session` revokes the row and clears `mac_collector`.
   Verification clears `mac_desk`; desk login revokes and clears `mac_collector`.
 

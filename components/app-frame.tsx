@@ -10,7 +10,7 @@ import { isDesk } from "@/lib/catalog";
 import { COLLECTOR_GUIDE } from "@/lib/nav";
 import { useStore } from "@/lib/store";
 
-const PUBLIC = ["/", "/login", "/signup", "/privacy", "/verify", "/admin/password"];
+const PUBLIC = ["/", "/login", "/signup", "/privacy", "/verify", "/admin/password", "/admin/password/set"];
 const ONBOARDING = [
   "/collection/setup",
   "/collection/add",

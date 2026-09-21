@@ -135,24 +135,27 @@ export async function dispatchCollectorAccessMail(
   input: {
     to: string;
     name: string;
-    action: "login" | "register";
-    url: string;
+    action: "login" | "register" | "desk_login" | "desk_set_password";
+    code?: string;
+    url?: string;
     tokenId?: string;
   },
   options: MailDeliveryOptions = {},
 ) {
   const greeting = input.name.split(" ")[0] || "Collector";
+  const isCode = Boolean(input.code);
   const mail = letter({
     kind: "access",
     to: [input.to],
-    subject: "Your Mechanical Art Capital access link",
-    heading: `${greeting}, verify your email`,
-    intro:
-      input.action === "register"
-        ? "Use the secure link below to verify your email and create your collection."
-        : "Use the secure link below to open your collection.",
+    subject: isCode
+      ? "Your Mechanical Art Capital sign-in code"
+      : "Set your Mechanical Art Capital desk password",
+    heading: isCode ? `${greeting}, enter your code` : `${greeting}, set your desk password`,
+    intro: isCode
+      ? "Enter this code in the app. It lasts 15 minutes and works once."
+      : "Use the secure link below to set your desk password. It lasts 15 minutes and works once.",
     rows: [["Email", input.to]],
-    body: input.url,
+    body: input.code ?? input.url ?? "",
   });
   return deliver(
     mail,

@@ -13,41 +13,83 @@ export default function LoginPage() {
   const { signIn, settings, user } = useStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [deskMode, setDeskMode] = useState(false);
+  const [code, setCode] = useState("");
+  const [awaitingCode, setAwaitingCode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
 
+  async function completeDesk(session: Response) {
+    const authenticated = await session.json() as {
+      role: DeskRole;
+      mustRotate?: boolean;
+      needsCode?: boolean;
+      setup?: boolean;
+    };
+    if (authenticated.setup) {
+      setNotice("Check your email for a secure link to set your desk password. It lasts 15 minutes and works once.");
+      setBusy(false);
+      return;
+    }
+    if (authenticated.needsCode) {
+      setAwaitingCode(true);
+      setNotice("Check your email for a sign-in code. It lasts 15 minutes and works once.");
+      setBusy(false);
+      return;
+    }
+    if (authenticated.mustRotate) {
+      router.replace("/admin/password");
+      return;
+    }
+    signIn({ email: email.trim(), role: authenticated.role });
+    router.replace("/admin");
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setNotice("");
     setBusy(true);
-    if (deskMode) {
+
+    if (password.trim()) {
       const session = await fetch("/api/desk-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, code: code.trim() || undefined }),
         cache: "no-store",
         credentials: "include",
       }).catch(() => null);
+      if (session?.status === 202) {
+        await completeDesk(session);
+        return;
+      }
       if (!session?.ok) {
         setError("Desk session could not start.");
         setBusy(false);
         return;
       }
-      const authenticated = await session.json() as {
-        role: DeskRole;
-        mustRotate?: boolean;
-      };
-      if (authenticated.mustRotate) {
-        router.replace("/admin/password");
+      await completeDesk(session);
+      return;
+    }
+
+    if (awaitingCode || code.trim()) {
+      const verified = await fetch("/api/collector-session/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+        cache: "no-store",
+        credentials: "include",
+      }).catch(() => null);
+      if (!verified?.ok) {
+        setError("That code could not be used.");
+        setBusy(false);
         return;
       }
-      signIn({ email: email.trim(), role: authenticated.role });
-      router.replace("/admin");
+      const result = await verified.json().catch(() => null) as { redirect?: string } | null;
+      signIn({ email: email.trim(), role: "collector" });
+      router.replace(result?.redirect || "/collection");
       return;
     }
 
@@ -72,7 +114,8 @@ export default function LoginPage() {
       return;
     }
     if (accessResult?.mode === "live" && accessResult.accepted) {
-      setNotice("Check your email for a secure sign-in link. It lasts 15 minutes and works once.");
+      setAwaitingCode(true);
+      setNotice("Check your email for a sign-in code. It lasts 15 minutes and works once.");
       setBusy(false);
       return;
     }
@@ -83,12 +126,6 @@ export default function LoginPage() {
     }
     signIn({ email: email.trim(), role: "collector" });
     router.replace("/collection");
-  }
-
-  function showDeskSignIn() {
-    setDeskMode(true);
-    setNotice("");
-    setError("");
   }
 
   return (
@@ -116,12 +153,6 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {notice ? (
-        <div className="rounded-xl border border-mac-gold/40 bg-mac-card px-5 py-6 text-center">
-          <Mail className="mx-auto h-6 w-6 text-mac-gold" />
-          <p className="mt-3 text-sm leading-relaxed text-mac-fg">{notice}</p>
-        </div>
-      ) : (
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
           <div className="flex items-center justify-between">
@@ -142,7 +173,6 @@ export default function LoginPage() {
           />
         </div>
 
-        {deskMode ? (
         <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
           <div className="flex items-center justify-between">
             <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
@@ -157,8 +187,8 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
+              placeholder="Desk only"
               autoComplete="current-password"
-              required
             />
             <button
               type="button"
@@ -170,8 +200,26 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
+
+        {awaitingCode ? (
+          <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
+            <label htmlFor="login-code" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
+              Sign-in code
+            </label>
+            <input
+              id="login-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="mt-1 w-full bg-transparent text-[15px] tracking-[0.3em] text-mac-fg outline-none placeholder:text-mac-faint"
+              placeholder="000000"
+              required
+            />
+          </div>
         ) : null}
 
+        {notice ? <p className="text-center text-sm leading-relaxed text-mac-fg">{notice}</p> : null}
         {error ? <p className="text-center text-xs text-red-400">{error}</p> : null}
 
         <button
@@ -179,20 +227,9 @@ export default function LoginPage() {
           disabled={busy}
           className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-mac-navy text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
         >
-          {busy ? "Please wait…" : deskMode ? "Sign in" : "Send sign-in link"}
+          {busy ? "Please wait…" : password.trim() || awaitingCode ? "Sign in" : "Send code"}
         </button>
       </form>
-      )}
-
-      {!deskMode && !notice ? (
-        <button
-          type="button"
-          onClick={showDeskSignIn}
-          className="mac-tap pt-5 text-center text-[12px] font-medium text-mac-muted underline underline-offset-4"
-        >
-          MAC desk staff
-        </button>
-      ) : null}
 
       <div className="pt-6 pb-2 text-center">
         <p className="text-[12px] text-mac-muted">

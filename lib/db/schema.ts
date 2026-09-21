@@ -98,7 +98,7 @@ export const collectorAccessTokens = pgTable(
     index("collector_access_tokens_expires_at_idx").on(table.expiresAt),
     check(
       "collector_access_tokens_purpose_check",
-      sql`${table.purpose} in ('login', 'register')`,
+      sql`${table.purpose} in ('login', 'register', 'desk_login', 'desk_set_password')`,
     ),
     check(
       "collector_access_tokens_send_status_check",
@@ -111,6 +111,16 @@ export const collectorAccessTokens = pgTable(
         or
         (
           ${table.purpose} = 'register'
+          and ${table.customerId} is null
+          and (
+            (${table.consumedAt} is null and ${table.registrationPayload} is not null)
+            or
+            (${table.consumedAt} is not null and ${table.registrationPayload} is null)
+          )
+        )
+        or
+        (
+          ${table.purpose} in ('desk_login', 'desk_set_password')
           and ${table.customerId} is null
           and (
             (${table.consumedAt} is null and ${table.registrationPayload} is not null)

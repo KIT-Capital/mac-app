@@ -36,7 +36,10 @@ export async function requestCollectorAccess(input: unknown, address: string) {
       findCustomerByEmail: (email: string) => findCustomerByEmail(db, email),
       findStaffByEmail: (email: string) => findStaffByEmail(db, email),
       createAccessToken: (token: Parameters<typeof createCollectorAccessToken>[1]) =>
-        createCollectorAccessToken(db, token),
+        createCollectorAccessToken(db, {
+          ...token,
+          secret: String(process.env.COLLECTOR_SESSION_SECRET ?? ""),
+        }),
       sendAccessEmail: dispatchCollectorAccessMail,
       markAccessTokenSent: (id: string, sent: boolean) =>
         markCollectorAccessTokenSent(db, id, sent),
@@ -45,12 +48,15 @@ export async function requestCollectorAccess(input: unknown, address: string) {
   );
 }
 
-export async function verifyCollectorAccess(token: string) {
+export async function verifyCollectorAccess(token: string, email?: string) {
   const config = evaluateLiveBookConfig(process.env);
   if (!config.enabled) throw new Error("COLLECTOR_LIVE_BOOK_DISABLED");
   if (!config.ok) throw new Error(config.errors[0]);
 
-  const redeemed = await redeemCollectorAccessToken(getDb(), token);
+  const redeemed = await redeemCollectorAccessToken(getDb(), token, {
+    secret: config.secret,
+    email,
+  });
 
   return {
     sessionToken: sealCollectorSessionId(redeemed.sessionId, config.secret),

@@ -11,12 +11,15 @@ import { openCollectorSessionId } from "../collector-access.mjs";
 import { createDb } from "./client";
 import {
   consumeAccessRateLimit,
+  consumeDeskLoginCode,
+  completeDeskSetPassword,
   createCollectorAccessToken,
   redeemCollectorAccessToken,
   resolveCollectorSession,
   revokeCollectorSession,
   sweepCollectorAccessRows,
 } from "./collector-sessions";
+import { hashAccessCode } from "../access-code.mjs";
 import { executeLiveBookOperation } from "./live-book-mutations";
 import { deskActor, registerCollector } from "./records";
 import {
@@ -24,6 +27,7 @@ import {
   collectorAccessTokens,
   collectorSessions,
   customers,
+  staffAccounts,
 } from "./schema";
 
 const skip = !process.env.DATABASE_URL;
@@ -32,12 +36,23 @@ const customerIds: string[] = [];
 const tokenIds: string[] = [];
 const sessionIds: string[] = [];
 const rateScopes: string[] = [];
+const staffIds: string[] = [];
 const SECRET = "collector-session-test-secret-with-enough-entropy";
 
 describe("collector access rows", { skip }, () => {
   const db = createDb();
+  const issue = (input: Omit<Parameters<typeof createCollectorAccessToken>[1], "secret">) =>
+    createCollectorAccessToken(db, { secret: SECRET, ...input });
+  const redeem = (
+    token: string,
+    email: string,
+    extra: { sessionId?: string; beforeSessionInsert?: () => Promise<void> } = {},
+  ) => redeemCollectorAccessToken(db, token, { secret: SECRET, email, ...extra });
 
   after(async () => {
+    if (staffIds.length) {
+      await db.delete(staffAccounts).where(inArray(staffAccounts.id, staffIds));
+    }
     if (sessionIds.length) {
       await db.delete(collectorSessions).where(inArray(collectorSessions.id, sessionIds));
     }
@@ -63,7 +78,7 @@ describe("collector access rows", { skip }, () => {
 
   it("redeems a login token once and creates a revocable session", async () => {
     const owner = await collector("redeem");
-    const issued = await createCollectorAccessToken(db, {
+    const issued = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
@@ -71,13 +86,13 @@ describe("collector access rows", { skip }, () => {
     });
     tokenIds.push(issued.id);
 
-    const first = await redeemCollectorAccessToken(db, issued.token);
+    const first = await redeem(issued.token, owner.email);
     sessionIds.push(first.sessionId);
     assert.equal(first.customer.id, owner.id);
     assert.equal(first.redirectPath, "/collection");
 
     await assert.rejects(
-      () => redeemCollectorAccessToken(db, issued.token),
+      () => redeem(issued.token, owner.email),
       /ACCESS_TOKEN_INVALID/,
     );
     assert.equal((await resolveCollectorSession(db, first.sessionId))?.customer.id, owner.id);
@@ -88,24 +103,24 @@ describe("collector access rows", { skip }, () => {
 
   it("registers once and treats an existing registration email as login", async () => {
     const email = `register.${suffix}@mac.test`;
-    const first = await createCollectorAccessToken(db, {
+    const first = await issue({
       purpose: "register",
       registration: { name: "New Collector", email, phone: "+1 212 555 0199" },
       expiresAt: new Date(Date.now() + 15 * 60_000),
     });
     tokenIds.push(first.id);
-    const registered = await redeemCollectorAccessToken(db, first.token);
+    const registered = await redeem(first.token, email);
     customerIds.push(registered.customer.id);
     sessionIds.push(registered.sessionId);
     assert.equal(registered.redirectPath, "/collection/setup");
 
-    const second = await createCollectorAccessToken(db, {
+    const second = await issue({
       purpose: "register",
       registration: { name: "Changed Name", email, phone: "" },
       expiresAt: new Date(Date.now() + 15 * 60_000),
     });
     tokenIds.push(second.id);
-    const existing = await redeemCollectorAccessToken(db, second.token);
+    const existing = await redeem(second.token, email);
     sessionIds.push(existing.sessionId);
     assert.equal(existing.customer.id, registered.customer.id);
     assert.equal(existing.customer.name, "New Collector");
@@ -121,7 +136,7 @@ describe("collector access rows", { skip }, () => {
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000),
     });
     sessionIds.push(duplicateSessionId);
-    const issued = await createCollectorAccessToken(db, {
+    const issued = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
@@ -130,7 +145,7 @@ describe("collector access rows", { skip }, () => {
     tokenIds.push(issued.id);
 
     await assert.rejects(
-      () => redeemCollectorAccessToken(db, issued.token, { sessionId: duplicateSessionId }),
+      () => redeem(issued.token, owner.email, { sessionId: duplicateSessionId }),
     );
     const [stored] = await db
       .select({ consumedAt: collectorAccessTokens.consumedAt })
@@ -161,7 +176,7 @@ describe("collector access rows", { skip }, () => {
 
   it("returns the same invalid error for expired and consumed tokens", async () => {
     const owner = await collector("expired");
-    const expired = await createCollectorAccessToken(db, {
+    const expired = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
@@ -169,21 +184,21 @@ describe("collector access rows", { skip }, () => {
     });
     tokenIds.push(expired.id);
     await assert.rejects(
-      () => redeemCollectorAccessToken(db, expired.token),
+      () => redeem(expired.token, owner.email),
       /ACCESS_TOKEN_INVALID/,
     );
   });
 
   it("keeps every old session revoked after suspension and reactivation", async () => {
     const owner = await collector("suspension");
-    const issued = await createCollectorAccessToken(db, {
+    const issued = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
       expiresAt: new Date(Date.now() + 15 * 60_000),
     });
     tokenIds.push(issued.id);
-    const redeemed = await redeemCollectorAccessToken(db, issued.token);
+    const redeemed = await redeem(issued.token, owner.email);
     sessionIds.push(redeemed.sessionId);
 
     const desk = deskActor("appraiser", "desk@mechartcap.com");
@@ -203,14 +218,14 @@ describe("collector access rows", { skip }, () => {
 
   it("does not revive old sessions when an active collector is invited again", async () => {
     const owner = await collector("reinvite");
-    const firstToken = await createCollectorAccessToken(db, {
+    const firstToken = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
       expiresAt: new Date(Date.now() + 15 * 60_000),
     });
     tokenIds.push(firstToken.id);
-    const oldSession = await redeemCollectorAccessToken(db, firstToken.token);
+    const oldSession = await redeem(firstToken.token, owner.email);
     sessionIds.push(oldSession.sessionId);
 
     const desk = deskActor("appraiser", "desk@mechartcap.com");
@@ -219,14 +234,14 @@ describe("collector access rows", { skip }, () => {
       id: owner.id,
       patch: { status: "invited" },
     });
-    const inviteToken = await createCollectorAccessToken(db, {
+    const inviteToken = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
       expiresAt: new Date(Date.now() + 15 * 60_000),
     });
     tokenIds.push(inviteToken.id);
-    const newSession = await redeemCollectorAccessToken(db, inviteToken.token);
+    const newSession = await redeem(inviteToken.token, owner.email);
     sessionIds.push(newSession.sessionId);
 
     assert.equal(await resolveCollectorSession(db, oldSession.sessionId), null);
@@ -238,7 +253,7 @@ describe("collector access rows", { skip }, () => {
 
   it("serializes redemption with a concurrent suspension", async () => {
     const owner = await collector("suspension-race");
-    const issued = await createCollectorAccessToken(db, {
+    const issued = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
@@ -250,7 +265,7 @@ describe("collector access rows", { skip }, () => {
     const entered = new Promise<void>((resolve) => { enteredResolve = resolve; });
     let releaseResolve!: () => void;
     const release = new Promise<void>((resolve) => { releaseResolve = resolve; });
-    const redemption = redeemCollectorAccessToken(db, issued.token, {
+    const redemption = redeem(issued.token, owner.email, {
       beforeSessionInsert: async () => {
         enteredResolve();
         await release;
@@ -313,7 +328,7 @@ describe("collector access rows", { skip }, () => {
     });
     try {
       const owner = await collector("route");
-      const issued = await createCollectorAccessToken(db, {
+      const issued = await issue({
         purpose: "login",
         customerId: owner.id,
         email: owner.email,
@@ -330,7 +345,7 @@ describe("collector access rows", { skip }, () => {
         .where(eq(collectorAccessTokens.id, issued.id));
       assert.equal(afterGet.consumedAt, null);
 
-      const firstPost = await verifyPost(verificationRequest(issued.token));
+      const firstPost = await verifyPost(verificationRequest(issued.token, owner.email));
       assert.equal(firstPost.status, 303);
       assert.equal(firstPost.headers.get("location"), "http://localhost:43173/collection");
       const cookie = firstPost.headers.get("set-cookie") ?? "";
@@ -338,16 +353,16 @@ describe("collector access rows", { skip }, () => {
       assert.ok(signedSession);
       sessionIds.push(openCollectorSessionId(signedSession, SECRET));
 
-      const reused = await verifyPost(verificationRequest(issued.token));
+      const reused = await verifyPost(verificationRequest(issued.token, owner.email));
       const missing = await verifyPost(verificationRequest(""));
-      const expired = await createCollectorAccessToken(db, {
+      const expired = await issue({
         purpose: "login",
         customerId: owner.id,
         email: owner.email,
         expiresAt: new Date(Date.now() - 1),
       });
       tokenIds.push(expired.id);
-      const expiredResponse = await verifyPost(verificationRequest(expired.token));
+      const expiredResponse = await verifyPost(verificationRequest(expired.token, owner.email));
       for (const response of [reused, missing, expiredResponse]) {
         assert.equal(response.status, 303);
         assert.equal(response.headers.get("location"), "https://mechart.app/verify?state=invalid");
@@ -360,17 +375,111 @@ describe("collector access rows", { skip }, () => {
     }
   });
 
+  it("lets two collectors share a six-digit code because hashes bind email", async () => {
+    const firstOwner = await collector("code-a");
+    const secondOwner = await collector("code-b");
+    const code = "424242";
+    for (const owner of [firstOwner, secondOwner]) {
+      const id = randomUUID();
+      await db.insert(collectorAccessTokens).values({
+        id,
+        tokenHash: hashAccessCode(SECRET, owner.email, code),
+        customerId: owner.id,
+        purpose: "login",
+        expiresAt: new Date(Date.now() + 15 * 60_000),
+      });
+      tokenIds.push(id);
+    }
+    const first = await redeem(code, firstOwner.email);
+    const second = await redeem(code, secondOwner.email);
+    sessionIds.push(first.sessionId, second.sessionId);
+    assert.equal(first.customer.id, firstOwner.id);
+    assert.equal(second.customer.id, secondOwner.id);
+  });
+
+  it("consumes a desk login code once", async () => {
+    const staffId = randomUUID();
+    const email = `desk-login.${suffix}@mac.test`;
+    await db.insert(staffAccounts).values({
+      id: staffId,
+      name: "Desk Login",
+      email,
+      role: "admin",
+    });
+    staffIds.push(staffId);
+    const issued = await issue({
+      purpose: "desk_login",
+      staffId,
+      email,
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(issued.id);
+    const payload = await consumeDeskLoginCode(db, { secret: SECRET, email, code: issued.token });
+    assert.equal(payload.staffId, staffId);
+    await assert.rejects(
+      () => consumeDeskLoginCode(db, { secret: SECRET, email, code: issued.token }),
+      /ACCESS_TOKEN_INVALID/,
+    );
+  });
+
+  it("sets the first desk password and consumes the link in one write", async () => {
+    const staffId = randomUUID();
+    const email = `desk-set.${suffix}@mac.test`;
+    await db.insert(staffAccounts).values({
+      id: staffId,
+      name: "Desk Set",
+      email,
+      role: "admin",
+    });
+    staffIds.push(staffId);
+    const issued = await issue({
+      purpose: "desk_set_password",
+      staffId,
+      email,
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    });
+    tokenIds.push(issued.id);
+    await assert.rejects(
+      () => completeDeskSetPassword(db, {
+        token: issued.token,
+        newPassword: "short",
+        clientAddress: "127.0.0.1",
+      }),
+      /PASSWORD_TOO_WEAK/,
+    );
+    const [afterWeak] = await db.select({ consumedAt: collectorAccessTokens.consumedAt })
+      .from(collectorAccessTokens)
+      .where(eq(collectorAccessTokens.id, issued.id));
+    assert.equal(afterWeak.consumedAt, null);
+    const set = await completeDeskSetPassword(db, {
+      token: issued.token,
+      newPassword: "first desk password 123",
+      clientAddress: "127.0.0.1",
+    });
+    assert.equal(set.staffId, staffId);
+    const [staff] = await db.select().from(staffAccounts).where(eq(staffAccounts.id, staffId));
+    assert.ok(staff.passwordHash);
+    await assert.rejects(
+      () => completeDeskSetPassword(db, {
+        token: issued.token,
+        newPassword: "another desk password 123",
+        clientAddress: "127.0.0.1",
+      }),
+      /ACCESS_TOKEN_INVALID/,
+    );
+  });
+
   it("sweeps only rows beyond their retention windows", async () => {
     const now = new Date();
     const owner = await collector("sweep");
-    const oldToken = await createCollectorAccessToken(db, {
+    const oldToken = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
       expiresAt: new Date(now.getTime() - 25 * 60 * 60_000),
     });
     tokenIds.push(oldToken.id);
-    const retainedToken = await createCollectorAccessToken(db, {
+    const retainedToken = await issue({
       purpose: "login",
       customerId: owner.id,
       email: owner.email,
@@ -427,14 +536,14 @@ describe("collector access rows", { skip }, () => {
   });
 });
 
-function verificationRequest(token: string) {
+function verificationRequest(token: string, email = "") {
   return new Request("https://mechart.app/api/collector-session/verify", {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
       "sec-fetch-site": "same-origin",
     },
-    body: new URLSearchParams({ token }),
+    body: new URLSearchParams({ token, email }),
   });
 }
 

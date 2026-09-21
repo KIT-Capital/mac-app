@@ -1,7 +1,9 @@
 import "server-only";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, gt, isNull, like, lt, sql } from "drizzle-orm";
+import { generateAccessCode, hashAccessCode, normalizeAccessCode } from "../access-code.mjs";
 import { hashRateLimitKey, rateWindowStart } from "../access-rate-limit.mjs";
+import { hashStaffPassword, parseStaffPasswordHash } from "../staff-password.mjs";
 import type { Database } from "./client";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
@@ -10,6 +12,7 @@ import {
   collectorAccessTokens,
   collectorSessions,
   customers,
+  deskAuditLog,
   staffAccounts,
 } from "./schema";
 
@@ -30,25 +33,55 @@ type RegistrationPayload = {
 };
 
 type CreateTokenInput = {
-  purpose: "login" | "register";
+  purpose: "login" | "register" | "desk_login" | "desk_set_password";
+  secret: string;
   customerId?: string;
   email?: string;
+  staffId?: string;
   registration?: RegistrationPayload;
   expiresAt: Date;
 };
 
-function tokenHash(token: string) {
+function linkHash(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function digestFor(input: { secret: string; email?: string; token: string }) {
+  try {
+    return hashAccessCode(input.secret, input.email, normalizeAccessCode(input.token));
+  } catch {
+    return linkHash(input.token);
+  }
+}
+
 export async function createCollectorAccessToken(db: Database, input: CreateTokenInput) {
-  const token = randomBytes(32).toString("base64url");
   const id = randomUUID();
+  if (input.purpose === "desk_set_password") {
+    const email = String(input.email ?? "").trim().toLowerCase();
+    if (!input.staffId || !email) throw new Error("STAFF_REQUIRED");
+    const token = randomBytes(32).toString("base64url");
+    await db.insert(collectorAccessTokens).values({
+      id,
+      tokenHash: linkHash(token),
+      customerId: null,
+      registrationPayload: { staffId: input.staffId, email },
+      purpose: input.purpose,
+      expiresAt: input.expiresAt,
+    });
+    return { id, token, expiresAt: input.expiresAt };
+  }
+  const email = String(input.email ?? input.registration?.email ?? "").trim().toLowerCase();
+  if (!email) throw new Error("COLLECTOR_EMAIL_INVALID");
+  if (input.purpose === "desk_login" && !input.staffId) throw new Error("STAFF_REQUIRED");
+  const token = generateAccessCode();
+  const deskPayload = input.purpose === "desk_login"
+    ? { staffId: input.staffId, email }
+    : null;
   await db.insert(collectorAccessTokens).values({
     id,
-    tokenHash: tokenHash(token),
+    tokenHash: hashAccessCode(input.secret, email, token),
     customerId: input.customerId ?? null,
-    registrationPayload: input.registration ?? null,
+    registrationPayload: input.registration ?? deskPayload,
     purpose: input.purpose,
     expiresAt: input.expiresAt,
   });
@@ -70,18 +103,25 @@ export async function redeemCollectorAccessToken(
   db: Database,
   token: string,
   options: {
+    secret: string;
+    email?: string;
     now?: Date;
     sessionId?: string;
     beforeSessionInsert?: () => Promise<void>;
-  } = {},
+  },
 ) {
   const now = options.now ?? new Date();
+  const tokenHash = digestFor({
+    secret: options.secret,
+    email: options.email,
+    token,
+  });
   return db.transaction(async (tx) => {
     const [candidate] = await tx
       .select()
       .from(collectorAccessTokens)
       .where(and(
-        eq(collectorAccessTokens.tokenHash, tokenHash(token)),
+        eq(collectorAccessTokens.tokenHash, tokenHash),
         isNull(collectorAccessTokens.consumedAt),
         gt(collectorAccessTokens.expiresAt, now),
       ))
@@ -183,6 +223,104 @@ export async function redeemCollectorAccessToken(
       expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
     });
     return { customer, sessionId, redirectPath };
+  });
+}
+
+export async function consumeDeskLoginCode(
+  db: Database,
+  input: { secret: string; email: string; code: string; now?: Date },
+) {
+  const now = input.now ?? new Date();
+  const tokenHash = hashAccessCode(input.secret, input.email, input.code);
+  return db.transaction(async (tx) => {
+    const [candidate] = await tx
+      .select()
+      .from(collectorAccessTokens)
+      .where(and(
+        eq(collectorAccessTokens.tokenHash, tokenHash),
+        eq(collectorAccessTokens.purpose, "desk_login"),
+        isNull(collectorAccessTokens.consumedAt),
+        gt(collectorAccessTokens.expiresAt, now),
+      ))
+      .limit(1);
+    if (!candidate) throw new Error("ACCESS_TOKEN_INVALID");
+    const [access] = await tx
+      .update(collectorAccessTokens)
+      .set({ consumedAt: now, registrationPayload: null, updatedAt: now })
+      .where(and(
+        eq(collectorAccessTokens.id, candidate.id),
+        isNull(collectorAccessTokens.consumedAt),
+      ))
+      .returning({ id: collectorAccessTokens.id });
+    if (!access) throw new Error("ACCESS_TOKEN_INVALID");
+    return candidate.registrationPayload as { staffId?: string; email?: string };
+  });
+}
+
+export async function completeDeskSetPassword(
+  db: Database,
+  input: { token: string; newPassword: string; clientAddress: string; now?: Date },
+) {
+  const newPassword = String(input.newPassword ?? "");
+  if (newPassword.length < 12) throw new Error("PASSWORD_TOO_WEAK");
+  if (!String(input.clientAddress ?? "").trim()) throw new Error("CLIENT_ADDRESS_REQUIRED");
+  const serialized = await hashStaffPassword(newPassword);
+  const parsed = parseStaffPasswordHash(serialized);
+  if (!parsed) throw new Error("STAFF_PASSWORD_HASH_INVALID");
+  const now = input.now ?? new Date();
+  return db.transaction(async (tx) => {
+    const [candidate] = await tx
+      .select()
+      .from(collectorAccessTokens)
+      .where(and(
+        eq(collectorAccessTokens.tokenHash, linkHash(input.token)),
+        eq(collectorAccessTokens.purpose, "desk_set_password"),
+        isNull(collectorAccessTokens.consumedAt),
+        gt(collectorAccessTokens.expiresAt, now),
+      ))
+      .for("update")
+      .limit(1);
+    if (!candidate) throw new Error("ACCESS_TOKEN_INVALID");
+    const payload = candidate.registrationPayload as { staffId?: string } | null;
+    if (!payload?.staffId) throw new Error("ACCESS_TOKEN_INVALID");
+    const [row] = await tx.select().from(staffAccounts)
+      .where(and(eq(staffAccounts.id, payload.staffId), isNull(staffAccounts.disabledAt)))
+      .for("update")
+      .limit(1);
+    if (!row) throw new Error("ACCESS_TOKEN_INVALID");
+    if (row.passwordHash) throw new Error("PASSWORD_ALREADY_SET");
+    if (newPassword.toLowerCase().includes(row.email.toLowerCase())) {
+      throw new Error("PASSWORD_TOO_WEAK");
+    }
+    const [updated] = await tx.update(staffAccounts).set({
+      passwordHash: parsed.hash,
+      passwordSalt: parsed.salt,
+      passwordParams: parsed.params,
+      passwordSetAt: now,
+      mustRotate: false,
+      sessionValidAfter: now,
+      updatedAt: now,
+    }).where(eq(staffAccounts.id, row.id)).returning();
+    if (!updated) throw new Error("STAFF_NOT_FOUND");
+    const [access] = await tx
+      .update(collectorAccessTokens)
+      .set({ consumedAt: now, registrationPayload: null, updatedAt: now })
+      .where(and(
+        eq(collectorAccessTokens.id, candidate.id),
+        isNull(collectorAccessTokens.consumedAt),
+      ))
+      .returning({ id: collectorAccessTokens.id });
+    if (!access) throw new Error("ACCESS_TOKEN_INVALID");
+    await tx.insert(deskAuditLog).values({
+      id: randomUUID(),
+      actorEmail: updated.email,
+      actorRole: updated.role,
+      action: "staff.password.set",
+      targetId: updated.id,
+      clientAddress: input.clientAddress,
+      detail: {},
+    });
+    return { staffId: updated.id, email: updated.email, role: updated.role };
   });
 }
 
