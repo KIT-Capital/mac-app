@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { memberIdForEmail, pieceInActivatedRepo, retailMembers } from "./owners";
-import type { Agreement } from "./types";
+import { memberIdForEmail, ownedCounts, pieceInActivatedRepo, retailMembers } from "./owners";
+import type { Agreement, Timepiece } from "./types";
 
 function agreement(overrides: Partial<Agreement> = {}): Agreement {
   return {
@@ -32,6 +32,16 @@ describe("retail members", () => {
     );
     assert.equal(memberIdForEmail(users, "jonathan.hale@mechartcap.com"), "MAC00001-21");
     assert.equal(memberIdForEmail(users, "admin@mechartcap.com"), null);
+  });
+
+  it("counts pieces and repos without regard to email casing", () => {
+    const counts = ownedCounts(
+      "Jonathan.Hale@mechartcap.com",
+      [{ ownerEmail: "jonathan.hale@mechartcap.com" } as Timepiece],
+      [agreement({ email: "JONATHAN.HALE@MECHARTCAP.COM" })],
+    );
+    assert.equal(counts.pieces, 1);
+    assert.equal(counts.agreements, 1);
   });
 });
 

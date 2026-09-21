@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
-import { retailMembers } from "@/lib/owners";
+import { ownedCounts, retailMembers } from "@/lib/owners";
 import { useStore } from "@/lib/store";
 
 export default function AdminMembersPage() {
@@ -22,17 +22,20 @@ export default function AdminMembersPage() {
       ) : (
         <AdminTable
           headers={["Member ID", "Name", "Party", "Email", "Phone", "Pieces", "Repos"]}
-          rows={members.map((member) => [
-            member.memberId || "—",
-            <Link key={member.id} href="/admin/assets" className="text-mac-gold">
-              {member.name}
-            </Link>,
-            member.role,
-            member.email,
-            member.phone || "—",
-            String(timepieces.filter((piece) => piece.ownerEmail === member.email).length),
-            String(agreements.filter((agreement) => agreement.email === member.email).length),
-          ])}
+          rows={members.map((member) => {
+            const counts = ownedCounts(member.email, timepieces, agreements);
+            return [
+              member.memberId || "—",
+              <Link key={member.id} href="/admin/assets" className="text-mac-gold">
+                {member.name}
+              </Link>,
+              member.role,
+              member.email,
+              member.phone || "—",
+              String(counts.pieces),
+              String(counts.agreements),
+            ];
+          })}
         />
       )}
     </AdminChrome>
