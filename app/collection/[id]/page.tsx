@@ -15,6 +15,7 @@ import {
   WITH_MAC_PHRASE,
   shotPhrase,
 } from "@/lib/appraisal-words";
+import { catalogEntryForPiece, custodyLabel, pieceCustody } from "@/lib/client-pieces";
 import { appraisalView, deskToday, heldWatchIds, isAppraisalCurrent, missingEvidenceKinds } from "@/lib/contract/repo-book.mjs";
 import { nextId } from "@/lib/ids";
 import { pieceInActivatedRepo } from "@/lib/owners";
@@ -43,6 +44,7 @@ export default function WatchDetailPage() {
     agreements,
     photos,
     appraisalAttempts,
+    catalog,
     bookMode,
   } = useStore();
   const { timepieces } = useOwnedAssets();
@@ -52,6 +54,8 @@ export default function WatchDetailPage() {
   const watch = timepieces.find((w) => w.id === params.id);
   const onLiveRepo = watch ? heldWatchIds(agreements).has(watch.id) : false;
   const activated = watch ? pieceInActivatedRepo(agreements, watch.id) : false;
+  const custody = watch ? pieceCustody(agreements, watch.id) : "free";
+  const catalogRow = watch ? catalogEntryForPiece(catalog ?? [], watch) : null;
 
   if (!watch) {
     return (
@@ -160,6 +164,23 @@ export default function WatchDetailPage() {
             </h1>
             {watch.reference ? (
               <p className="text-[13px] text-mac-faint font-mono">Ref. {watch.reference}</p>
+            ) : null}
+            {watch.serial ? (
+              <p className="text-[13px] text-mac-faint font-mono">Serial {watch.serial}</p>
+            ) : null}
+            {catalogRow ? (
+              <p className="mt-1 text-[12px] text-mac-muted">
+                Catalog {catalogRow.brand} {catalogRow.model}
+              </p>
+            ) : null}
+            {custody !== "free" ? (
+              <p className="mt-1 text-[12px] text-mac-muted">{custodyLabel(custody)}</p>
+            ) : null}
+            {watch.videoName ? (
+              <p className="mt-1 text-[12px] text-mac-muted">
+                Video {watch.videoName}
+                {watch.videoDurationSeconds ? ` · ${watch.videoDurationSeconds}s` : ""}
+              </p>
             ) : null}
           </div>
 

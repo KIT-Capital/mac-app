@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { AdminChrome, AdminTable } from "@/components/admin-chrome";
 import { APPRAISAL_WORDS } from "@/lib/appraisal-words";
+import { catalogEntryForPiece, custodyLabel, pieceCustody } from "@/lib/client-pieces";
 import { moneyRange } from "@/lib/catalog";
 import { appraisalView } from "@/lib/contract/repo-book.mjs";
+import { memberIdForEmail } from "@/lib/owners";
 import { useStore } from "@/lib/store";
 
 function daysSince(iso: string) {
@@ -19,7 +21,7 @@ function age(days: number) {
 }
 
 export default function AdminAssetsPage() {
-  const { timepieces, appraisalAttempts } = useStore();
+  const { timepieces, appraisalAttempts, agreements, users, catalog } = useStore();
   const pieceById = new Map(timepieces.map((piece) => [piece.id, piece]));
 
   const queue = appraisalAttempts
@@ -73,14 +75,18 @@ export default function AdminAssetsPage() {
         Client assets
       </h2>
       <AdminTable
-        headers={["Code", "Piece", "Owner", "Appraisal", "Range", ""]}
+        headers={["Code", "Piece", "Member", "Custody", "Catalog", "Appraisal", "Range", ""]}
         rows={timepieces.map((w) => {
           const view = appraisalView(appraisalAttempts, w.id, w);
           const latest = latestAttemptFor(w.id);
+          const catalogRow = catalogEntryForPiece(catalog ?? [], w);
+          const memberId = memberIdForEmail(users, w.ownerEmail);
           return [
             w.assetCode || w.id,
             `${w.brand} ${w.model}`,
-            w.ownerEmail || "—",
+            memberId || w.ownerEmail || "—",
+            custodyLabel(pieceCustody(agreements, w.id)),
+            catalogRow ? `${catalogRow.model}` : "—",
             `${APPRAISAL_WORDS[view.word]}${view.decisionsUsed ? ` · ${view.decisionsUsed}/3` : ""}`,
             moneyRange(w.valueLow, w.valueHigh),
             latest ? (

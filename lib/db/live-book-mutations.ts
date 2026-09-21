@@ -426,10 +426,21 @@ function pieceValues(timepiece: Record<string, unknown>, actor: Actor) {
   const status = collector
     ? timepiece.status === "reviewing" ? "reviewing" : "not_evaluated"
     : timepiece.status === "appraised" || timepiece.status === "reviewing" ? timepiece.status : "not_evaluated";
+  const videoName = String(timepiece.videoName ?? "").trim() || null;
+  let videoDurationSeconds: number | null = null;
+  if (videoName) {
+    const seconds = Number(timepiece.videoDurationSeconds);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 60) throw new Error("VIDEO_TOO_LONG");
+    videoDurationSeconds = Math.round(seconds);
+  }
   return {
     brand: String(timepiece.brand ?? "").trim(),
     model: String(timepiece.model ?? "").trim(),
     reference: String(timepiece.reference ?? "").trim() || null,
+    serial: String(timepiece.serial ?? "").trim() || null,
+    catalogId: String(timepiece.catalogId ?? "").trim() || null,
+    videoName,
+    videoDurationSeconds,
     status,
     financeable: collector ? false : Boolean(timepiece.financeable),
     condition: String(timepiece.condition ?? ""),

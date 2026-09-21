@@ -52,6 +52,13 @@ test.describe("desk", () => {
     await expect(page.getByText("Jonathan Hale · MAC00001-21")).toBeVisible();
   });
 
+  test("desk client pieces show Hale member ID and locked custody", async ({ page }) => {
+    await signInDesk(page);
+    await page.getByRole("link", { name: "Client Assets" }).click();
+    await expect(page.getByText("MAC00001-21").first()).toBeVisible();
+    await expect(page.getByText("Locked in activated repo").first()).toBeVisible();
+  });
+
   test("live-book import requires a desk session and does not change the store", async ({ request }) => {
     const response = await request.post("/api/desk/live-book-import", {
       headers: sameOrigin,

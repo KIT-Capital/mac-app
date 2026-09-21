@@ -23,6 +23,8 @@ export type Timepiece = {
   brand: string;
   model: string;
   reference?: string;
+  serial?: string | null;
+  catalogId?: string | null;
   images: string[];
   photoKinds?: PhotoKind[];
   status: WatchStatus;
@@ -41,6 +43,8 @@ export type Timepiece = {
   complication: string;
   evaluatedAt?: string;
   assetCode?: string;
+  videoName?: string | null;
+  videoDurationSeconds?: number | null;
   /** Derived from appraisalAttempts at read; never the source of truth. */
   appraisalState?: AppraisalStateWord;
   decisionsUsed?: number;
