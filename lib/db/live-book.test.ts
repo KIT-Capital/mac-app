@@ -551,6 +551,32 @@ describe("live-book operation repository", { skip }, () => {
     assert.deepEqual(restored.settings.requiredPhotoKinds, five);
   });
 
+  it("reserves the brand preset for super admins and round-trips it", async () => {
+    const appraiser = deskActor("appraiser", "dov@mechartcap.com");
+    const superAdmin = deskActor("super_admin", "rc@mechartcap.com");
+    for (const actor of [appraiser, deskActor("admin", "rosario@mechartcap.com")]) {
+      await assert.rejects(
+        () => executeLiveBookOperation(db, actor, {
+          action: "settings.update",
+          patch: { brandPreset: "mbf" },
+        }),
+        { message: "ROLE_FORBIDDEN" },
+      );
+    }
+    await executeLiveBookOperation(db, superAdmin, {
+      action: "settings.update",
+      patch: { brandPreset: "mbf" },
+    });
+    const switched = await readLiveBookState(db, superAdmin);
+    assert.equal(switched.settings.brandPreset, "mbf");
+    await executeLiveBookOperation(db, superAdmin, {
+      action: "settings.update",
+      patch: { vaultLocation: "Manhattan vault" },
+    });
+    const afterOther = await readLiveBookState(db, superAdmin);
+    assert.equal(afterOther.settings.brandPreset, "mbf");
+  });
+
   it("reserves appraisal values and catalog writes for appraisers and super admins", async () => {
     const a = await collector("appraisal-fence");
     const piece = await createTimepiece(db, a.actor, a.customer.id, { brand: "Cartier", model: "Santos" });

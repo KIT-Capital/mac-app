@@ -219,7 +219,7 @@ export function RequestBuilder({ backHref = "/collection" }: { backHref?: string
                         type="checkbox"
                         checked={!unticked.includes(item.id)}
                         onChange={(e) => toggle(item.id, e.target.checked)}
-                        className="h-4 w-4 accent-[#0E2A44]"
+                        className="h-4 w-4 accent-mac-navy"
                       />
                       {item.brand} {item.model}
                     </label>
@@ -297,7 +297,7 @@ export function RequestBuilder({ backHref = "/collection" }: { backHref?: string
             <button
               type="submit"
               disabled={busy || !ticked.length}
-              className="mac-tap flex h-12 w-full items-center justify-center bg-[#0E2A44] text-[12px] font-semibold tracking-[0.18em] text-white uppercase disabled:opacity-40"
+              className="mac-tap flex h-12 w-full items-center justify-center bg-mac-navy text-[12px] font-semibold tracking-[0.18em] text-white uppercase disabled:opacity-40"
             >
               {busy ? "Sending…" : "Apply"}
             </button>

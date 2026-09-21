@@ -196,7 +196,7 @@ export default function AdminAccessPage() {
           {busy ? "Sending invite…" : draft.id ? "Update User" : "Invite User"}
         </PillButton>
       </form>
-      {notice ? <p className="mb-4 text-sm text-[#FCB040]">{notice}</p> : null}
+      {notice ? <p className="mb-4 text-sm text-mac-gold">{notice}</p> : null}
       {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
       <AdminTable
         headers={["Name", "Email", "Role", "Status", ""]}
@@ -205,7 +205,7 @@ export default function AdminAccessPage() {
           u.email,
           u.role,
           u.status,
-          <div key={u.id} className="flex gap-3 text-[#FCB040]">
+          <div key={u.id} className="flex gap-3 text-mac-gold">
             <button type="button" onClick={() => setDraft(u)}>Edit</button>
             <button type="button" onClick={() => void removeUser(u.id)}>Remove</button>
           </div>,
@@ -221,8 +221,8 @@ export default function AdminAccessPage() {
             super admins; only the master account edits other super admins.
           </p>
           {temporaryPassword ? (
-            <div className="mt-4 border border-[#FCB040]/40 bg-[#FCB040]/10 p-4">
-              <p className="text-xs tracking-[0.14em] text-[#FCB040] uppercase">
+            <div className="mt-4 border border-mac-gold/40 bg-mac-gold/10 p-4">
+              <p className="text-xs tracking-[0.14em] text-mac-gold uppercase">
                 Temporary password — shown once
               </p>
               <div className="mt-2 flex items-center gap-3">
@@ -230,7 +230,7 @@ export default function AdminAccessPage() {
                 <button
                   type="button"
                   onClick={() => void navigator.clipboard.writeText(temporaryPassword)}
-                  className="text-xs font-semibold text-[#FCB040] underline"
+                  className="text-xs font-semibold text-mac-gold underline"
                 >
                   Copy
                 </button>
@@ -287,7 +287,7 @@ export default function AdminAccessPage() {
               member.isMaster ? `${roleLabel(member.role)} · master` : roleLabel(member.role),
               memberStatus(member),
               member.manageable ? (
-                <div key={member.id} className="flex gap-3 text-[#FCB040]">
+                <div key={member.id} className="flex gap-3 text-mac-gold">
                   <button
                     type="button"
                     disabled={staffBusy}

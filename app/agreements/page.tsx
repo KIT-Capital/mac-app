@@ -31,7 +31,7 @@ export default function AgreementsPage() {
         ) : (
           groups.map((group) => (
             <section key={group.word}>
-              <h2 className="mb-3 text-[11px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
+              <h2 className="mb-3 text-[11px] font-bold tracking-[0.16em] text-mac-champagne uppercase">
                 {group.word}
               </h2>
               <div className="space-y-3">
@@ -41,12 +41,12 @@ export default function AgreementsPage() {
                   return (
                     <article
                       key={a.id}
-                      className="rounded-2xl border border-mac-line bg-mac-card p-4 transition hover:border-[#FCB040]/50"
+                      className="rounded-2xl border border-mac-line bg-mac-card p-4 transition hover:border-mac-gold/50"
                     >
                       <Link href={`/agreements/${a.id}`} className="block">
-                        <div className="flex justify-between text-[11px] tracking-[0.14em] text-[#E8D5C0] uppercase">
+                        <div className="flex justify-between text-[11px] tracking-[0.14em] text-mac-champagne uppercase">
                           <span className="font-bold">{a.agreementCode || a.id}</span>
-                          <span className="text-[#FCB040]">{request ? retailRequestWord(a) : bookLabel(a)}</span>
+                          <span className="text-mac-gold">{request ? retailRequestWord(a) : bookLabel(a)}</span>
                         </div>
                         <p className="mt-2 text-2xl font-bold text-mac-fg">{money(a.amount)}</p>
                         <p className="mt-1 text-xs text-mac-faint">
@@ -56,7 +56,7 @@ export default function AgreementsPage() {
                       {closed ? (
                         <Link
                           href={startAgainHref(a)}
-                          className="mt-3 inline-block text-[11px] font-bold tracking-[0.14em] text-[#FCB040] uppercase"
+                          className="mt-3 inline-block text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
                         >
                           Start again
                         </Link>

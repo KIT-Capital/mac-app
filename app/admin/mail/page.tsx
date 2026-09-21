@@ -110,7 +110,7 @@ function AdminMailBody() {
             message.to.join(", "),
             message.subject,
             message.status,
-            <button key={message.id} type="button" className="text-[#FCB040]" onClick={() => setSelected(message)}>
+            <button key={message.id} type="button" className="text-mac-gold" onClick={() => setSelected(message)}>
               Read
             </button>,
           ])}
@@ -121,7 +121,7 @@ function AdminMailBody() {
         <article className="mt-6 rounded-2xl border border-white/10 bg-[#161B24] p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FCB040] uppercase">{selected.kind}</p>
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-mac-gold uppercase">{selected.kind}</p>
               <h2 className="mt-1 text-lg text-white">{selected.subject}</h2>
               <p className="mt-1 text-[12px] text-white/50">To {selected.to.join(", ")}</p>
             </div>

@@ -58,7 +58,7 @@ export default function WatchDetailPage() {
         <p className="mt-3 text-[14px] font-medium text-mac-muted">Timepiece Not Found</p>
         <Link
           href="/collection"
-          className="mt-4 rounded-xl border border-mac-line bg-white/5 px-4 py-2 text-xs font-semibold text-[#FCB040]"
+          className="mt-4 rounded-xl border border-mac-line bg-white/5 px-4 py-2 text-xs font-semibold text-mac-gold"
         >
           Return to Collection
         </Link>
@@ -138,7 +138,7 @@ export default function WatchDetailPage() {
           ) : null}
 
           <div className="absolute top-3 right-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-mac-line bg-black/70 px-3 py-1 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase backdrop-blur-md">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-mac-line bg-black/70 px-3 py-1 text-[10px] font-bold tracking-wider text-mac-gold uppercase backdrop-blur-md">
               {view.word === "accepted" ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
               {view.word === "not_accepted" ? <XCircle className="h-3 w-3" /> : null}
               {view.word === "with_mac" ? <Clock className="h-3 w-3" /> : null}
@@ -150,7 +150,7 @@ export default function WatchDetailPage() {
         {/* Content Body */}
         <div className="p-5 space-y-5">
           <div>
-            <p className="text-[11px] font-bold tracking-[0.16em] text-[#FCB040] uppercase">
+            <p className="text-[11px] font-bold tracking-[0.16em] text-mac-gold uppercase">
               {watch.brand}
             </p>
             <h1 className="mt-0.5 text-[24px] font-semibold text-mac-fg tracking-tight">
@@ -163,7 +163,7 @@ export default function WatchDetailPage() {
 
           {/* Appraisal state (R29) */}
           <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
-            <p className="text-[10px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
+            <p className="text-[10px] font-bold tracking-[0.16em] text-mac-champagne uppercase">
               Appraisal
             </p>
             <p
@@ -203,7 +203,7 @@ export default function WatchDetailPage() {
             ) : null}
             {view.returnedAttempt?.responseNote ? (
               <div className="mt-3 border-t border-mac-line pt-3">
-                <p className="text-[10px] font-semibold tracking-[0.16em] text-[#FCB040] uppercase">
+                <p className="text-[10px] font-semibold tracking-[0.16em] text-mac-gold uppercase">
                   MAC asked for a change before deciding
                 </p>
                 <p className="mt-1 text-[13px] text-mac-fg">
@@ -215,7 +215,7 @@ export default function WatchDetailPage() {
 
           {/* Informational band. The appraisal value above is the business number. */}
           <div className="rounded-2xl border border-mac-line bg-mac-card p-4">
-            <p className="text-[10px] font-bold tracking-[0.16em] text-[#E8D5C0] uppercase">
+            <p className="text-[10px] font-bold tracking-[0.16em] text-mac-champagne uppercase">
               Appraisal range
             </p>
             <p className="mt-1 text-[22px] font-bold text-mac-fg">
@@ -292,7 +292,7 @@ export default function WatchDetailPage() {
                 type="button"
                 disabled={!canSend || sending}
                 onClick={() => void send()}
-                className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-[#FCB040] text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59] disabled:opacity-40"
+                className="mac-tap flex h-12 w-full items-center justify-center rounded-xl bg-mac-gold text-[13px] font-bold tracking-[0.18em] text-[#0A0D14] uppercase shadow-md transition hover:bg-[#ffbe59] disabled:opacity-40"
               >
                 Send for appraisal
               </button>
@@ -314,7 +314,7 @@ export default function WatchDetailPage() {
             <button
               type="button"
               onClick={() => router.push(`/repurchase/new?watch=${watch.id}`)}
-              className="mac-tap flex h-12 w-full items-center justify-center rounded-xl border border-[#FCB040]/40 bg-transparent text-[13px] font-bold tracking-[0.18em] text-[#FCB040] uppercase transition hover:bg-[#FCB040]/10"
+              className="mac-tap flex h-12 w-full items-center justify-center rounded-xl border border-mac-gold/40 bg-transparent text-[13px] font-bold tracking-[0.18em] text-mac-gold uppercase transition hover:bg-mac-gold/10"
             >
               Apply to Sell &amp; Repurchase
             </button>

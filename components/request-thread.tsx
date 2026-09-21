@@ -17,7 +17,7 @@ export function RequestThread({ events }: { events: RetailThreadEvent[] }) {
 
   return (
     <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
-      <h3 className="text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">Activity</h3>
+      <h3 className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Activity</h3>
       <ol className="mt-2 space-y-2">
         {rows.map((row) => (
           <li key={`${row.event.action}-${row.event.createdAt}`} className="text-[13px] text-mac-fg">

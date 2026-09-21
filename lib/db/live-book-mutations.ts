@@ -409,6 +409,7 @@ function settingsRowValues(source: Record<string, unknown>) {
     membershipMonthlyCents: Math.round(Number(source.membershipMonthly) * 100),
     vaultLocation: String(source.vaultLocation),
     requiredPhotoKinds: normalizeRequiredPhotoKinds(source.requiredPhotoKinds as string[] | undefined),
+    brandPreset: source.brandPreset === "mbf" ? "mbf" : "mac",
   };
 }
 
@@ -427,6 +428,7 @@ function settingsRowPatch(patch: Record<string, unknown>) {
     membershipMonthly: "membershipMonthlyCents",
     vaultLocation: "vaultLocation",
     requiredPhotoKinds: "requiredPhotoKinds",
+    brandPreset: "brandPreset",
   };
   return Object.fromEntries(
     Object.entries(fields)
@@ -760,6 +762,9 @@ async function executeLiveBookOperationCore(
     if (patch.requiredPhotoKinds !== undefined && !isSuperAdmin(actor)) {
       throw new Error("ROLE_FORBIDDEN");
     }
+    if (patch.brandPreset !== undefined && !isSuperAdmin(actor)) {
+      throw new Error("ROLE_FORBIDDEN");
+    }
     await db.execute(sql`select pg_advisory_xact_lock(hashtext('mac-desk-settings'))`);
     const [current] = await db.select().from(deskSettings)
       .where(eq(deskSettings.id, "default"))
@@ -780,6 +785,7 @@ async function executeLiveBookOperationCore(
           membershipMonthly: current.membershipMonthlyCents / 100,
           vaultLocation: current.vaultLocation,
           requiredPhotoKinds: normalizeRequiredPhotoKinds(current.requiredPhotoKinds),
+          brandPreset: current.brandPreset === "mbf" ? "mbf" : "mac",
         }
       : DEFAULT_SETTINGS;
     const nextSettings = { ...currentSettings, ...patch };

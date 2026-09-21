@@ -60,7 +60,7 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           onClick={onContinue}
           aria-label="Sign in with Google"
           title="Sign in with Google"
-          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card shadow-sm transition hover:border-[#FCB040] active:scale-95"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card shadow-sm transition hover:border-mac-gold active:scale-95"
         >
           <GoogleMark />
         </button>
@@ -69,7 +69,7 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           onClick={onContinue}
           aria-label="Continue with Facebook"
           title="Continue with Facebook"
-          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card shadow-sm transition hover:border-[#FCB040] active:scale-95"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card shadow-sm transition hover:border-mac-gold active:scale-95"
         >
           <FacebookMark />
         </button>
@@ -78,7 +78,7 @@ export function SocialLogin({ onContinue }: { onContinue: () => void }) {
           onClick={onContinue}
           aria-label="Sign in with Apple"
           title="Sign in with Apple"
-          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card text-mac-fg shadow-sm transition hover:border-[#FCB040] active:scale-95"
+          className="mac-tap flex h-11 w-11 items-center justify-center rounded-full border border-mac-line bg-mac-card text-mac-fg shadow-sm transition hover:border-mac-gold active:scale-95"
         >
           <AppleMark />
         </button>

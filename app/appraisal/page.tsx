@@ -20,7 +20,7 @@ export default function AppraisalPage() {
 
   return (
     <main className="flex flex-1 flex-col bg-white text-[#10141D]">
-      <div className="bg-[#0E2A44] text-white">
+      <div className="bg-mac-navy text-white">
         <ScreenHeader title="Certified Valuation" backHref="/collection" />
       </div>
       <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -29,7 +29,7 @@ export default function AppraisalPage() {
             <MacLogoMark className="p-1" />
           </div>
           <div className="text-right text-[11px] leading-4 text-black/60">
-            <p className="font-bold text-[#0E2A44] uppercase">Mechanical Art Capital LLC</p>
+            <p className="font-bold text-mac-navy uppercase">Mechanical Art Capital LLC</p>
             <p>Certified Valuation Schedule</p>
             <p>Issued: {new Date().toLocaleDateString()}</p>
           </div>
@@ -87,13 +87,13 @@ export default function AppraisalPage() {
         <button
           type="button"
           onClick={() => window.print()}
-          className="mac-tap flex h-11 items-center gap-2 rounded-xl border border-black/15 px-5 text-xs font-bold uppercase tracking-wider text-[#0E2A44] shadow-sm"
+          className="mac-tap flex h-11 items-center gap-2 rounded-xl border border-black/15 px-5 text-xs font-bold uppercase tracking-wider text-mac-navy shadow-sm"
         >
           Print / PDF
         </button>
         <Link
           href="/collection"
-          className="mac-tap flex h-11 items-center gap-2 rounded-xl bg-[#0E2A44] px-5 text-xs font-bold uppercase tracking-wider text-white shadow-sm"
+          className="mac-tap flex h-11 items-center gap-2 rounded-xl bg-mac-navy px-5 text-xs font-bold uppercase tracking-wider text-white shadow-sm"
         >
           <Pencil className="h-4 w-4" />
           Edit Collection

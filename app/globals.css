@@ -10,9 +10,9 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
-  --color-mac-navy: #0e2a44;
-  --color-mac-gold: #fcb040;
-  --color-mac-champagne: #e8d5c0;
+  --color-mac-navy: var(--brand-primary);
+  --color-mac-gold: var(--brand-accent);
+  --color-mac-champagne: var(--brand-soft);
   --color-mac-parchment: #f3eee6;
   --color-mac-bg: var(--mac-bg);
   --color-mac-card: var(--mac-card);
@@ -75,32 +75,32 @@
   --card-foreground: #ffffff;
   --popover: #111111;
   --popover-foreground: #ffffff;
-  --primary: #0e2a44;
+  --primary: var(--brand-primary);
   --primary-foreground: #ffffff;
   --secondary: #111111;
   --secondary-foreground: #ffffff;
   --muted: #161616;
   --muted-foreground: #a3a3a3;
-  --accent: #0e2a44;
+  --accent: var(--brand-primary);
   --accent-foreground: #ffffff;
   --destructive: oklch(0.577 0.245 27.325);
   --border: rgb(255 255 255 / 12%);
   --input: rgb(255 255 255 / 12%);
-  --ring: #fcb040;
-  --chart-1: #0e2a44;
-  --chart-2: #fcb040;
-  --chart-3: #e8d5c0;
+  --ring: var(--brand-accent);
+  --chart-1: var(--brand-primary);
+  --chart-2: var(--brand-accent);
+  --chart-3: var(--brand-soft);
   --chart-4: #6b7c8a;
   --chart-5: #ffffff;
   --radius: 0.125rem;
   --sidebar: #000000;
   --sidebar-foreground: #ffffff;
-  --sidebar-primary: #0e2a44;
+  --sidebar-primary: var(--brand-primary);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #111111;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 10%);
-  --sidebar-ring: #fcb040;
+  --sidebar-ring: var(--brand-accent);
 }
 
 .dark {
@@ -172,7 +172,7 @@
   .mac-app-screen textarea,
   .mac-phone-screen textarea {
     color: var(--mac-fg);
-    caret-color: #fcb040;
+    caret-color: var(--brand-accent);
   }
   .mac-app-screen input::placeholder,
   .mac-phone-screen input::placeholder,

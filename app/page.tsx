@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { MacLockup } from "@/components/mac-logo";
 import { useStore } from "@/lib/store";
+import { brandFromSettings } from "@/lib/theme";
 
 export default function WelcomePage() {
   const { settings, updateSettings } = useStore();
   const light = settings.appearance === "light";
+  const brand = brandFromSettings(settings);
 
   return (
     <main
@@ -35,8 +37,7 @@ export default function WelcomePage() {
               light ? "text-black/55" : "text-white/65"
             }`}
           >
-            Appraise your timepiece with MAC, the horology experts who appreciate mechanical art as
-            much as you do. MAC buys qualifying pieces; you may buy them back on a preset scale.
+            {brand.splash}
           </p>
           <div className="mt-10 w-full space-y-3">
             <Link
@@ -49,7 +50,7 @@ export default function WelcomePage() {
             </Link>
             <Link
               href="/login"
-              className="mac-tap flex h-12 w-full items-center justify-center bg-[#0E2A44] text-[12px] font-semibold tracking-[0.18em] text-white uppercase"
+              className="mac-tap flex h-12 w-full items-center justify-center bg-mac-navy text-[12px] font-semibold tracking-[0.18em] text-white uppercase"
             >
               Sign In
             </Link>

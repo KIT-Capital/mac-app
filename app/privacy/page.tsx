@@ -8,7 +8,7 @@ export default function PrivacyPage() {
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
       <ScreenHeader title="Privacy Policy" backHref="/signup" menu={false} />
       <article className="mx-auto w-full max-w-xl flex-1 space-y-4 overflow-y-auto px-6 py-6 text-[13px] leading-relaxed text-mac-muted">
-        <span className="inline-block rounded-full border border-[#FCB040]/30 bg-[#FCB040]/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">
+        <span className="inline-block rounded-full border border-mac-gold/30 bg-mac-gold/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-mac-gold uppercase">
           Client Data & Title Verification Standard
         </span>
         <p className="font-medium text-mac-fg">
@@ -32,7 +32,7 @@ export default function PrivacyPage() {
         <div className="pt-4">
           <Link
             href="/signup"
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-white/10 px-5 text-xs font-semibold uppercase tracking-wider text-[#FCB040] hover:bg-white/15"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-white/10 px-5 text-xs font-semibold uppercase tracking-wider text-mac-gold hover:bg-white/15"
           >
             ← Back to Registration
           </Link>

@@ -82,7 +82,7 @@ export default function CollectionPage() {
 
         <Link
           href="/collection/add"
-          className="mac-tap absolute bottom-5 left-1/2 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-[#0E2A44] text-white shadow-md md:static md:mt-8 md:h-12 md:w-auto md:translate-x-0 md:rounded-none md:px-6 md:text-[12px] md:font-semibold md:tracking-[0.16em] md:uppercase"
+          className="mac-tap absolute bottom-5 left-1/2 flex h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full bg-mac-navy text-white shadow-md md:static md:mt-8 md:h-12 md:w-auto md:translate-x-0 md:rounded-none md:px-6 md:text-[12px] md:font-semibold md:tracking-[0.16em] md:uppercase"
           aria-label="Add a timepiece"
           title="Add a timepiece"
         >

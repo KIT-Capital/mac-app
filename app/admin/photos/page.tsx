@@ -52,7 +52,7 @@ export default function AdminPhotosPage() {
           </NativeSelect>
         </label>
         {bookMode !== "live" ? (
-          <label className="mac-tap flex h-11 items-center rounded-xl bg-[#FCB040] px-5 text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm cursor-pointer hover:bg-[#ffbe59]">
+          <label className="mac-tap flex h-11 items-center rounded-xl bg-mac-gold px-5 text-[12px] font-bold tracking-[0.16em] text-[#0A0D14] uppercase shadow-sm cursor-pointer hover:bg-[#ffbe59]">
             Upload Photo
             <input type="file" accept="image/*" className="sr-only" onChange={(e) => onUpload(e.target.files?.[0])} />
           </label>
@@ -74,7 +74,7 @@ export default function AdminPhotosPage() {
               </div>
               <figcaption className="flex items-center justify-between px-2 py-2 text-[11px] text-white/55">
                 <span className="uppercase">{photo.kind}</span>
-                <button type="button" className="text-[#FCB040]" onClick={() => removePhoto(photo.id)}>
+                <button type="button" className="text-mac-gold" onClick={() => removePhoto(photo.id)}>
                   Remove
                 </button>
               </figcaption>

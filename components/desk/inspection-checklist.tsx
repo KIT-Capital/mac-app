@@ -40,7 +40,7 @@ export function InspectionChecklist({
   return (
     <section className="space-y-4 rounded-2xl border border-white/10 bg-[#161B24] p-4">
       <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">MAC sign</h3>
-      {reason ? <p className="text-[13px] text-[#FCB040]">{reason}</p> : null}
+      {reason ? <p className="text-[13px] text-mac-gold">{reason}</p> : null}
       <ul className="space-y-2">
         {INSPECTION_CHECKLIST.map((item) => (
           <li key={item.key}>

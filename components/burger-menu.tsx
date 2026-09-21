@@ -54,7 +54,7 @@ function BurgerDrawer({ onClose }: { onClose: () => void }) {
   return createPortal(
     <div className="absolute inset-0 z-50 flex">
       <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/55" onClick={onClose} />
-      <nav className="relative z-10 flex h-full w-[78%] max-w-[300px] flex-col bg-[#0E2A44] text-white shadow-2xl">
+      <nav className="relative z-10 flex h-full w-[78%] max-w-[300px] flex-col bg-mac-navy text-white shadow-2xl">
         <div className="flex items-center justify-between px-4 pt-10 pb-4">
           <div className="min-w-0">
             <MacLogoMark onDark className="w-14" />

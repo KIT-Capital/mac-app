@@ -117,15 +117,15 @@ export default function LoginPage() {
       </div>
 
       {notice ? (
-        <div className="rounded-xl border border-[#FCB040]/40 bg-mac-card px-5 py-6 text-center">
-          <Mail className="mx-auto h-6 w-6 text-[#FCB040]" />
+        <div className="rounded-xl border border-mac-gold/40 bg-mac-card px-5 py-6 text-center">
+          <Mail className="mx-auto h-6 w-6 text-mac-gold" />
           <p className="mt-3 text-sm leading-relaxed text-mac-fg">{notice}</p>
         </div>
       ) : (
       <form onSubmit={onSubmit} className="space-y-4">
-        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
           <div className="flex items-center justify-between">
-            <label htmlFor="login-email" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+            <label htmlFor="login-email" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
               Email Address
             </label>
             <Mail className="h-3.5 w-3.5 text-mac-faint" />
@@ -143,9 +143,9 @@ export default function LoginPage() {
         </div>
 
         {deskMode ? (
-        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-[#FCB040] focus-within:ring-1 focus-within:ring-[#FCB040]/50">
+        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
           <div className="flex items-center justify-between">
-            <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+            <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
               Password
             </label>
             <Lock className="h-3.5 w-3.5 text-mac-faint" />
@@ -177,7 +177,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy}
-          className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-[#0E2A44] text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
+          className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-mac-navy text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
         >
           {busy ? "Please wait…" : deskMode ? "Sign in" : "Send sign-in link"}
         </button>
@@ -197,7 +197,7 @@ export default function LoginPage() {
       <div className="pt-6 pb-2 text-center">
         <p className="text-[12px] text-mac-muted">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-semibold text-[#FCB040] underline underline-offset-4">
+          <Link href="/signup" className="font-semibold text-mac-gold underline underline-offset-4">
             Sign up
           </Link>
         </p>

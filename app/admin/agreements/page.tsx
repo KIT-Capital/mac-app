@@ -421,7 +421,7 @@ export default function AdminAgreementsPage() {
           `${s.termMonths} mo`,
           `${Math.round(s.ltv * 100)}%`,
           s.status === "open" ? "Open" : s.status === "assigned" ? "Assigned" : "Closed",
-          <div key={s.id} className="flex gap-3 text-[#FCB040]">
+          <div key={s.id} className="flex gap-3 text-mac-gold">
             <button type="button" onClick={() => setDraft(s)}>Edit</button>
             <button type="button" onClick={() => void onRemoveShell(s.id)}>Remove</button>
           </div>,
@@ -438,7 +438,7 @@ export default function AdminAgreementsPage() {
             aria-selected={tab === item.id}
             className={
               tab === item.id
-                ? "rounded-md bg-[#FCB040] px-3 py-2 text-[11px] font-semibold tracking-[0.08em] text-[#0A0D14] uppercase"
+                ? "rounded-md bg-mac-gold px-3 py-2 text-[11px] font-semibold tracking-[0.08em] text-[#0A0D14] uppercase"
                 : "rounded-md px-3 py-2 text-[11px] font-semibold tracking-[0.08em] text-white/65 uppercase hover:bg-white/5"
             }
             onClick={() => {
@@ -464,7 +464,7 @@ export default function AdminAgreementsPage() {
             money(a.amount),
             a.signedAt ? "signed" : a.status.replace("_", " "),
             bookLabel(a) ?? "—",
-            <div key={a.id} className="flex flex-wrap items-center gap-3 text-[#FCB040]" onClick={(event) => event.stopPropagation()}>
+            <div key={a.id} className="flex flex-wrap items-center gap-3 text-mac-gold" onClick={(event) => event.stopPropagation()}>
               {!a.signedAt ? (
                 <button type="button" onClick={() => void signAgreement(a.id)}>Mark signed</button>
               ) : null}
@@ -541,7 +541,7 @@ export default function AdminAgreementsPage() {
                   {a.bookEnd ? (
                     <button
                       type="button"
-                      className="text-[12px] font-bold tracking-[0.18em] text-[#FCB040] uppercase"
+                      className="text-[12px] font-bold tracking-[0.18em] text-mac-gold uppercase"
                       onClick={async () => {
                         if (!await clearAgreementEnd(a.id)) {
                           setEndError(END_ERRORS.LIVE_WATCH_CONFLICT);
@@ -564,12 +564,12 @@ export default function AdminAgreementsPage() {
           headers={tab === "queue" ? ["Code", "Owner", "CS", ""] : ["Code", "Owner", ""]}
           rows={tabRows.map((a) => {
             const open = (
-              <Link key={`${a.id}-open`} href={`/admin/requests/${a.id}`} className="text-[#FCB040]">
+              <Link key={`${a.id}-open`} href={`/admin/requests/${a.id}`} className="text-mac-gold">
                 Open
               </Link>
             );
             const actions = (
-              <div key={a.id} className="flex flex-wrap items-center gap-3 text-[#FCB040]">
+              <div key={a.id} className="flex flex-wrap items-center gap-3 text-mac-gold">
                 {tab === "queue" ? (
                   <>
                     <button type="button" onClick={() => void onDeskReturn(a, "confirm")}>Confirm</button>

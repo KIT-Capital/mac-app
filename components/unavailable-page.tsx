@@ -23,14 +23,14 @@ export function UnavailablePage() {
         </p>
         <p className="text-[12px] text-mac-faint">
           Questions:{" "}
-          <a className="text-[#FCB040]" href={`mailto:${CONTACT_EMAIL}`}>
+          <a className="text-mac-gold" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
         </p>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="rounded-full bg-[#0E2A44] px-8 py-3 text-[11px] font-bold tracking-[0.18em] text-white uppercase shadow-sm"
+          className="rounded-full bg-mac-navy px-8 py-3 text-[11px] font-bold tracking-[0.18em] text-white uppercase shadow-sm"
         >
           Try again
         </button>

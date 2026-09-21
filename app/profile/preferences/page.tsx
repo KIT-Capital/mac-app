@@ -23,14 +23,14 @@ export default function PreferencesPage() {
       <ScreenHeader title="Preferences" backHref="/profile" />
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
         <section>
-          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
             Appearance
           </p>
           <AppearanceToggle />
         </section>
 
         <section className="space-y-2">
-          <p className="text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+          <p className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
             Notifications
           </p>
           <PrefToggle
@@ -54,7 +54,7 @@ export default function PreferencesPage() {
         </section>
 
         <section>
-          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-[#E8D5C0] uppercase">
+          <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
             Preferred contact
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -66,7 +66,7 @@ export default function PreferencesPage() {
                 className={cn(
                   "mac-tap rounded-xl border py-3 text-[12px] font-semibold tracking-[0.12em] uppercase",
                   prefs.preferredContact === method
-                    ? "border-[#FCB040] bg-[#0E2A44] text-white"
+                    ? "border-mac-gold bg-mac-navy text-white"
                     : "border-mac-line bg-mac-card text-mac-muted",
                 )}
               >
@@ -104,7 +104,7 @@ function PrefToggle({
       <span
         className={cn(
           "relative h-6 w-11 rounded-full transition",
-          checked ? "bg-[#0E2A44]" : "bg-mac-line",
+          checked ? "bg-mac-navy" : "bg-mac-line",
         )}
       >
         <span

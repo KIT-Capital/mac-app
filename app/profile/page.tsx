@@ -22,7 +22,7 @@ export default function ProfilePage() {
 
   return (
     <main className="flex flex-1 flex-col bg-mac-bg text-mac-fg">
-      <div className="relative h-[148px] overflow-hidden bg-[#0E2A44]">
+      <div className="relative h-[148px] overflow-hidden bg-mac-navy">
         <div className="absolute inset-0">
           <WatchPhoto
             src="/watches/richard-mille.jpg"

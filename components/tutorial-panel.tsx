@@ -13,13 +13,13 @@ export function TutorialPanel({
   const desk = tone === "desk";
   const leadClass = desk ? "text-white/70" : "text-mac-muted";
   const cardClass = desk ? "border-white/25 bg-[#222]" : "border-mac-line bg-mac-card";
-  const kickerClass = desk ? "text-[#FCB040]" : "text-[#E8D5C0]";
+  const kickerClass = desk ? "text-mac-gold" : "text-mac-champagne";
   const titleClass = desk ? "text-white" : "text-mac-fg";
   const bodyClass = desk ? "text-white/65" : "text-mac-muted";
 
   return (
     <div className="space-y-4">
-      <span className="inline-block rounded-full border border-[#FCB040]/30 bg-[#FCB040]/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-[#FCB040] uppercase">
+      <span className="inline-block rounded-full border border-mac-gold/30 bg-mac-gold/10 px-3 py-0.5 text-[10px] font-bold tracking-wider text-mac-gold uppercase">
         {badge}
       </span>
       <h2 className={cn("text-[20px] font-semibold", titleClass)}>{tutorial.title}</h2>

@@ -23,7 +23,7 @@ export function ScreenHeader({
   return (
     <header
       className={cn(
-        "relative flex h-[54px] shrink-0 items-center justify-between border-b border-white/10 bg-[#0E2A44] px-3 shadow-sm md:h-16 md:px-5",
+        "relative flex h-[54px] shrink-0 items-center justify-between border-b border-white/10 bg-mac-navy px-3 shadow-sm md:h-16 md:px-5",
         className,
       )}
     >
