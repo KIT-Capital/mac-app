@@ -41,7 +41,10 @@ cookie contains only a signed opaque session-row id. Expired, consumed, and
 missing codes show the same retry message. Codes are never logged or stored in
 plaintext. Access mail is never retained in the generic desk outbox, including
 send failures. SMS codes stay in Twilio Verify; the app does not hash them.
-WorkOS and Neon Auth remain disabled.
+WhatsApp is a retail notice and Desk inbox channel on the same Twilio account,
+not a login method. Outbound WhatsApp copy omits piece names, dollars, and login
+secrets. Inbound webhook posts require a valid Twilio signature. WorkOS and Neon
+Auth remain disabled.
 
 An invited collector may request the same non-enumerating login code. Successful
 verification atomically activates that exact customer ID and email before issuing

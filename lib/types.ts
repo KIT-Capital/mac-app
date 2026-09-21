@@ -251,7 +251,8 @@ export type UserPreferences = {
   pushNotifications: boolean;
   emailUpdates: boolean;
   smsUpdates: boolean;
-  preferredContact: "email" | "phone";
+  whatsappUpdates: boolean;
+  preferredContact: "email" | "phone" | "whatsapp";
   language: "en";
 };
 

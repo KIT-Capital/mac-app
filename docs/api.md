@@ -22,6 +22,20 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 - `GET` lists the process-local outbox; desk session required. Missing or invalid session is **403**.
 - Rate-limited per client IP.
 
+## `GET` `/api/desk/whatsapp`
+
+- Desk session required. Missing or invalid session is **403**.
+- Browser mode (`MAC_LIVE_BOOK` off) returns `{ configured, messages: [] }` without opening Neon.
+- Live mode lists recent retail WhatsApp rows (direction, phone, body, kind). Desk people are never parties.
+- This is a staff inbox, not a public feed.
+
+## `POST` `/api/webhooks/twilio-whatsapp`
+
+- Twilio form post. Validates `X-Twilio-Signature` against `COLLECTOR_MAGIC_LINK_ORIGIN` plus the path. Forged signatures are **403**.
+- Missing Twilio WhatsApp keys, an unset origin, or live book off/invalid answers **204** and writes nothing.
+- Stores inbound text for a matching retail phone, or with a null customer when the number is unknown. Reserved desk emails are ignored.
+- Not origin-gated as a browser mutation. Not a login path.
+
 ## `POST` `/api/contracts/pdf`
 
 - Browser mode (`MAC_LIVE_BOOK` unset): same-origin or `Origin` exactly equal to

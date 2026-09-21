@@ -17,6 +17,7 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 - **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
+- **WhatsApp** — Twilio Messages API for opted-in retail notices and a Desk inbox at `/admin/whatsapp`. **Implemented.** Desk roles are not WhatsApp users. Copy omits piece names, dollars, and login secrets.
 - **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** `proxy.ts` returns 403 for `/admin` without a valid cookie. Moving the secret is a separate security plan.
 - **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses the isolated `development` branch. **Verified** connectivity. Stage 1–5 and 7 plus the live operations-book and shared desk-data tables exist on `development` only. No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI uses the browser store by default and the scoped Neon path only when the owner switch is enabled. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
@@ -25,7 +26,9 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
   `mac_collector` session primitives exist behind default-off `MAC_LIVE_BOOK`.
   Enabled use runs in development, staging, and production with an HTTPS origin
   outside development; login and signup request a verification code by email, or
-  by SMS when Twilio Verify keys are set.
+  by SMS when Twilio Verify keys are set. Opted-in collectors and dealers may
+  also receive short WhatsApp notices; inbound replies land on the Desk inbox.
+  WhatsApp is not a login method.
 - **Internal mail routing** — `MAC_INTERNAL_EMAIL` is the single recipient for
   MAC desk aliases during the prototype. Collector copies remain addressed to
   collectors and the public From address remains `info@mechartcap.com`.
@@ -35,6 +38,8 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 ```
 app/                 routes
 app/api/mail         outbound mail
+app/api/desk/whatsapp desk WhatsApp inbox
+app/api/webhooks/twilio-whatsapp inbound Twilio WhatsApp
 app/api/desk-session desk cookie
 app/api/collector-session collector email verification
 app/api/live-book scoped repo-book reads and operations

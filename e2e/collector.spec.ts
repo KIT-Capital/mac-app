@@ -520,7 +520,8 @@ test.describe("collector app", () => {
     await page.getByRole("button", { name: "Light" }).click();
     await expect(page.locator("[data-appearance='light']")).toHaveCount(1);
     await page.getByRole("button", { name: "Push notices" }).click();
-    await page.getByRole("button", { name: "phone" }).click();
+    await page.getByRole("button", { name: "WhatsApp updates" }).click();
+    await page.getByRole("button", { name: "whatsapp", exact: true }).click();
     await page.goto("/collection");
     await page.goto("/profile/preferences");
     await expect(page.locator("[data-appearance='light']")).toHaveCount(1);

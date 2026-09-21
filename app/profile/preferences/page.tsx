@@ -51,14 +51,20 @@ export default function PreferencesPage() {
             checked={prefs.smsUpdates}
             onChange={(smsUpdates) => updatePreferences({ smsUpdates })}
           />
+          <PrefToggle
+            label="WhatsApp updates"
+            hint="Short notices. No piece names or dollar amounts."
+            checked={prefs.whatsappUpdates}
+            onChange={(whatsappUpdates) => updatePreferences({ whatsappUpdates })}
+          />
         </section>
 
         <section>
           <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
             Preferred contact
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            {(["email", "phone"] as const).map((method) => (
+          <div className="grid grid-cols-3 gap-2">
+            {(["email", "phone", "whatsapp"] as const).map((method) => (
               <button
                 key={method}
                 type="button"

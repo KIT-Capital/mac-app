@@ -53,9 +53,9 @@ flowchart TB
   M --- book
 ```
 
-**Shipped today:** `collector`, `dealer`, `admin`, `appraiser`, `super_admin`. Collectors and dealers self-identify on signup and may change on profile; that tag is **frozen on each repo** at apply and at renew. Collectors sign in with a one-time email or SMS code (no password). Desk uses a password, and when live identity is on, a one-time email code as well. First-login for seeded desk people is a set-password link. There is no hidden “MAC desk staff” control on login.
+**Shipped today:** `collector`, `dealer`, `admin`, `appraiser`, `super_admin`. Collectors and dealers self-identify on signup and may change on profile; that tag is **frozen on each repo** at apply and at renew. Collectors sign in with a one-time email or SMS code (no password). Desk uses a password, and when live identity is on, a one-time email code as well. First-login for seeded desk people is a set-password link. There is no hidden “MAC desk staff” control on login. Retail WhatsApp notices and the Desk inbox ship with this unit (opt-in on profile; no WhatsApp login).
 
-**Approved, not yet shipped** (`2026-09-19` roles plan; each unit lands as its own PR): Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. WhatsApp for retail via Twilio (Norfolk AI now, MAC later). Master super admin is Ricardo Cidale. Seeded desk people: Dov Tuzman (appraiser), Rosario David (admin) (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
+**Approved, not yet shipped** (`2026-09-19` roles plan leftover desk-stores units): Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Master super admin is Ricardo Cidale. Seeded desk people: Dov Tuzman (appraiser), Rosario David (admin) (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
 
 Retail users **see** agreements, pieces, appraised values, and an “in an activated repo” flag. They do **not** edit a signed repo and they do **not** record a book end.
 
@@ -183,9 +183,9 @@ When MAC has signed:
 - This app **assumes** they are in MAC’s possession and in a MAC-controlled vault.
 - Official inventory remains the third-party book. This app does not write that book or QuickBooks.
 
-## Channels (proposed)
+## Channels
 
-Email, password, SMS (Twilio), WhatsApp for **retail** notices and a Desk inbox. Desk staff are not WhatsApp users. Neon Auth stays off. WorkOS is not the core login (decision `0002` must not be read as permission to enable it).
+Email, SMS login codes (Twilio Verify), and WhatsApp for **retail** notices plus a Desk inbox. Desk staff are not WhatsApp users. Neon Auth stays off. WorkOS is not the core login (decision `0002` must not be read as permission to enable it).
 
 ## Desk stores
 

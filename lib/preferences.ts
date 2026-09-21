@@ -5,6 +5,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   pushNotifications: true,
   emailUpdates: true,
   smsUpdates: false,
+  whatsappUpdates: false,
   preferredContact: "email",
   language: "en",
 };
