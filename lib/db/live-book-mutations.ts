@@ -54,6 +54,8 @@ import {
   lockStaffForDeskMutation,
   writeDeskAudit,
 } from "./staff-accounts";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
+import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import type { Actor } from "./records";
 import { deskActor } from "./records";
 import {
@@ -899,7 +901,7 @@ async function executeLiveBookOperationCore(
     if (!brandId) {
       const [found] = await db.select({ id: catalogBrands.id })
         .from(catalogBrands)
-        .where(sql`lower(${catalogBrands.name}) = lower(${String(entry.brand)})`)
+        .where(sql`lower(${catalogBrands.name}) = lower(${String(entry.brand)}) and ${catalogBrands.tenantId} = ${DEFAULT_TENANT_ID}`)
         .limit(1);
       brandId = found?.id ?? "";
     }
@@ -909,6 +911,7 @@ async function executeLiveBookOperationCore(
       : null;
     const values = {
       id: String(entry.id),
+      tenantId: DEFAULT_TENANT_ID,
       brandId,
       brand: String(entry.brand),
       model: String(entry.model),
@@ -960,6 +963,7 @@ async function executeLiveBookOperationCore(
     const brand = operation.brand as Record<string, unknown>;
     const values = {
       id: String(brand.id),
+      tenantId: DEFAULT_TENANT_ID,
       name: String(brand.name),
       tier: Number(brand.tier) === 2 ? 2 : 1,
       slug: String(brand.slug),
@@ -1108,7 +1112,7 @@ async function executeLiveBookOperationCore(
     const [customerCollision, staffCollision] = await Promise.all([
       db.select({ id: customers.id, email: customers.email })
         .from(customers)
-        .where(or(eq(customers.id, id), eq(customers.email, email)))
+        .where(or(eq(customers.id, id), customerEmailOnDefaultTenant(email)))
         .limit(1),
       db.select({ id: staffAccounts.id }).from(staffAccounts)
         .where(eq(staffAccounts.email, email))
@@ -1116,14 +1120,17 @@ async function executeLiveBookOperationCore(
     ]);
     if (customerCollision[0]) throw new Error("ID_COLLISION");
     if (staffCollision[0]) throw new Error("RESERVED_DESK_EMAIL");
+    const memberId = await allocateMemberIdIn(db);
     await db.insert(customers).values({
       id,
+      tenantId: DEFAULT_TENANT_ID,
       email,
       name: String(customer.name),
       phone: String(customer.phone),
       role: "collector",
       status: "invited",
       member: Boolean(customer.member),
+      memberId,
       preferences: {},
     });
     return;
@@ -1156,6 +1163,7 @@ async function executeLiveBookOperationCore(
     if (existing) throw new Error("ID_COLLISION");
     await db.insert(timepieces).values({
       id: String(timepiece.id),
+      tenantId: DEFAULT_TENANT_ID,
       customerId: actor.customerId,
       ...values,
     });
@@ -1366,6 +1374,7 @@ async function executeLiveBookOperationCore(
       await tx.update(liveAgreementMembers).set({ status: "released" }).where(eq(liveAgreementMembers.agreementId, agreement.id));
       await tx.insert(liveAgreements).values({
         id: successorId,
+        tenantId: DEFAULT_TENANT_ID,
         customerId: agreement.customerId,
         amountCents,
         termMonths: 12,
@@ -1608,6 +1617,7 @@ async function submitRequest(
   const note = String(operation.note ?? "");
   const [row] = await db.insert(liveAgreements).values({
     id,
+    tenantId: DEFAULT_TENANT_ID,
     customerId: actor.customerId,
     amountCents,
     termMonths,

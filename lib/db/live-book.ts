@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { HELD_PIECE_CONSTRAINTS } from "../live-book-errors.mjs";
 import { assertIsolation, canReadAgreement, canWriteCustomer, canWritePhoto } from "./isolation.mjs";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import type { Database } from "./client";
 import { dollarsToCents } from "./money.mjs";
 import type { Actor } from "./records";
@@ -89,6 +90,7 @@ export async function insertLiveAgreement(db: Database, actor: Actor, input: Liv
         .insert(liveAgreements)
         .values({
           id: input.id,
+          tenantId: DEFAULT_TENANT_ID,
           customerId: input.customerId,
           amountCents,
           termMonths: input.termMonths,

@@ -17,6 +17,7 @@ import {
   timepieces,
 } from "./schema";
 import { hashStaffPassword } from "../staff-password.mjs";
+import { DEFAULT_TENANT_ID, parseMemberId } from "../tenant.mjs";
 
 const skip = !process.env.DATABASE_URL;
 const suffix = Date.now();
@@ -94,6 +95,10 @@ describe("commitLiveBookImport", { skip }, () => {
     assert.equal(loaded?.amountCents, 20000000);
     assert.equal(loaded?.bookEnd, null);
     assert.deepEqual(loaded?.watchIds.sort(), haleExport.timepieces.map((watch) => watch.id).sort());
+
+    const [firstOwner] = await db.select().from(customers).where(eq(customers.id, customerId));
+    assert.ok(firstOwner?.memberId);
+    assert.equal(parseMemberId(firstOwner.memberId)?.prefix, "MAC");
 
     const second = await commitLiveBookImport(
       db,
@@ -187,6 +192,60 @@ describe("commitLiveBookImport", { skip }, () => {
     assert.equal(newRepo?.bookEnd, null);
     assert.ok(newRepo?.members.every((member) => member.status === "live"));
     assert.deepEqual(oldRepo?.watchIds.sort(), newRepo?.watchIds.sort());
+  });
+
+  it("assigns a member ID to an existing collector who does not have one", async () => {
+    const priorEmail = `prior.member.${suffix}@mac.test`;
+    const priorId = `cust-${priorEmail}`;
+    const watchId = `prior-watch-${suffix}`;
+    const agreementId = `prior-agr-${suffix}`;
+    createdCustomerIds.push(priorId);
+    createdPieceIds.push(watchId);
+    createdAgreementIds.push(agreementId);
+    await db.insert(customers).values({
+      id: priorId,
+      tenantId: DEFAULT_TENANT_ID,
+      email: priorEmail,
+      name: "Prior Collector",
+      role: "collector",
+    });
+    const payload = {
+      timepieces: [
+        {
+          id: watchId,
+          ownerEmail: priorEmail,
+          brand: "Cartier",
+          model: "Crash",
+          status: "appraised",
+          financeable: true,
+          valueLow: 80000,
+          valueHigh: 100000,
+          images: ["/watches/cartier-crash.jpg"],
+        },
+      ],
+      agreements: [
+        {
+          id: agreementId,
+          watchIds: [watchId],
+          amount: 50000,
+          termMonths: 12,
+          delivery: "Desk arranges intake",
+          ownerName: "Prior Collector",
+          email: priorEmail,
+          status: "pending_signature",
+          createdAt: "2021-03-14",
+        },
+      ],
+    };
+    const first = await commitLiveBookImport(db, desk, payload, { confirmLiveImport: true });
+    assert.equal(first.ok, true);
+    const [assigned] = await db.select().from(customers).where(eq(customers.id, priorId));
+    assert.ok(assigned?.memberId);
+    assert.equal(parseMemberId(assigned.memberId)?.prefix, "MAC");
+    const second = await commitLiveBookImport(db, desk, payload, { confirmLiveImport: true });
+    assert.equal(second.ok, true);
+    const [again] = await db.select().from(customers).where(eq(customers.id, priorId));
+    assert.equal(again?.memberId, assigned.memberId);
   });
 
   it("refuses an admin import that carries appraisal values", async () => {

@@ -11,6 +11,8 @@ import {
   isDeskActor,
 } from "./isolation.mjs";
 import { centsToDollars, dollarsToCents } from "./money.mjs";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
+import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import { customers, timepieces } from "./schema";
 
 /**
@@ -91,20 +93,25 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
     throw new Error("RESERVED_DESK_EMAIL");
   }
   try {
-    const [row] = await db
-      .insert(customers)
-      .values({
-        id: randomUUID(),
-        email,
-        name: input.name.trim() || "Collector",
-        phone: input.phone?.trim() ?? "",
-        role: "collector",
-        preferences: DEFAULT_PREFERENCES,
-      })
-      .returning();
-    return row;
+    return await db.transaction(async (tx) => {
+      const memberId = await allocateMemberIdIn(tx);
+      const [row] = await tx
+        .insert(customers)
+        .values({
+          id: randomUUID(),
+          tenantId: DEFAULT_TENANT_ID,
+          email,
+          name: input.name.trim() || "Collector",
+          phone: input.phone?.trim() ?? "",
+          role: "collector",
+          memberId,
+          preferences: DEFAULT_PREFERENCES,
+        })
+        .returning();
+      return row;
+    });
   } catch (error) {
-    if (constraintName(error) === "customers_email_unique") {
+    if (constraintName(error) === "customers_tenant_email_uidx") {
       throw new Error("DUPLICATE_EMAIL");
     }
     throw error;
@@ -114,7 +121,7 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
 export async function findCustomerByEmail(db: Database, emailInput: string) {
   const email = normalizeEmail(emailInput);
   if (!email.includes("@")) return null;
-  const [row] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
+  const [row] = await db.select().from(customers).where(customerEmailOnDefaultTenant(email)).limit(1);
   return row ?? null;
 }
 
@@ -130,13 +137,13 @@ export async function activateInvitedCollector(
       updatedAt: new Date(),
     }).where(and(
       eq(customers.id, customerId),
-      eq(customers.email, email),
+      customerEmailOnDefaultTenant(email),
       eq(customers.status, "invited"),
     )).returning();
     if (activated) return activated;
     const [existing] = await tx.select().from(customers).where(and(
       eq(customers.id, customerId),
-      eq(customers.email, email),
+      customerEmailOnDefaultTenant(email),
     )).limit(1);
     if (!existing) throw new Error("COLLECTOR_NOT_FOUND");
     if (existing.status !== "active") throw new Error("COLLECTOR_INACTIVE");
@@ -155,18 +162,23 @@ export async function registerVerifiedCollector(
   if (isReservedDeskEmail(email)) throw new Error("RESERVED_DESK_EMAIL");
   if (!name) throw new Error("NAME_REQUIRED");
 
-  const [created] = await db
-    .insert(customers)
-    .values({
-      id: randomUUID(),
-      email,
-      name,
-      phone,
-      role: "collector",
-      preferences: DEFAULT_PREFERENCES,
-    })
-    .onConflictDoNothing({ target: customers.email })
-    .returning();
+  const [created] = await db.transaction(async (tx) => {
+    const memberId = await allocateMemberIdIn(tx);
+    return tx
+      .insert(customers)
+      .values({
+        id: randomUUID(),
+        tenantId: DEFAULT_TENANT_ID,
+        email,
+        name,
+        phone,
+        role: "collector",
+        memberId,
+        preferences: DEFAULT_PREFERENCES,
+      })
+      .onConflictDoNothing({ target: [customers.tenantId, customers.email] })
+      .returning();
+  });
   if (created) return created;
 
   const existing = await findCustomerByEmail(db, email);
@@ -212,6 +224,7 @@ export async function createTimepiece(
     .insert(timepieces)
     .values({
       id: randomUUID(),
+      tenantId: DEFAULT_TENANT_ID,
       customerId,
       brand: input.brand.trim(),
       model: input.model.trim(),

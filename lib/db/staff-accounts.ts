@@ -11,6 +11,7 @@ import {
   staffAccounts,
   customers,
 } from "./schema";
+import { customerEmailOnDefaultTenant } from "./tenants";
 import {
   hashStaffPassword,
   parseStaffPasswordHash,
@@ -191,7 +192,7 @@ export async function bootstrapFirstAdmin(
     const password = passwordColumns(serialized);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
     const customer = await tx.select({ id: customers.id }).from(customers)
-      .where(eq(customers.email, email)).limit(1);
+      .where(customerEmailOnDefaultTenant(email)).limit(1);
     if (customer.length) throw new Error("STAFF_EMAIL_RESERVED");
     const id = randomUUID();
     const [created] = await tx.insert(staffAccounts).values({
@@ -370,7 +371,7 @@ export async function addStaffAccount(
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
     const [customer, staff] = await Promise.all([
       tx.select({ id: customers.id }).from(customers)
-        .where(eq(customers.email, email)).limit(1),
+        .where(customerEmailOnDefaultTenant(email)).limit(1),
       tx.select().from(staffAccounts)
         .where(eq(staffAccounts.email, email)).limit(1),
     ]);

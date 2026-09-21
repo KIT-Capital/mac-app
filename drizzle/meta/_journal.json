@@ -232,6 +232,13 @@
       "when": 1789954662785,
       "tag": "0032_tidy_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789961932866,
+      "tag": "0033_fast_deathstrike",
+      "breakpoints": true
     }
   ]
 }
