@@ -213,6 +213,8 @@ flowchart LR
 - **Repos** — assembled from **free** pieces. MAC purchase and activation require final inspected acceptance for every included piece. Whole-collection table. Heart of the Desk.
 - **Analytics** — graphs and exports. Not the official ledger. Never label a close **paid off**.
 
+- **Brand** — super admin overlay plus master-created tenants. MAC chrome stays Logo-FF. Login still looks up people on the MAC tenant until a retail domain exists.
+
 White-label: same four stores scoped by tenant. Super Admin sets that tenant’s palette, logo, and prefix. MAC default chrome stays Logo-FF.
 
 ## What the code must not do

@@ -350,6 +350,15 @@ export type PhotoRecord = {
   ownerEmail: string;
 };
 
+export type TenantBrand = {
+  id: string;
+  code: string;
+  name: string;
+  logoUrl: string;
+  palette: { primary: string; accent: string; soft: string };
+  fromName: string;
+};
+
 export type AppSettings = {
   companyName: string;
   phone: string;
@@ -389,6 +398,7 @@ export type AppState = {
   photos: PhotoRecord[];
   appraisalAttempts: AppraisalAttempt[];
   appraisalAttemptPhotos: AppraisalAttemptPhoto[];
+  tenants: TenantBrand[];
   settings: AppSettings;
   applicationPurchaseShares?: ApplicationPurchaseShares;
   profiles: Record<string, Profile>;

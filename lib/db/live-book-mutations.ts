@@ -56,7 +56,7 @@ import {
   writeDeskAudit,
 } from "./staff-accounts";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
-import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
+import { allocateMemberIdIn, customerEmailOnDefaultTenant, tenantFromRow } from "./tenants";
 import type { Actor } from "./records";
 import { deskActor, isRetailActor } from "./records";
 import { isRetailRole } from "../roles.mjs";
@@ -77,13 +77,15 @@ import {
   livePreviews,
   photoObjects,
   staffAccounts,
+  tenants,
   timepieces,
   agreementDocuments,
   agreementEvents,
   agreementSignatures,
 } from "./schema";
 
-import { canEditAppraisal, canInspect, canManageRetailAccount, isDeskRole, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
+import { canEditAppraisal, canEditTenantBrand, canInspect, canManageRetailAccount, isDeskRole, isMasterSuperAdmin, isSuperAdmin, patchNeedsAppraisal } from "../roles.mjs";
+import { applyTenantBrandPatch, parseTenantCreate } from "../tenant-brand.mjs";
 import { normalizeRequiredPhotoKinds } from "../timepiece-shots.mjs";
 import type { DeskRole } from "../types";
 
@@ -639,6 +641,8 @@ export const AUDITED_DESK_ACTIONS = new Set([
   "brand.upsert",
   "shell.upsert",
   "shell.remove",
+  "tenant.create",
+  "tenant.update",
 ]);
 const LOCKED_APPRAISAL_ACTIONS = new Set([
   "appraisal.submit",
@@ -673,6 +677,7 @@ const LOCKED_AGREEMENT_ACTIONS = new Set([
 function auditTargetId(operation: Operation & Record<string, unknown>) {
   if (typeof operation.id === "string") return operation.id;
   if (operation.action === "settings.update") return "default";
+  if (operation.action === "tenant.create") return String(operation.code ?? "");
   if (operation.brand && typeof operation.brand === "object") {
     return String((operation.brand as Record<string, unknown>).id ?? "");
   }
@@ -781,7 +786,7 @@ export async function executeLiveBookOperation(
           email: actor.email,
           role: actor.role,
         });
-        const trusted = deskActor(staff.role, staff.email, staff.id);
+        const trusted = deskActor(staff.role, staff.email, staff.id, staff.isMaster);
         await consumeSparkleQuota(tx as unknown as Database, trusted);
         await writeDeskAudit(
           tx,
@@ -809,7 +814,7 @@ export async function executeLiveBookOperation(
         email: actor.email,
         role: actor.role,
       });
-      const trusted = deskActor(staff.role, staff.email, staff.id);
+      const trusted = deskActor(staff.role, staff.email, staff.id, staff.isMaster);
       const result = await executeLiveBookOperationCore(
         tx as unknown as Database,
         trusted,
@@ -886,6 +891,49 @@ async function executeLiveBookOperationCore(
       id: String(operation.id),
       reason: String(operation.reason),
     });
+  }
+
+  if (action === "tenant.create") {
+    requireDesk(actor);
+    if (!isMasterSuperAdmin(actor)) throw new Error("ROLE_FORBIDDEN");
+    const tenant = parseTenantCreate({
+      code: operation.code,
+      name: operation.name,
+    });
+    try {
+      await db.insert(tenants).values({
+        id: tenant.id,
+        code: tenant.code,
+        name: tenant.name,
+        logoUrl: tenant.logoUrl,
+        primaryColor: tenant.palette.primary,
+        accentColor: tenant.palette.accent,
+        softColor: tenant.palette.soft,
+        fromName: tenant.fromName,
+      });
+    } catch {
+      throw new Error("TENANT_EXISTS");
+    }
+    return { tenant };
+  }
+
+  if (action === "tenant.update") {
+    requireDesk(actor);
+    if (!canEditTenantBrand(actor)) throw new Error("ROLE_FORBIDDEN");
+    const tenantId = String(operation.id);
+    const [row] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).for("update").limit(1);
+    if (!row) throw new Error("TENANT_NOT_FOUND");
+    const next = applyTenantBrandPatch(tenantFromRow(row), operation.patch);
+    await db.update(tenants).set({
+      name: next.name,
+      logoUrl: next.logoUrl,
+      primaryColor: next.palette.primary,
+      accentColor: next.palette.accent,
+      softColor: next.palette.soft,
+      fromName: next.fromName,
+      updatedAt: new Date(),
+    }).where(eq(tenants.id, next.id));
+    return { tenant: next };
   }
 
   if (action === "settings.update") {

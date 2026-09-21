@@ -30,6 +30,11 @@ export const tenants = pgTable(
     code: text("code").notNull(),
     name: text("name").notNull(),
     nextMemberSequence: integer("next_member_sequence").notNull().default(1),
+    logoUrl: text("logo_url").notNull().default(""),
+    primaryColor: text("primary_color").notNull().default("#0E2A44"),
+    accentColor: text("accent_color").notNull().default("#FCB040"),
+    softColor: text("soft_color").notNull().default("#E8D5C0"),
+    fromName: text("from_name").notNull().default("Mechanical Art Capital"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -37,6 +42,13 @@ export const tenants = pgTable(
     uniqueIndex("tenants_code_uidx").on(table.code),
     check("tenants_code_check", sql`${table.code} ~ '^[A-Z]{2,8}$'`),
     check("tenants_next_member_sequence_check", sql`${table.nextMemberSequence} >= 1`),
+    check("tenants_logo_url_check", sql`char_length(${table.logoUrl}) <= 500`),
+    check("tenants_from_name_check", sql`char_length(btrim(${table.fromName})) between 1 and 80`),
+    check("tenants_name_length_check", sql`char_length(btrim(${table.name})) between 1 and 80`),
+    check(
+      "tenants_palette_hex_check",
+      sql`${table.primaryColor} ~ '^#[0-9A-Fa-f]{6}$' and ${table.accentColor} ~ '^#[0-9A-Fa-f]{6}$' and ${table.softColor} ~ '^#[0-9A-Fa-f]{6}$'`,
+    ),
   ],
 );
 

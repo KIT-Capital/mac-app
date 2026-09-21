@@ -23,14 +23,17 @@ import type {
   PhotoKind,
   PhotoRecord,
   Profile,
+  TenantBrand,
   Timepiece,
 } from "@/lib/types";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
+import { defaultMacTenant } from "../tenant-brand.mjs";
 import type { Database } from "./client";
 import { discloseCatalog } from "./catalog";
 import { centsToDollars } from "./money.mjs";
 import type { Actor } from "./records";
 import { isRetailActor } from "./records";
+import { tenantFromRow } from "./tenants";
 import {
   customers,
   appraisalAttemptPhotos,
@@ -45,6 +48,7 @@ import {
   liveAgreements,
   livePreviews,
   agreementEvents,
+  tenants,
   timepieces,
 } from "./schema";
 
@@ -62,6 +66,7 @@ export type LiveBookRows = {
   catalog?: Row[];
   brands?: Row[];
   shells?: Row[];
+  tenants?: Row[];
   returnedAgreementIds?: string[];
 };
 export type LiveBookState = Pick<
@@ -77,6 +82,7 @@ export type LiveBookState = Pick<
   | "catalog"
   | "brands"
   | "shells"
+  | "tenants"
 > & { applicationPurchaseShares: ApplicationPurchaseShares };
 
 const ALLOWED_KINDS = new Set(PHOTO_KINDS);
@@ -136,6 +142,20 @@ function currentPreviews(rows: Row[]) {
         || text(rowA, "id").localeCompare(text(rowB, "id"));
     })
     .map(([, row]) => row);
+}
+
+function mappedTenants(rows: Row[]): TenantBrand[] {
+  if (!rows.length) return [defaultMacTenant()];
+  return rows.map((row) => tenantFromRow({
+    id: text(row, "id"),
+    code: text(row, "code"),
+    name: text(row, "name"),
+    logoUrl: text(row, "logoUrl"),
+    primaryColor: text(row, "primaryColor", "#0E2A44"),
+    accentColor: text(row, "accentColor", "#FCB040"),
+    softColor: text(row, "softColor", "#E8D5C0"),
+    fromName: text(row, "fromName", "Mechanical Art Capital"),
+  }));
 }
 
 function settings(rows: Row[]): AppSettings {
@@ -559,6 +579,7 @@ export function mapLiveBookRows(
     catalog: disclosed.catalog,
     brands: disclosed.brands,
     shells: discloseDeskTerms ? authoritativeShells : [],
+    tenants: mappedTenants(rows.tenants ?? []),
     applicationPurchaseShares: applicationPurchaseShares(
       authoritativeSettings,
       openShell,
@@ -568,7 +589,7 @@ export function mapLiveBookRows(
 
 export async function readLiveBookState(db: Database, actor: Actor): Promise<LiveBookState> {
   return db.transaction(async (tx) => {
-    const [customerRows, settingRows, catalogRows, brandRows, shellRows, applicationRows] = await Promise.all([
+    const [customerRows, settingRows, catalogRows, brandRows, shellRows, tenantRows, applicationRows] = await Promise.all([
       isRetailActor(actor)
         ? tx.select().from(customers).where(eq(customers.id, actor.customerId))
         : tx.select().from(customers).where(eq(customers.tenantId, DEFAULT_TENANT_ID)),
@@ -576,6 +597,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       tx.select().from(catalogReferences).where(eq(catalogReferences.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(catalogBrands).where(eq(catalogBrands.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(agreementShells),
+      tx.select().from(tenants),
       isRetailActor(actor)
         ? tx.select({ id: applications.id })
             .from(applications)
@@ -598,6 +620,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
         catalog: catalogRows,
         brands: brandRows,
         shells: shellRows,
+        tenants: tenantRows,
       }, isRetailActor(actor) ? actor.customerId : undefined, !isRetailActor(actor) || applicationRows.length > 0);
     }
     const [pieceRows, agreementRows] = await Promise.all([
@@ -638,6 +661,7 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
       catalog: catalogRows,
       brands: brandRows,
       shells: shellRows,
+      tenants: tenantRows,
       returnedAgreementIds: [...new Set(returnRows.map((row) => row.agreementId))],
     }, isRetailActor(actor) ? actor.customerId : undefined,
     !isRetailActor(actor) || applicationRows.length > 0 || agreementRows.length > 0);

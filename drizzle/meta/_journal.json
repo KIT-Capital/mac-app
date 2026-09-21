@@ -267,6 +267,13 @@
       "when": 1789984506121,
       "tag": "0037_yellow_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789993170564,
+      "tag": "0038_special_obadiah_stane",
+      "breakpoints": true
     }
   ]
 }

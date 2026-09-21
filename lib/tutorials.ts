@@ -73,6 +73,10 @@ export const DESK_TUTORIAL = {
       body: "Desk roles are admin, appraiser, and super admin. Admins and appraisers add or disable admin accounts. Only a super admin adds appraisers or super admins, and only the master account edits other super admins. Forced password rotation opens only the password page until the new password is set.",
     },
     {
+      title: "Brand",
+      body: "Super admins open Brand to set a tenant overlay. Only Ricardo’s master account creates a tenant. Mechanical Art Capital keeps Logo-FF and the MAC palette. A From name may change for mail and WhatsApp copy. Do not ship third-party marks without a tenant and the right to use them.",
+    },
+    {
       title: "Front of the app",
       body: "Use Front of the app at the bottom of this wall to see the member screens. Collectors never get a desk link in their own navigation. Reopen this tutorial from Tutorial in the desk menu.",
     },

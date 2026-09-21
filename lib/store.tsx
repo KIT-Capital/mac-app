@@ -65,7 +65,8 @@ import {
   validateRecordedEndKind,
 } from "@/lib/contract/repo-book.mjs";
 import { DEFAULT_MIN_SALE_AMOUNT, DEFAULT_SETTINGS, SERVER_SETTING_KEYS } from "@/lib/theme";
-import { canEditAppraisal, canInspect, isDeskRole, isRetailRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { canEditAppraisal, canEditTenantBrand, canInspect, isDeskRole, isMasterSuperAdmin, isRetailRole, isSuperAdmin, patchNeedsAppraisal } from "@/lib/roles.mjs";
+import { defaultMacTenant, parseTenantCreate, applyTenantBrandPatch } from "@/lib/tenant-brand.mjs";
 import { REQUESTABLE_PHOTO_KINDS, normalizeRequiredPhotoKinds } from "@/lib/timepiece-shots.mjs";
 import { ADMIN_PROFILE, DEMO_AGREEMENTS, DEMO_PROFILE, DEMO_TIMEPIECES, STAFF_PROFILE } from "@/lib/seed";
 import {
@@ -86,6 +87,7 @@ import type {
   PhotoKind,
   PhotoRecord,
   Profile,
+  TenantBrand,
   Timepiece,
   UserPreferences,
 } from "@/lib/types";
@@ -147,6 +149,8 @@ type Store = AppState & {
   renewAgreement: (id: string, closeDate: string) => Promise<{ ok: true; successor: Agreement } | { ok: false; error: string }>;
   clearAgreementEnd: (id: string) => Promise<boolean>;
   updateSettings: (patch: Partial<AppSettings>) => Promise<OperationAck>;
+  createTenant: (input: { code: string; name: string }) => Promise<OperationAck>;
+  updateTenantBrand: (id: string, patch: Partial<Pick<TenantBrand, "name" | "logoUrl" | "palette" | "fromName">>) => Promise<OperationAck>;
   upsertUser: (user: ManagedUser) => Promise<OperationAck>;
   removeUser: (id: string) => Promise<OperationAck>;
   upsertCatalog: (entry: CatalogEntry) => Promise<OperationAck>;
@@ -203,6 +207,7 @@ function emptyState(): AppState {
     photos: [],
     appraisalAttempts: [],
     appraisalAttemptPhotos: [],
+    tenants: [defaultMacTenant()],
     settings: DEMO_SETTINGS,
     profiles: {},
   };
@@ -281,6 +286,8 @@ const DESK_DATA_ACTIONS = new Set([
   "brand.upsert",
   "shell.upsert",
   "shell.remove",
+  "tenant.create",
+  "tenant.update",
 ]);
 
 type BookState = Pick<
@@ -295,6 +302,7 @@ type BookState = Pick<
   | "catalog"
   | "brands"
   | "shells"
+  | "tenants"
   | "settings"
   | "applicationPurchaseShares"
 >;
@@ -410,6 +418,7 @@ function mergeBook(
     catalog: desk.catalog,
     brands: desk.brands,
     shells: desk.shells,
+    tenants: desk.tenants.length ? desk.tenants : [defaultMacTenant()],
     settings: mergeLiveSettings(
       desk.settings,
       _base.settings,
@@ -937,6 +946,7 @@ function demoState(): AppState {
     photos: photosFromWatches(DEMO_TIMEPIECES),
     appraisalAttempts: [],
     appraisalAttemptPhotos: [],
+    tenants: [defaultMacTenant()],
     settings: DEMO_SETTINGS,
     profiles: seedProfiles(DEMO_PROFILE),
   };
@@ -1053,6 +1063,7 @@ function withDeskDefaults(state: Partial<AppState>, timepieces: Timepiece[]): Ap
     photos: state.photos?.length ? state.photos : photosFromWatches(timepieces),
     appraisalAttempts: state.appraisalAttempts ?? [],
     appraisalAttemptPhotos: state.appraisalAttemptPhotos ?? [],
+    tenants: state.tenants?.length ? state.tenants : [defaultMacTenant()],
     settings: seedDeskDefaults
       ? {
           ...DEMO_SETTINGS,
@@ -1794,6 +1805,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : undefined,
             deferLive: Object.keys(serverPatch).length > 0,
           },
+        );
+      },
+      createTenant: async (input) => {
+        if (!isMasterSuperAdmin(state.user)) {
+          return { ok: false, error: "ROLE_FORBIDDEN" };
+        }
+        let tenant;
+        try {
+          tenant = parseTenantCreate(input);
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "TENANT_CREATE_INVALID" };
+        }
+        if (state.tenants.some((row) => row.id === tenant.id || row.code === tenant.code)) {
+          return { ok: false, error: "TENANT_EXISTS" };
+        }
+        return updateStore(
+          (prev) => ({ ...prev, tenants: [...prev.tenants, tenant] }),
+          { operation: { action: "tenant.create", code: tenant.code, name: tenant.name }, deferLive: true },
+        );
+      },
+      updateTenantBrand: async (id, patch) => {
+        if (!canEditTenantBrand(state.user)) {
+          return { ok: false, error: "ROLE_FORBIDDEN" };
+        }
+        const current = state.tenants.find((row) => row.id === id);
+        if (!current) return { ok: false, error: "TENANT_NOT_FOUND" };
+        let next;
+        try {
+          next = applyTenantBrandPatch(current, patch);
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : "TENANT_UPDATE_INVALID" };
+        }
+        return updateStore(
+          (prev) => ({
+            ...prev,
+            tenants: prev.tenants.map((row) => (row.id === id ? next : row)),
+          }),
+          { operation: { action: "tenant.update", id, patch }, deferLive: true },
         );
       },
       upsertUser: async (user) =>

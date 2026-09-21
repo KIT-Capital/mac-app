@@ -13,6 +13,7 @@ import {
   LogOut,
   Mail,
   MessageCircle,
+  Palette,
   Sliders,
   Smartphone,
   Users,
@@ -21,6 +22,8 @@ import {
 import { MacLogoMark } from "@/components/mac-logo";
 import { endClientSession } from "@/lib/session-client";
 import { useStore } from "@/lib/store";
+import { isSuperAdmin } from "@/lib/roles.mjs";
+import { DEFAULT_TENANT_ID, DEFAULT_TENANT_NAME } from "@/lib/tenant.mjs";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -28,6 +31,7 @@ const LINKS = [
   { href: "/admin/guide", label: "Tutorial", icon: CircleHelp },
   { href: "/admin/config", label: "Configure", icon: Sliders },
   { href: "/admin/access", label: "Access & Roles", icon: Users2 },
+  { href: "/admin/brand", label: "Brand", icon: Palette, superAdmin: true },
   { href: "/admin/catalog", label: "Timepiece Catalog", icon: BookOpen },
   { href: "/admin/members", label: "Members", icon: Users },
   { href: "/admin/assets", label: "Client Assets", icon: FileSpreadsheet },
@@ -46,7 +50,9 @@ export function AdminChrome({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut, user } = useStore();
+  const { signOut, user, tenants } = useStore();
+  const tenantName = tenants.find((row) => row.id === DEFAULT_TENANT_ID)?.name ?? DEFAULT_TENANT_NAME;
+  const links = LINKS.filter((link) => !("superAdmin" in link && link.superAdmin) || isSuperAdmin(user));
 
   async function leaveDesk() {
     await endClientSession(signOut);
@@ -63,7 +69,7 @@ export function AdminChrome({
           <p className="text-[10px] tracking-[0.16em] text-mac-gold uppercase">Admin desk</p>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2" aria-label="Desk">
-          {LINKS.map((link) => {
+          {links.map((link) => {
             const active = link.href === "/admin"
             ? pathname === "/admin"
             : link.href === "/admin/agreements"
@@ -110,7 +116,7 @@ export function AdminChrome({
           <span className="text-[12px] font-bold tracking-[0.2em] text-mac-gold uppercase">
             Desk · {title}
           </span>
-          <span className="text-[11px] tracking-[0.14em] text-white/35 uppercase">16:9 admin</span>
+          <span className="text-[11px] tracking-[0.14em] text-white/35 uppercase">{tenantName}</span>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
       </div>
