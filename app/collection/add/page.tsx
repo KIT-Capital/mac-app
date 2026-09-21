@@ -95,6 +95,8 @@ function AddFormEditor() {
   const [videoDurationSeconds, setVideoDurationSeconds] = useState<number | null>(
     existing?.videoDurationSeconds ?? null,
   );
+  const [videoBusy, setVideoBusy] = useState(false);
+  const videoGeneration = useRef(0);
   const deskPicker = isDesk(user);
   const brandNames = pickerBrandNames(brands ?? [], catalog ?? [], deskPicker);
   const [brand, setBrand] = useState(() => {
@@ -449,6 +451,7 @@ function AddFormEditor() {
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
+    if (videoBusy) return;
     // Intake only records the piece. A submission is created on the detail
     // screen by `appraisal.submit`, which freezes the evidence (KTD1).
     await submit(existing?.status ?? "not_evaluated");
@@ -561,16 +564,23 @@ function AddFormEditor() {
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
+                  videoGeneration.current += 1;
+                  const generation = videoGeneration.current;
                   if (!file) {
+                    setVideoBusy(false);
                     setVideoName("");
                     setVideoDurationSeconds(null);
                     return;
                   }
+                  setVideoBusy(true);
+                  setVideoName("");
+                  setVideoDurationSeconds(null);
                   const url = URL.createObjectURL(file);
                   const node = document.createElement("video");
                   node.preload = "metadata";
                   node.onloadedmetadata = () => {
                     URL.revokeObjectURL(url);
+                    if (generation !== videoGeneration.current) return;
                     try {
                       const seconds = assertVideoDuration(node.duration);
                       setVideoName(file.name);
@@ -580,10 +590,14 @@ function AddFormEditor() {
                       setVideoName("");
                       setVideoDurationSeconds(null);
                       setError(`Use a clip of ${MAX_VIDEO_SECONDS} seconds or less.`);
+                    } finally {
+                      setVideoBusy(false);
                     }
                   };
                   node.onerror = () => {
                     URL.revokeObjectURL(url);
+                    if (generation !== videoGeneration.current) return;
+                    setVideoBusy(false);
                     setVideoName("");
                     setVideoDurationSeconds(null);
                     setError("That video could not be read.");
@@ -777,7 +791,7 @@ function AddFormEditor() {
         <div className="grid grid-cols-2 gap-3 border-t border-mac-line bg-mac-bg px-5 py-4">
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || videoBusy}
             className={`mac-tap flex h-12 items-center justify-center text-[12px] font-semibold tracking-[0.18em] uppercase ${
               light ? "bg-black text-white" : "bg-white text-black"
             }`}

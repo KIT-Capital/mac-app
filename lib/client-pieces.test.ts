@@ -58,12 +58,31 @@ describe("client pieces", () => {
       "cat-rm",
     );
     assert.equal(catalogIdForSelection(catalog, "Patek", "Nautilus"), null);
+    assert.equal(
+      catalogIdForSelection(catalog, "  richard mille  ", "rm 011", "rm 011"),
+      "cat-rm",
+    );
   });
 
   it("labels free, in-request, and locked pieces", () => {
     assert.equal(pieceCustody([], "w1"), "free");
     assert.equal(pieceCustody([agreement({ executedOn: undefined, status: "submitted" })], "w1"), "in_request");
     assert.equal(pieceCustody([agreement()], "w1"), "locked");
+    assert.equal(
+      pieceCustody(
+        [agreement({ bookEnd: { kind: "in_liquidation", date: "2026-09-20", amount: 1 } })],
+        "w1",
+      ),
+      "locked",
+    );
+    assert.equal(
+      pieceCustody(
+        [agreement({ bookEnd: { kind: "bought_back", date: "2026-09-20", amount: 1 } })],
+        "w1",
+      ),
+      "free",
+    );
+    assert.equal(pieceCustody([agreement({ status: "closed", executedOn: undefined })], "w1"), "free");
     assert.equal(custodyLabel("locked"), "Locked in activated repo");
   });
 

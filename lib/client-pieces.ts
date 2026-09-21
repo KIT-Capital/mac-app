@@ -1,4 +1,5 @@
-import { pieceInActivatedRepo } from "@/lib/owners";
+import { catalogMatch } from "@/lib/catalog";
+import { deskToday, heldWatchIds, holdsPieces } from "@/lib/contract/repo-book.mjs";
 import type { Agreement, CatalogEntry, Timepiece } from "@/lib/types";
 
 export const MAX_VIDEO_SECONDS = 60;
@@ -13,11 +14,7 @@ export function catalogEntryForPiece(
     const linked = catalog.find((entry) => entry.id === piece.catalogId);
     if (linked) return linked;
   }
-  return catalog.find((entry) =>
-    entry.brand === piece.brand
-    && entry.model === piece.model
-    && (!piece.reference || entry.reference === piece.reference)
-  ) ?? null;
+  return catalogMatch(piece, catalog) ?? null;
 }
 
 export function catalogIdForSelection(catalog: CatalogEntry[], brand: string, model: string, reference?: string) {
@@ -25,11 +22,12 @@ export function catalogIdForSelection(catalog: CatalogEntry[], brand: string, mo
 }
 
 export function pieceCustody(agreements: Agreement[], timepieceId: string): PieceCustody {
-  if (pieceInActivatedRepo(agreements, timepieceId)) return "locked";
-  const listed = agreements.some((agreement) =>
-    agreement.watchIds.includes(timepieceId) && !agreement.bookEnd,
+  const today = deskToday();
+  if (!heldWatchIds(agreements, today).has(timepieceId)) return "free";
+  const holding = agreements.find((agreement) =>
+    agreement.watchIds.includes(timepieceId) && holdsPieces(agreement, today),
   );
-  return listed ? "in_request" : "free";
+  return holding?.executedOn ? "locked" : "in_request";
 }
 
 export function custodyLabel(state: PieceCustody) {
