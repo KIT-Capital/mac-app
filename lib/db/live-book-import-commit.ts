@@ -10,6 +10,8 @@ import { asDeskActor, type Actor } from "./records";
 import { assertIsolation, isDeskActor } from "./isolation.mjs";
 import { isFixtureAppEnv } from "../env/live-book-flag.mjs";
 import { canEditAppraisal, isDeskRole } from "../roles.mjs";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
+import { allocateMemberIdIn } from "./tenants";
 import {
   customers,
   liveAgreementEnds,
@@ -99,13 +101,21 @@ export async function commitLiveBookImport(
       if (staffCollision.length) throw new Error("RESERVED_DESK_EMAIL");
     }
     for (const person of transactionPlan.customers) {
+      const [existing] = await tx
+        .select({ id: customers.id, memberId: customers.memberId })
+        .from(customers)
+        .where(eq(customers.id, person.id))
+        .limit(1);
+      const memberId = existing?.memberId ?? await allocateMemberIdIn(tx);
       await tx
         .insert(customers)
         .values({
           id: person.id,
+          tenantId: DEFAULT_TENANT_ID,
           email: person.email,
           name: person.name,
           role: "collector",
+          memberId,
         })
         .onConflictDoUpdate({
           target: customers.id,
@@ -118,6 +128,7 @@ export async function commitLiveBookImport(
         .insert(timepieces)
         .values({
           id: watch.id,
+          tenantId: DEFAULT_TENANT_ID,
           customerId: watch.customerId,
           brand: watch.brand,
           model: watch.model,
@@ -183,6 +194,7 @@ export async function commitLiveBookImport(
         .insert(liveAgreements)
         .values({
           id: agreement.id,
+          tenantId: DEFAULT_TENANT_ID,
           customerId: agreement.customerId,
           amountCents,
           termMonths: agreement.termMonths,

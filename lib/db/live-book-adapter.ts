@@ -24,6 +24,7 @@ import type {
   Profile,
   Timepiece,
 } from "@/lib/types";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import type { Database } from "./client";
 import { discloseCatalog } from "./catalog";
 import { centsToDollars } from "./money.mjs";
@@ -560,10 +561,10 @@ export async function readLiveBookState(db: Database, actor: Actor): Promise<Liv
     const [customerRows, settingRows, catalogRows, brandRows, shellRows, applicationRows] = await Promise.all([
       actor.role === "collector"
         ? tx.select().from(customers).where(eq(customers.id, actor.customerId))
-        : tx.select().from(customers),
+        : tx.select().from(customers).where(eq(customers.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(deskSettings),
-      tx.select().from(catalogReferences),
-      tx.select().from(catalogBrands),
+      tx.select().from(catalogReferences).where(eq(catalogReferences.tenantId, DEFAULT_TENANT_ID)),
+      tx.select().from(catalogBrands).where(eq(catalogBrands.tenantId, DEFAULT_TENANT_ID)),
       tx.select().from(agreementShells),
       actor.role === "collector"
         ? tx.select({ id: applications.id })

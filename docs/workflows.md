@@ -189,7 +189,7 @@ Email, password, SMS (Twilio), WhatsApp for **retail** notices and a Desk inbox.
 
 ## Desk stores
 
-Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Catalog brands, models, retail checkmarks, and Sparkle shipped 2026-09-21 (U13). Members, analytics, and per-tenant brand rows besides the two presets remain later units of that plan.
+Decision `0004`. Plan `plans/2026-09-19-desk-stores-whitelabel-analytics-plan.md`. Catalog brands, models, retail checkmarks, and Sparkle shipped 2026-09-21 (U13). Tenant stamp `tenant_id` plus MAC member-ID allocation shipped as U-tenant. Members list/display, analytics, and per-tenant brand rows besides the two presets remain later units of that plan.
 
 ```mermaid
 flowchart LR

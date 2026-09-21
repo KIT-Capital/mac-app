@@ -225,6 +225,11 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   that puts a request on the book.
 - Desk-data actions are `settings.update`, `brand.upsert`, `catalog.upsert`,
   `catalog.remove`, `catalog.sparkle`, `shell.upsert`, and `shell.remove`.
+  Catalog, customer, timepiece, and agreement rows carry `tenant_id`. The seeded
+  default is Mechanical Art Capital (`tenant-mac` / `MAC`). New collectors
+  receive a member ID `{PREFIX}{#####}-{YY}` (for example `MAC00001-26`) allocated
+  per tenant; the number is never reused. Brand overlay and creating extra
+  tenants stay later units.
   Catalog writes, Sparkle research, and appraisal fields require
   appraiser or super admin; `requiredPhotoKinds` requires super admin; the
   remaining settings and shell actions accept any desk role.

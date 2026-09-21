@@ -13,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 
 /** Stage 1 compatibility probe. Not a product table. */
 export const schemaProbe = pgTable("mac_schema_probe", {
@@ -21,25 +22,62 @@ export const schemaProbe = pgTable("mac_schema_probe", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** One product, many tenants. Default row is Mechanical Art Capital. */
+export const tenants = pgTable(
+  "tenants",
+  {
+    id: text("id").primaryKey(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    nextMemberSequence: integer("next_member_sequence").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("tenants_code_uidx").on(table.code),
+    check("tenants_code_check", sql`${table.code} ~ '^[A-Z]{2,8}$'`),
+    check("tenants_next_member_sequence_check", sql`${table.nextMemberSequence} >= 1`),
+  ],
+);
+
 /** Collector party record. WorkOS subject stays null until identity is purchased. */
-export const customers = pgTable("customers", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  phone: text("phone").notNull().default(""),
-  role: text("role").notNull().default("collector"),
-  status: text("status").notNull().default("active"),
-  member: boolean("member").notNull().default(false),
-  avatar: text("avatar").notNull().default(""),
-  onboardingComplete: boolean("onboarding_complete").notNull().default(false),
-  applicationSubmitted: boolean("application_submitted").notNull().default(false),
-  promoCode: text("promo_code"),
-  preferences: jsonb("preferences").notNull().default(sql`'{}'::jsonb`),
-  workosSubject: text("workos_subject"),
-  lastActive: timestamp("last_active", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const customers = pgTable(
+  "customers",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
+    email: text("email").notNull(),
+    name: text("name").notNull(),
+    phone: text("phone").notNull().default(""),
+    role: text("role").notNull().default("collector"),
+    status: text("status").notNull().default("active"),
+    member: boolean("member").notNull().default(false),
+    memberId: text("member_id"),
+    avatar: text("avatar").notNull().default(""),
+    onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+    applicationSubmitted: boolean("application_submitted").notNull().default(false),
+    promoCode: text("promo_code"),
+    preferences: jsonb("preferences").notNull().default(sql`'{}'::jsonb`),
+    workosSubject: text("workos_subject"),
+    lastActive: timestamp("last_active", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("customers_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("customers_tenant_email_uidx").on(table.tenantId, table.email),
+    uniqueIndex("customers_tenant_member_id_uidx")
+      .on(table.tenantId, table.memberId)
+      .where(sql`${table.memberId} is not null`),
+    check(
+      "customers_member_id_check",
+      sql`${table.memberId} is null or ${table.memberId} ~ '^[A-Z]{2,8}[0-9]{5}-[0-9]{2}$'`,
+    ),
+  ],
+);
 
 export const collectorAccessTokens = pgTable(
   "collector_access_tokens",
@@ -256,6 +294,10 @@ export const catalogBrands = pgTable(
   "catalog_brands",
   {
     id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
     name: text("name").notNull(),
     tier: integer("tier").notNull(),
     slug: text("slug").notNull(),
@@ -266,7 +308,8 @@ export const catalogBrands = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("catalog_brands_slug_uidx").on(table.slug),
+    index("catalog_brands_tenant_id_idx").on(table.tenantId),
+    uniqueIndex("catalog_brands_tenant_slug_uidx").on(table.tenantId, table.slug),
     check("catalog_brands_tier_check", sql`${table.tier} in (1, 2)`),
   ],
 );
@@ -276,6 +319,10 @@ export const catalogReferences = pgTable(
   "catalog_references",
   {
     id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
     brandId: text("brand_id").references(() => catalogBrands.id),
     brand: text("brand").notNull(),
     model: text("model").notNull(),
@@ -298,6 +345,7 @@ export const catalogReferences = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("catalog_references_tenant_id_idx").on(table.tenantId),
     index("catalog_references_brand_id_idx").on(table.brandId),
     check("catalog_references_values_check", sql`
       ${table.typicalLowCents} >= 0
@@ -366,6 +414,10 @@ export const timepieces = pgTable(
   "timepieces",
   {
     id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
     customerId: text("customer_id")
       .notNull()
       .references(() => customers.id),
@@ -394,7 +446,10 @@ export const timepieces = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("timepieces_customer_id_idx").on(table.customerId)],
+  (table) => [
+    index("timepieces_tenant_id_idx").on(table.tenantId),
+    index("timepieces_customer_id_idx").on(table.customerId),
+  ],
 );
 
 /** Direct-upload original and preview metadata. No image bytes enter the server. */
@@ -461,6 +516,10 @@ export const agreements = pgTable(
   "agreements",
   {
     id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
     customerId: text("customer_id")
       .notNull()
       .references(() => customers.id),
@@ -478,6 +537,7 @@ export const agreements = pgTable(
   },
   (table) => [
     uniqueIndex("agreements_application_id_uidx").on(table.applicationId),
+    index("agreements_tenant_id_idx").on(table.tenantId),
     index("agreements_customer_id_idx").on(table.customerId),
   ],
 );
@@ -589,6 +649,10 @@ export const liveAgreements = pgTable(
   "live_agreements",
   {
     id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .default(DEFAULT_TENANT_ID)
+      .references(() => tenants.id),
     customerId: text("customer_id")
       .notNull()
       .references(() => customers.id),
@@ -618,6 +682,7 @@ export const liveAgreements = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("live_agreements_tenant_id_idx").on(table.tenantId),
     index("live_agreements_customer_id_idx").on(table.customerId),
     index("live_agreements_status_idx").on(table.status),
     check(

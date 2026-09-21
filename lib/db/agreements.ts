@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
+import { DEFAULT_TENANT_ID } from "../tenant.mjs";
 import type { Database } from "./client";
 import { assertIsolation, canPrepareAgreement, canReadAgreement, canSubmitApplication } from "./isolation.mjs";
 import { dollarsToCents } from "./money.mjs";
@@ -263,6 +264,7 @@ export async function prepareAgreement(db: Database, actor: Actor, applicationId
         .insert(agreements)
         .values({
           id: agreementId,
+          tenantId: DEFAULT_TENANT_ID,
           customerId: application.customerId,
           applicationId: application.id,
           timepieceId: application.timepieceId,
