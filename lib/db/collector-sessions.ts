@@ -4,7 +4,7 @@ import { and, eq, gt, isNull, like, lt, sql } from "drizzle-orm";
 import { hashRateLimitKey, rateWindowStart } from "../access-rate-limit.mjs";
 import type { Database } from "./client";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
-import { allocateMemberIdIn } from "./tenants";
+import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import {
   accessRateLimits,
   collectorAccessTokens,
@@ -109,7 +109,10 @@ export async function redeemCollectorAccessToken(
       [customer] = await tx
         .select()
         .from(customers)
-        .where(eq(customers.id, access.customerId))
+        .where(and(
+          eq(customers.id, access.customerId),
+          eq(customers.tenantId, DEFAULT_TENANT_ID),
+        ))
         .for("update")
         .limit(1);
       redirectPath = "/collection";
@@ -141,7 +144,7 @@ export async function redeemCollectorAccessToken(
         [customer] = await tx
           .select()
           .from(customers)
-          .where(eq(customers.email, registration.email))
+          .where(customerEmailOnDefaultTenant(registration.email))
           .for("update")
           .limit(1);
       }
@@ -159,13 +162,13 @@ export async function redeemCollectorAccessToken(
         updatedAt: now,
       }).where(and(
         eq(customers.id, invited.id),
-        eq(customers.email, invited.email),
+        customerEmailOnDefaultTenant(invited.email),
         eq(customers.status, "invited"),
       )).returning();
       if (!customer) {
         [customer] = await tx.select().from(customers).where(and(
           eq(customers.id, invited.id),
-          eq(customers.email, invited.email),
+          customerEmailOnDefaultTenant(invited.email),
           eq(customers.status, "active"),
         )).limit(1);
       }

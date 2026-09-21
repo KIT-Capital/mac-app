@@ -1,9 +1,14 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { DEFAULT_TENANT_ID, formatMemberId } from "../tenant.mjs";
 import type { Database } from "./client";
-import { tenants } from "./schema";
+import { customers, tenants } from "./schema";
 
 const MAX_SEQUENCE = 99999;
+
+/** Login and registration look up people on the seeded MAC tenant until U-brand exists. */
+export function customerEmailOnDefaultTenant(email: string) {
+  return and(eq(customers.tenantId, DEFAULT_TENANT_ID), eq(customers.email, email));
+}
 
 type TenantTx = {
   execute: Database["execute"];

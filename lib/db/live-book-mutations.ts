@@ -55,7 +55,7 @@ import {
   writeDeskAudit,
 } from "./staff-accounts";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
-import { allocateMemberIdIn } from "./tenants";
+import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import type { Actor } from "./records";
 import { deskActor } from "./records";
 import {
@@ -1112,7 +1112,7 @@ async function executeLiveBookOperationCore(
     const [customerCollision, staffCollision] = await Promise.all([
       db.select({ id: customers.id, email: customers.email })
         .from(customers)
-        .where(or(eq(customers.id, id), eq(customers.email, email)))
+        .where(or(eq(customers.id, id), customerEmailOnDefaultTenant(email)))
         .limit(1),
       db.select({ id: staffAccounts.id }).from(staffAccounts)
         .where(eq(staffAccounts.email, email))

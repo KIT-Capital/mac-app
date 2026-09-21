@@ -12,7 +12,7 @@ import {
 } from "./isolation.mjs";
 import { centsToDollars, dollarsToCents } from "./money.mjs";
 import { DEFAULT_TENANT_ID } from "../tenant.mjs";
-import { allocateMemberIdIn } from "./tenants";
+import { allocateMemberIdIn, customerEmailOnDefaultTenant } from "./tenants";
 import { customers, timepieces } from "./schema";
 
 /**
@@ -121,7 +121,7 @@ export async function registerCollector(db: Database, input: RegisterCollectorIn
 export async function findCustomerByEmail(db: Database, emailInput: string) {
   const email = normalizeEmail(emailInput);
   if (!email.includes("@")) return null;
-  const [row] = await db.select().from(customers).where(eq(customers.email, email)).limit(1);
+  const [row] = await db.select().from(customers).where(customerEmailOnDefaultTenant(email)).limit(1);
   return row ?? null;
 }
 
@@ -137,13 +137,13 @@ export async function activateInvitedCollector(
       updatedAt: new Date(),
     }).where(and(
       eq(customers.id, customerId),
-      eq(customers.email, email),
+      customerEmailOnDefaultTenant(email),
       eq(customers.status, "invited"),
     )).returning();
     if (activated) return activated;
     const [existing] = await tx.select().from(customers).where(and(
       eq(customers.id, customerId),
-      eq(customers.email, email),
+      customerEmailOnDefaultTenant(email),
     )).limit(1);
     if (!existing) throw new Error("COLLECTOR_NOT_FOUND");
     if (existing.status !== "active") throw new Error("COLLECTOR_INACTIVE");
