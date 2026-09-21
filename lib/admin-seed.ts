@@ -21,6 +21,7 @@ export const DEMO_USERS: ManagedUser[] = [
     role: "admin",
     status: "active",
     member: true,
+    memberId: null,
     lastActive: "2026-09-13",
   },
   {
@@ -31,6 +32,7 @@ export const DEMO_USERS: ManagedUser[] = [
     role: "appraiser",
     status: "active",
     member: true,
+    memberId: null,
     lastActive: "2026-09-12",
   },
   {
@@ -41,6 +43,7 @@ export const DEMO_USERS: ManagedUser[] = [
     role: "collector",
     status: "active",
     member: false,
+    memberId: "MAC00001-21",
     lastActive: "2026-09-11",
   },
 ];

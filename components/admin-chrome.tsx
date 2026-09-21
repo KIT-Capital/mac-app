@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Sliders,
   Smartphone,
+  Users,
   Users2,
 } from "lucide-react";
 import { MacLogoMark } from "@/components/mac-logo";
@@ -28,6 +29,7 @@ const LINKS = [
   { href: "/admin/config", label: "Configure", icon: Sliders },
   { href: "/admin/access", label: "Access & Roles", icon: Users2 },
   { href: "/admin/catalog", label: "Timepiece Catalog", icon: BookOpen },
+  { href: "/admin/members", label: "Members", icon: Users },
   { href: "/admin/assets", label: "Client Assets", icon: FileSpreadsheet },
   { href: "/admin/agreements", label: "Repo Agreements", icon: FileText },
   { href: "/admin/photos", label: "Photo Vault", icon: Camera },

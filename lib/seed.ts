@@ -6,6 +6,7 @@ export const DEMO_PROFILE: Profile = {
   email: "jonathan.hale@mechartcap.com",
   phone: "+1 (212) 555-0148",
   member: false,
+  memberId: "MAC00001-21",
   avatar: "/watches/patek-wrist.jpg",
   role: "collector",
   onboardingComplete: true,
@@ -18,6 +19,7 @@ export const ADMIN_PROFILE: Profile = {
   email: "admin@mechartcap.com",
   phone: "+1 (833) 209-0972",
   member: true,
+  memberId: null,
   avatar: "/brand/logo-ff-mark.png",
   role: "admin",
   onboardingComplete: true,
@@ -29,6 +31,7 @@ export const STAFF_PROFILE: Profile = {
   email: "desk@mechartcap.com",
   phone: "+1 (833) 209-0972",
   member: true,
+  memberId: null,
   avatar: "/brand/logo-ff-mark.png",
   role: "appraiser",
   onboardingComplete: true,
@@ -139,6 +142,7 @@ export const DEMO_AGREEMENTS: Agreement[] = [
     delivery: "Desk arranges intake",
     ownerName: "Jonathan Hale",
     email: "jonathan.hale@mechartcap.com",
+    memberId: "MAC00001-21",
     // Already on the book since 2021 with its pieces held, so the demo reads
     // past due. KTD21 maps rows of this vintage to executed on their created day.
     status: "executed",

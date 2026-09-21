@@ -13,6 +13,7 @@ import {
   deskRequestTab,
   hasRecordReturn,
 } from "@/lib/contract/request-transitions.mjs";
+import { memberIdForEmail } from "@/lib/owners";
 import { persistableState } from "@/lib/session-persist.mjs";
 import { useStore } from "@/lib/store";
 import type { Agreement, AgreementEnd, AgreementShell, AppState, BookEndKind } from "@/lib/types";
@@ -182,6 +183,7 @@ export default function AdminAgreementsPage() {
     renewAgreement,
     clearAgreementEnd,
     user,
+    users,
   } = useStore();
   const [draft, setDraft] = useState<AgreementShell>(blankShell(settings.typicalTerm));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -193,6 +195,11 @@ export default function AdminAgreementsPage() {
   const [documentNote, setDocumentNote] = useState<{ id: string; text: string } | null>(null);
   const [sendHistory, setSendHistory] = useState<{ id: string; rows: { actorKind: string; recipientKind: string; result: string }[] } | null>(null);
   const selected = agreements.find((item) => item.id === selectedId) ?? null;
+
+  function ownerLabel(agreement: Agreement) {
+    const memberId = agreement.memberId || memberIdForEmail(users, agreement.email);
+    return memberId ? `${agreement.ownerName} · ${memberId}` : agreement.ownerName;
+  }
 
   useEffect(() => {
     if (!selectedId) return;
@@ -460,7 +467,7 @@ export default function AdminAgreementsPage() {
           }}
           rows={tabRows.map((a) => [
             a.agreementCode || a.id,
-            a.ownerName,
+            ownerLabel(a),
             money(a.amount),
             a.signedAt ? "signed" : a.status.replace("_", " "),
             bookLabel(a) ?? "—",
@@ -589,9 +596,9 @@ export default function AdminAgreementsPage() {
               </div>
             );
             if (tab === "queue") {
-              return [a.agreementCode || a.id, a.ownerName, a.customerSuccess ? "CS" : "—", actions];
+              return [a.agreementCode || a.id, ownerLabel(a), a.customerSuccess ? "CS" : "—", actions];
             }
-            return [a.agreementCode || a.id, a.ownerName, actions];
+            return [a.agreementCode || a.id, ownerLabel(a), actions];
           })}
         />
       )}

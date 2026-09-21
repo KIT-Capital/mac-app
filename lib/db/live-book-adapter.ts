@@ -287,6 +287,7 @@ function profile(row: Row): Profile {
     email: ownerKey(text(row, "email")),
     phone: text(row, "phone"),
     member: Boolean(row.member),
+    memberId: optionalText(row, "memberId") ?? null,
     avatar: text(row, "avatar"),
     role: isRetailRole(row.role) ? row.role : "collector",
     onboardingComplete: Boolean(row.onboardingComplete),
@@ -310,6 +311,7 @@ function managedUser(row: Row): ManagedUser {
           ? "invited"
           : "active",
     member: Boolean(row.member),
+    memberId: optionalText(row, "memberId") ?? null,
     lastActive: row.lastActive instanceof Date
       ? row.lastActive.toISOString().slice(0, 10)
       : text(row, "lastActive", "1970-01-01"),
@@ -456,6 +458,7 @@ export function mapLiveBookRows(
       ownerName: text(row, "ownerName"),
       email: ownerKey(text(row, "email")),
       partyKind: isRetailRole(row.partyKind) ? row.partyKind : "collector",
+      memberId: optionalText(customerById.get(text(row, "customerId")) ?? {}, "memberId") ?? null,
       status: agreementStatus(row.status),
       createdAt: text(row, "createdOn"),
     };

@@ -489,6 +489,9 @@ export default function AgreementDetailPage() {
             <div>
               <span className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Book: {bookLabel(agreement)}</span>
               <p className="text-[12px] text-mac-muted">Contract #{agreement.agreementCode || agreement.id}</p>
+              {agreement.memberId ? (
+                <p className="text-[12px] text-mac-muted">Member {agreement.memberId}</p>
+              ) : null}
             </div>
             {!agreement.signedAt ? (
               <button
@@ -569,6 +572,12 @@ export default function AgreementDetailPage() {
                 Transaction number: {agreement.id.replace(/\D/g, "") || "31419"}
                 <br />
                 Seller name: {agreement.ownerName}
+                {agreement.memberId ? (
+                  <>
+                    <br />
+                    Member ID: {agreement.memberId}
+                  </>
+                ) : null}
                 <br />
                 Buyer name: Mechanical Art Capital LLC
               </p>

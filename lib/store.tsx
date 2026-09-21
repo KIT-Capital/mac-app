@@ -965,6 +965,7 @@ function profileForEmail(email: string, patch?: Partial<Profile>): Profile {
     email,
     phone: patch?.phone || "",
     member: patch?.member ?? false,
+    memberId: isDeskRole(role) ? null : (patch?.memberId ?? null),
     avatar: patch?.avatar || "/watches/patek-wrist.jpg",
     role,
     onboardingComplete: patch?.onboardingComplete ?? false,
@@ -1017,6 +1018,7 @@ function asManagedUser(user: Profile): ManagedUser {
     role: user.role,
     status: "active",
     member: user.member,
+    memberId: isDeskRole(user.role) ? null : (user.memberId ?? null),
     lastActive: new Date().toISOString().slice(0, 10),
   };
 }
@@ -1420,6 +1422,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ownerName: user.name,
           email: user.email,
           partyKind: snapshotPartyKind(current, user.email),
+          memberId: user.memberId ?? null,
           createdAt: today,
           // A request reserves its pieces from the moment it exists; the term
           // clock only starts once MAC executes (KTD7).
@@ -1699,6 +1702,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ownerName: planned.successor.ownerName,
           email: planned.successor.email,
           partyKind: snapshotPartyKind(current, planned.successor.email),
+          memberId: agreement.memberId ?? current.users.find((item) => profileKey(item.email) === profileKey(planned.successor.email))?.memberId ?? null,
           // The pieces never left MAC, so a successor opens executed (KTD21).
           status: planned.successor.status,
           createdAt: planned.successor.createdAt,
