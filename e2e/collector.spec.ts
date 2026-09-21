@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { HALE, addTimepieceWithPhotos, appraiseNewHalePiece, completeTimepieceIntakePhotos, openCollectorAgreements, openMenu, sendForAppraisal, signIn, signInHale, signOutFromMenu } from "./helpers";
+import { HALE, addTimepieceWithPhotos, appraiseNewHalePiece, completeTimepieceIntakePhotos, openCollectorAgreements, openDeskBook, openMenu, sendForAppraisal, signIn, signInDesk, signInHale, signOutFromMenu } from "./helpers";
 
 test.describe("collector app", () => {
   test("splash shows the official lockup and collector actions", async ({ page }) => {
@@ -716,7 +716,7 @@ test.describe("collector app", () => {
     await openCollectorAgreements(page);
     await page.getByRole("link", { name: /MAC-31419/ }).click();
     await expect(page.getByText(/pending legal approval/i).first()).toBeVisible();
-    await expect(page.getByText(/not for signature/i).first()).toBeVisible();
+    await expect(page.getByText(/software attestation, not counsel-approved/i).first()).toBeVisible();
     await expect(page.getByText(/not a loan/i)).toBeVisible();
     await expect(page.getByText(/\bstored document\b/i)).toHaveCount(0);
     await expect(page.getByText(/\bofficial\b/i)).toHaveCount(0);
@@ -727,6 +727,27 @@ test.describe("collector app", () => {
     await expect(page.getByText(/Electronic signing is not available/i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Email me/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Email this address/i })).toHaveCount(0);
+  });
+
+  test("Hale frozen agreement shows nineteen clauses and stays a temporary preview", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 810 });
+    await signInDesk(page);
+    await openDeskBook(page);
+    await page.getByRole("row").filter({ hasText: "Jonathan Hale" }).click();
+    await page.getByRole("button", { name: "Freeze scale" }).click();
+    await expect(page.getByRole("button", { name: "Freeze scale" })).toHaveCount(0);
+    await page.goto("/login");
+
+    await signInHale(page);
+    await openCollectorAgreements(page);
+    await page.getByRole("link", { name: /MAC-31419/ }).click();
+    await expect(page.getByRole("heading", { name: /Sale of the named collection/i })).toBeVisible();
+    await expect(page.locator("article section h3")).toHaveCount(19);
+    await expect(page.getByRole("heading", { name: /Monthly repurchase schedule/i })).toBeVisible();
+    await expect(page.getByText(/not a loan/i)).toBeVisible();
+    await expect(page.getByText(/Temporary preview — not stored/i)).toBeVisible();
+    await expect(page.getByText(/\bstored document\b/i)).toHaveCount(0);
+    await expect(page.getByText(/paid off|vesting/i)).toHaveCount(0);
   });
 
   test("new collector agreements list keeps the empty sale-and-repurchase copy", async ({ page }) => {

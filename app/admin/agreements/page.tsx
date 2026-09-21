@@ -8,6 +8,7 @@ import { Field, NativeSelect, PillButton } from "@/components/field";
 import { isDesk, money } from "@/lib/catalog";
 import { bookLabel, deskToday, validateAgreementEnd } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, settingsToTerms } from "@/lib/contract/repo-scale.mjs";
+import { isSuperAdmin } from "@/lib/roles.mjs";
 import {
   DESK_REQUEST_TABS,
   deskRequestTab,
@@ -179,6 +180,7 @@ export default function AdminAgreementsPage() {
     recordDeliveryRequest,
     recordReturnRequest,
     updateAgreement,
+    freezeAgreementScale,
     recordAgreementEnd,
     renewAgreement,
     clearAgreementEnd,
@@ -189,6 +191,7 @@ export default function AdminAgreementsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [endDraft, setEndDraft] = useState({ kind: "bought_back" as BookEndKind, date: "", amount: "" });
   const [endError, setEndError] = useState("");
+  const [freezeError, setFreezeError] = useState("");
   const [requestError, setRequestError] = useState<{ id: string; text: string } | null>(null);
   const [tab, setTab] = useState<(typeof DESK_REQUEST_TABS)[number]["id"]>("queue");
   const [shellError, setShellError] = useState("");
@@ -620,6 +623,41 @@ export default function AdminAgreementsPage() {
               ))}
             </ul>
           ) : null}
+        </section>
+      ) : null}
+      {selected && tab === "book" && !selected.scale && (user?.role === "admin" || isSuperAdmin(user)) ? (
+        <section className="mt-6 space-y-3 border border-white/25 bg-[#222] p-4">
+          <h3 className="text-[11px] tracking-[0.16em] text-white/40 uppercase">
+            Freeze scale — {selected.agreementCode || selected.id}
+          </h3>
+          <p className="text-[12px] text-white/55">
+            This repo has no frozen repurchase terms. Freeze writes the current desk scale once.
+            Amount, term, and a recorded end stay unchanged.
+          </p>
+          {freezeError ? <p className="text-sm text-red-300">{freezeError}</p> : null}
+          <PillButton
+            type="button"
+            variant="navy"
+            className="md:w-auto px-6"
+            onClick={() => {
+              setFreezeError("");
+              void freezeAgreementScale(selected.id).then((result) => {
+                if (!result.ok) {
+                  setFreezeError(
+                    result.error === "AGREEMENT_SCALE_FROZEN"
+                      ? "Scale is already frozen."
+                      : result.error === "ADMIN_REQUIRED"
+                        ? "Only an admin can freeze scale."
+                        : result.error === "AGREEMENT_SCALE_INVALID"
+                          ? "Desk scale is below the Scenario 60 floor."
+                          : "Scale could not be frozen.",
+                  );
+                }
+              });
+            }}
+          >
+            Freeze scale
+          </PillButton>
         </section>
       ) : null}
       {selected && tab === "book" && !selected.signedAt && !selected.bookEnd ? (

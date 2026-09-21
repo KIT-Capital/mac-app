@@ -983,6 +983,151 @@ describe("live-book operation repository", { skip }, () => {
       );
     }
   });
+
+  it("freezes a null scale once on signed and ended repos", async () => {
+    const owner = await collector("freeze-scale");
+    const passwordHash = await hashStaffPassword("temporary password 123");
+    const adminRow = await createStaffAccount(db, {
+      name: "U8 Admin",
+      email: `u8-admin.${suffix}@mac.test`,
+      role: "admin",
+      passwordHash,
+      mustRotate: false,
+    });
+    const appraiserRow = await createStaffAccount(db, {
+      name: "U8 Appraiser",
+      email: `u8-appraiser.${suffix}@mac.test`,
+      role: "appraiser",
+      passwordHash,
+      mustRotate: false,
+    });
+    const secondAdminRow = await createStaffAccount(db, {
+      name: "U8 Admin B",
+      email: `u8-admin-b.${suffix}@mac.test`,
+      role: "admin",
+      passwordHash,
+      mustRotate: false,
+    });
+    staffIds.push(adminRow.id, appraiserRow.id, secondAdminRow.id);
+    const admin = deskActor("admin", adminRow.email, adminRow.id);
+    const appraiser = deskActor("appraiser", appraiserRow.email, appraiserRow.id);
+    const secondAdmin = deskActor("admin", secondAdminRow.email, secondAdminRow.id);
+    const options = {
+      env: { MAC_LIVE_BOOK: "1" } as NodeJS.ProcessEnv,
+      clientAddress: "127.0.0.1",
+    };
+    const floorScale = {
+      purchaseShare: 0.6,
+      setupFee: 0.01,
+      annualAdjustment: 0.185,
+      earlyRepurchaseAmount: 0.035,
+      brokerFee: 0.035,
+    };
+    const first = await createTimepiece(db, owner.actor, owner.customer.id, { brand: "Cartier", model: "Tank" });
+    const second = await createTimepiece(db, owner.actor, owner.customer.id, { brand: "Rolex", model: "Daytona" });
+    const third = await createTimepiece(db, owner.actor, owner.customer.id, { brand: "Patek", model: "Nautilus" });
+    const signedId = `repo-freeze-signed-${suffix}`;
+    const endedId = `repo-freeze-ended-${suffix}`;
+    const raceId = `repo-freeze-race-${suffix}`;
+    for (const [id, piece] of [[signedId, first], [endedId, second], [raceId, third]] as const) {
+      await insertLiveAgreement(db, owner.actor, {
+        id,
+        customerId: owner.customer.id,
+        watchIds: [piece.id],
+        amount: 10_000,
+        termMonths: 12,
+        delivery: "Desk arranges intake",
+        ownerName: owner.customer.name,
+        email: owner.customer.email,
+        createdOn: "2026-01-01",
+      });
+    }
+    await db.update(liveAgreements)
+      .set({ signedOn: "2026-01-02" })
+      .where(eq(liveAgreements.id, signedId));
+    await executeLiveBookOperation(db, admin, {
+      action: "agreement.recordEnd",
+      id: endedId,
+      end: { kind: "bought_back", date: "2026-09-17", amount: 11_000 },
+    }, options);
+
+    await assert.rejects(
+      () => executeLiveBookOperation(db, appraiser, {
+        action: "agreement.freezeScale",
+        id: signedId,
+        scale: floorScale,
+      }, options),
+      { message: "ADMIN_REQUIRED" },
+    );
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "agreement.freezeScale",
+        id: signedId,
+        scale: { purchaseShare: 0 },
+      }, options),
+      { message: "AGREEMENT_SCALE_INVALID" },
+    );
+
+    await executeLiveBookOperation(db, admin, {
+      action: "agreement.freezeScale",
+      id: signedId,
+      scale: floorScale,
+    }, options);
+    await executeLiveBookOperation(db, admin, {
+      action: "agreement.freezeScale",
+      id: endedId,
+      scale: floorScale,
+    }, options);
+    await assert.rejects(
+      () => executeLiveBookOperation(db, admin, {
+        action: "agreement.freezeScale",
+        id: signedId,
+        scale: floorScale,
+      }, options),
+      { message: "AGREEMENT_SCALE_FROZEN" },
+    );
+
+    const signed = await db.select().from(liveAgreements).where(eq(liveAgreements.id, signedId));
+    const ended = await db.select().from(liveAgreements).where(eq(liveAgreements.id, endedId));
+    const endedBook = await db.select().from(liveAgreementEnds).where(eq(liveAgreementEnds.agreementId, endedId));
+    assert.equal(signed[0]?.amountCents, 1_000_000);
+    assert.equal(signed[0]?.termMonths, 12);
+    assert.equal(signed[0]?.signedOn, "2026-01-02");
+    assert.ok(signed[0]?.scale && typeof signed[0].scale === "object");
+    assert.equal((signed[0]?.scale as { purchaseShare?: number }).purchaseShare, 0.6);
+    assert.equal(ended[0]?.amountCents, 1_000_000);
+    assert.equal(ended[0]?.termMonths, 12);
+    assert.equal(endedBook[0]?.kind, "bought_back");
+    assert.equal(endedBook[0]?.amountCents, 1_100_000);
+
+    const freezeAudits = await db.select().from(deskAuditLog).where(and(
+      eq(deskAuditLog.action, "agreement.freezeScale"),
+      inArray(deskAuditLog.targetId, [signedId, endedId]),
+    ));
+    assert.equal(freezeAudits.length, 2);
+
+    const raced = await Promise.allSettled([
+      executeLiveBookOperation(db, admin, {
+        action: "agreement.freezeScale",
+        id: raceId,
+        scale: floorScale,
+      }, options),
+      executeLiveBookOperation(db, secondAdmin, {
+        action: "agreement.freezeScale",
+        id: raceId,
+        scale: floorScale,
+      }, options),
+    ]);
+    assert.equal(raced.filter((result) => result.status === "fulfilled").length, 1);
+    const rejected = raced.find((result) => result.status === "rejected");
+    assert.ok(rejected && rejected.status === "rejected");
+    assert.match(String(rejected.reason), /AGREEMENT_SCALE_FROZEN/);
+    const raceAudits = await db.select().from(deskAuditLog).where(and(
+      eq(deskAuditLog.action, "agreement.freezeScale"),
+      eq(deskAuditLog.targetId, raceId),
+    ));
+    assert.equal(raceAudits.length, 1);
+  });
 });
 
 /**
