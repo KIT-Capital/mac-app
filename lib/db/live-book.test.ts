@@ -2152,7 +2152,8 @@ describe("repo request concurrency", { skip }, () => {
         "detail" jsonb not null default '{}'::jsonb, "created_at" timestamptz not null default now()
       );
       create table "${schema}"."live_agreements" (
-        "id" text primary key, "customer_id" text not null, "amount_cents" integer not null,
+        "id" text primary key, "tenant_id" text not null default 'tenant-mac',
+        "customer_id" text not null, "amount_cents" integer not null,
         "term_months" integer not null, "delivery" text not null default '',
         "owner_name" text not null, "email" text not null, "status" text not null,
         "agreement_code" text, "created_on" text not null, "signed_on" text,

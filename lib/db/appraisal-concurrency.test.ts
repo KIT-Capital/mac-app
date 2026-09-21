@@ -28,7 +28,8 @@ describe("appraisal decision concurrency", { skip }, () => {
         "detail" jsonb not null default '{}'::jsonb, "created_at" timestamptz not null default now()
       );
       create table "${schema}"."timepieces" (
-        "id" text primary key, "customer_id" text not null, "brand" text not null,
+        "id" text primary key, "tenant_id" text not null default 'tenant-mac',
+        "customer_id" text not null, "brand" text not null,
         "model" text not null, "reference" text, "serial" text,
         "status" text not null default 'not_evaluated',
         "financeable" boolean not null default false, "condition" text not null default '',
