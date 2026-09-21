@@ -1,6 +1,6 @@
 # Restore drill runbook
 
-**Tier: REFERENCE** · Last verified: 2026-09-18
+**Tier: REFERENCE** · Last verified: 2026-09-21
 
 Rehearses a point-in-time restore of Neon **development** into a preview branch and verifies every stored PDF and photo row against R2 by checksum and size. Covers R24 and R25 of `docs/plans/2026-09-17-003-feat-production-go-live-plan.md`.
 
@@ -92,6 +92,31 @@ Fill one block per drill. Append; do not overwrite an earlier record.
 | Branch deletion confirmed by owner | |
 | Result | pass / fail |
 
-### 2026-__-__ drill
+### 2026-09-21 drill
 
-Not yet run. The first recorded drill satisfies R25's "followed once".
+| Field | Value |
+|---|---|
+| Trigger | Go-live prerequisite (U11) |
+| Approver (owner) | Ricardo Cidale |
+| Source environment | development |
+| Restore timestamp (UTC) | 2026-09-21T17:09:28Z |
+| Neon project id | withered-lake-05570428 |
+| Parent branch id | br-summer-truth-a52brhnv |
+| Preview branch id | br-blue-sound-a538ivrm |
+| Preview endpoint id | ep-patient-leaf-a50ob0pe |
+| `counts.agreementRows` / `counts.photoRows` / `counts.photoRowsWithPreview` | 12 / 2 / 1 |
+| `counts.missing` / `counts.mismatch` / `counts.failed` | 14 / 1 / 0 |
+| `counts.legacyHashed` / `counts.skipped` | 0 / 0 |
+| `counts.auditRows` | 2807 |
+| Finalize decision | discard |
+| Branch creation confirmed by owner | yes, 2026-09-21 |
+| Branch deletion confirmed by owner | yes, 2026-09-21 |
+| Result | fail |
+
+Report line:
+
+```json
+{"ok":false,"outcome":"failed","appEnv":"development","counts":{"agreementRows":12,"photoRows":2,"photoRowsWithPreview":1,"skipped":0,"objects":15,"verified":0,"missing":14,"mismatch":1,"failed":0,"legacyHashed":0,"auditRows":2807},"rowIds":{"missing":["005eb7df-cef0-46b6-a5d8-4eb77d0fe923","24803e0a-0623-468d-8e54-5353504b36e2","2d7c7968-ac4a-45b5-b4b3-840eec4c8aa6","33d1081d-a856-4299-8179-57b6c8eff6e6","3740a761-9987-40c0-8a1b-d0902877701c","5272aa6e-e2b0-4538-86cb-c194898802e5","65add1f2-3123-4ff5-8826-5dbb7c28fb09","8d540f49-1196-4bad-b68d-623328852b57","ab0e0de7-a76f-46dc-bddb-de72cd5d8e05","d8f07661-5e38-4e50-a661-a7e9bd9c4c01","ef5fd739-25f2-45a5-a028-750c70906bf2","fb8d5da7-38ee-4e37-b099-87b17341afbd","4467e7c8-e42c-4b87-a283-19f7f4a4f6bd"],"mismatch":["legacy-1789885343218"],"failed":[]},"errors":[]}
+```
+
+The preview was discarded after the check. Development, staging, production, and ci were still present. This run does not satisfy the pass rule (zero missing and zero mismatch).
