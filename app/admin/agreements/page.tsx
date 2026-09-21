@@ -373,7 +373,7 @@ export default function AdminAgreementsPage() {
   const tabRows = agreements.filter((row) => deskRequestTab(row) === tab);
 
   return (
-    <AdminChrome title="Agreement databases">
+    <AdminChrome title="Repos">
       <h2 className="mb-3 text-[11px] tracking-[0.16em] text-white/40 uppercase">Agreement shells</h2>
       <form onSubmit={onSubmit} className="mb-6 grid gap-4 md:grid-cols-3">
         <Field label="Code">
