@@ -71,7 +71,7 @@ Doppler is authoritative. One path only:
 
 Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover `RESEND_API` is gone. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler (`dev` / `stg` / `prd` / `dev_personal`) and all three Railway environments. `NEXT_PUBLIC_SITE_URL` is `https://mac-app-staging.up.railway.app` on Doppler `stg` / Railway staging, and `https://mechart.app` on Doppler `prd` / Railway production and Development. Production now also has `RESEND_REPLY_TO` from Doppler `prd`. Development may retain `DESK_SESSION_SECRET` as the single-key compatibility alias; staging and production use `DESK_SESSION_KEYS`.
 
-Sentry code is installed. Doppler and Railway Development use project `javascript-nextjs-uz`. Doppler `stg` / `prd` and Railway staging / production use project `javascript-nextjs-e0`. Each of those places has `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, and `SENTRY_PROJECT`. `SENTRY_AUTH_TOKEN` is still unset everywhere; it is build-only for source-map upload and must never be exposed as `NEXT_PUBLIC_*`. With both DSNs unset, capture helpers are no-ops and builds continue normally. The Railway Development smoke is recorded in `docs/runbooks/go-live.md`.
+Sentry code is installed. Doppler and Railway Development use project `javascript-nextjs-uz`. Doppler `stg` / `prd` and Railway staging / production use project `javascript-nextjs-e0`. Each of those places has `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, and `SENTRY_PROJECT`. `SENTRY_AUTH_TOKEN` is set on Doppler and Railway for development, staging, and production. It is the only upload-token name. It is build-only and must never be exposed as `NEXT_PUBLIC_*`. With both DSNs unset, capture helpers are no-ops and builds continue normally. The Railway Development smoke is recorded in `docs/runbooks/go-live.md`.
 
 ## Key catalog
 
@@ -93,7 +93,7 @@ Sentry code is installed. Doppler and Railway Development use project `javascrip
 | `RESEND_REPLY_TO` | Outbound Reply-To | Implemented | Default `financing@mechartcap.com` |
 | `SENTRY_DSN` | Node and edge error monitoring | Owner go-live gate | Runtime DSN; unset means server capture is disabled |
 | `NEXT_PUBLIC_SENTRY_DSN` | Browser error monitoring | Owner go-live gate | Public DSN baked into the client build by design |
-| `SENTRY_AUTH_TOKEN` | Sentry source-map upload | Owner go-live gate | Build-only secret; never expose to the browser |
+| `SENTRY_AUTH_TOKEN` | Sentry source-map upload | Set on Doppler and Railway, 2026-09-22 | Build-only secret; never expose to the browser |
 | `SENTRY_ORG` | Sentry source-map upload | Owner go-live gate | Organization slug, not a credential |
 | `SENTRY_PROJECT` | Sentry source-map upload | Owner go-live gate | Project slug, not a credential |
 | `PORT` | Railway / `next start` | Implemented | Injected by Railway |
