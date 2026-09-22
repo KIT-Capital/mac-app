@@ -71,7 +71,7 @@ Doppler is authoritative. One path only:
 
 Railway production, Development, and staging all have `RESEND_API_KEY`. Leftover `RESEND_API` is gone. `RESEND_FROM_EMAIL` is `info@mechartcap.com` in Doppler (`dev` / `stg` / `prd` / `dev_personal`) and all three Railway environments. `NEXT_PUBLIC_SITE_URL` is `https://mac-app-staging.up.railway.app` on Doppler `stg` / Railway staging, and `https://mechart.app` on Doppler `prd` / Railway production and Development. Production now also has `RESEND_REPLY_TO` from Doppler `prd`. Development may retain `DESK_SESSION_SECRET` as the single-key compatibility alias; staging and production use `DESK_SESSION_KEYS`.
 
-Sentry code is installed but project creation remains an owner gate. Once approved, put `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, and `SENTRY_PROJECT` in each Doppler/Railway environment. `SENTRY_AUTH_TOKEN` is build-only for source-map upload and must never be exposed as `NEXT_PUBLIC_*`. With both DSNs unset, capture helpers are no-ops and builds continue normally.
+Sentry code is installed. The Norfolk AI project exists, and Doppler `dev` holds `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG`, and `SENTRY_PROJECT`. Staging and production do not have those names yet. `SENTRY_AUTH_TOKEN` is still unset; it is build-only for source-map upload and must never be exposed as `NEXT_PUBLIC_*`. With both DSNs unset, capture helpers are no-ops and builds continue normally. Copying the names into `stg` and `prd` is a go-live step in `docs/runbooks/go-live.md`.
 
 ## Key catalog
 
