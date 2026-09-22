@@ -122,3 +122,32 @@ Report line:
 The preview was discarded after the check. Development, staging, production, and ci were still present. This run does not satisfy the pass rule (zero missing and zero mismatch).
 
 Later the same day, the owner approved removing those development test rows. Twelve stored agreement files, six send records, two stored photos, and one preview link were deleted. They belonged to test addresses created on 2026-09-20. Development then had no stored agreement file and no stored photo, so a new drill cannot pass until a real stored file and a real stored photo exist. Staging and production were not changed.
+
+### 2026-09-21 second drill
+
+| Field | Value |
+|---|---|
+| Trigger | Go-live prerequisite (U11) after re-seeding stored objects |
+| Approver (owner) | Ricardo Cidale |
+| Source environment | development |
+| Restore timestamp (UTC) | 2026-09-22T00:24:38Z |
+| Neon project id | withered-lake-05570428 |
+| Parent branch id | br-summer-truth-a52brhnv |
+| Preview branch id | br-small-poetry-a5beo4vv |
+| Preview endpoint id | ep-restless-river-a5wtr0kb |
+| `counts.agreementRows` / `counts.photoRows` / `counts.photoRowsWithPreview` | 1 / 1 / 1 |
+| `counts.missing` / `counts.mismatch` / `counts.failed` | 0 / 0 / 0 |
+| `counts.legacyHashed` / `counts.skipped` | 1 / 0 |
+| `counts.auditRows` | 2807 |
+| Finalize decision | discard |
+| Branch creation confirmed by owner | yes, 2026-09-21 |
+| Branch deletion confirmed by owner | yes, 2026-09-21 |
+| Result | pass |
+
+Report line:
+
+```json
+{"ok":true,"outcome":"success","appEnv":"development","counts":{"agreementRows":1,"photoRows":1,"photoRowsWithPreview":1,"skipped":0,"objects":3,"verified":3,"missing":0,"mismatch":0,"failed":0,"legacyHashed":1,"auditRows":2807},"rowIds":{"missing":[],"mismatch":[],"failed":[]},"errors":[]}
+```
+
+The preview was discarded after the check. Development, staging, production, and ci were still present. One stored agreement PDF and one stored photo with original and preview were verified against R2. The PDF matched by GET hash (`legacyHashed: 1`), which is not a failure. This run satisfies the pass rule.
