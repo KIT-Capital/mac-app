@@ -111,7 +111,9 @@ session-only: no `maxAge` or `expires`.
 The first live admin may be inserted from the two `DESK_BOOTSTRAP_*` values only
 while no desk row has a password (seeded rows without one do not count). The
 temporary password must be changed on `/admin/password`; the bootstrap values
-are removed afterward. Staff add, disable, enable, reset, password rotation, and
+are removed afterward. Production no longer holds `DESK_BOOTSTRAP_ADMIN_EMAIL`
+or `DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH` (removed 2026-09-22 after the first
+password change). Staff add, disable, enable, reset, password rotation, and
 covered desk operations append an immutable `desk_audit_log` row in the same
 transaction. Disabling is serialized and the last active sign-in-capable desk
 row cannot be disabled; recovery never silently re-runs bootstrap.
@@ -154,6 +156,6 @@ allowlist. Desk-only mail kinds and outbox `GET` require the desk cookie and ret
 
 Key names only in `docs/config-and-env-map.md` and `.env.example`. Neon connection values for `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, and `NEON_BRANCH` live in Doppler (`mac-app` / `dev`, `stg`, and `prd`). `COLLECTOR_SESSION_SECRET`, `COLLECTOR_MAGIC_LINK_ORIGIN`, `RESEND_API_KEY`, and `DESK_SESSION_KEYS` are mandatory live prerequisites. Bootstrap values are temporary owner gates, never committed values. Never commit `.env.local` or print connection strings.
 
-## Identity (proposed)
+## Identity
 
-WorkOS AuthKit is the proposed production identity, staff roles, and MFA path. Neon Auth stays disabled. Do not enable it in `neon.ts`.
+Desk and collector sign-in are MAC-owned: a desk password plus an email code, and an email or SMS code for collectors and dealers. WorkOS AuthKit is not the login. Neon Auth stays disabled. Do not enable it in `neon.ts`.

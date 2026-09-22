@@ -41,11 +41,11 @@ Credentials live in Doppler (or Railway variables until Doppler is provisioned) 
 
 ## 3. Agent-native parity (goal; current exception)
 
-Kit requires every user-facing capability to share one authorized path for humans and agents. This app does not yet expose tRPC/MCP procedures. Collection state lives in the browser. Record new UI-only capabilities as exceptions. Do not invent agent-only back doors.
+Kit requires every user-facing capability to share one authorized path for humans and agents. This app does not yet expose tRPC/MCP procedures. On development and in Playwright, collection state lives in the browser. Staging and production have `MAC_LIVE_BOOK` on, so those books live in Neon. Record new UI-only capabilities as exceptions. Do not invent agent-only back doors.
 
 ## 4. Media (current exception)
 
-Kit prefers presigned direct upload to object storage. This prototype stores collector photos as resized JPEG data URLs in `localStorage`. Do not introduce a server file proxy. Neon **MAC App** is linked for development; the app still uses the browser store. Persistence is `docs/plans/2026-09-15-production-persistence.md`. Do not auto-migrate `localStorage`.
+Kit prefers presigned direct upload to object storage. Browser mode still stores collector photo previews as resized JPEG data URLs in `localStorage`. Live mode stores originals in the private R2 bucket `mac-app`. Do not introduce a server file proxy. Neon **MAC App** is linked. Development stays on the browser store until its flag is turned on. Staging and production already use the live book. Persistence is `docs/plans/2026-09-15-production-persistence.md` and the go-live record is `docs/runbooks/go-live.md`. Do not auto-migrate `localStorage`.
 
 ## 5. Design system is a contract
 

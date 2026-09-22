@@ -45,7 +45,7 @@ This file is the checklist. It does not migrate a database, change a Railway var
 - [x] Snapshot `snap-winter-surf-a532i6uv` (`pre-go-live-2026-09-22`) taken, then the journal applied 2026-09-22 with `npm run db:migrate:production -- --confirm-production`. Applied count 39. Endpoint `ep-wild-fire-a5a5m53v`. Customers: 0.
 - [x] Staff match the seed: Ricardo Cidale (`rc@mechartcap.com`, super admin), Dov Tuzman (`dov@mechartcap.com`, appraiser), Rosario David (`rosario@mechartcap.com`, admin).
 - [x] `MAC_LIVE_BOOK` was already on. After deploy of `2e5a8e9`, `https://mechart.app/api/health` returned `{"ok":true,"appEnv":"production","checks":{"database":"ok","liveBook":"ok"}}`. The production watch pattern that blocked deploys was cleared so later `main` commits deploy.
-- [ ] Remove `DESK_BOOTSTRAP_ADMIN_EMAIL` and `DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH` after the first password rotation.
+- [x] Remove `DESK_BOOTSTRAP_ADMIN_EMAIL` and `DESK_BOOTSTRAP_ADMIN_PASSWORD_HASH` after the first password rotation. Removed from Doppler `prd` and Railway production on 2026-09-22 after the first admin saved a password. `DESK_BOOTSTRAP_ADMIN_TEMP_PASSWORD` was removed from Doppler `prd` in the same step. Staging and development did not hold these names.
 - [ ] Smoke the same five actions on `https://mechart.app`.
 - [ ] Watch Sentry and Resend through the first real collector invitation. After that invitation, fixes go forward. Do not restore the database over collector writes.
 

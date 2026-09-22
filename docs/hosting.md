@@ -84,4 +84,4 @@ Preview GETs use signed URLs; the private bucket remains non-public.
 
 ## What this stack does not add
 
-Collector state remains in the browser until `MAC_LIVE_BOOK` is turned on. Neon `development` holds repository tables. Staging and production have not been migrated. The owner checklist is `docs/runbooks/go-live.md`. No mailbox product is required on mechart.app for the app to run. Do not attach production `DATABASE_URL` or run the production migrate until the owner confirms that step.
+Development and Playwright keep collection state in the browser, because `MAC_LIVE_BOOK` is off there. Railway staging and production have the flag on. Both were migrated on 2026-09-22, journal through `0038_special_obadiah_stane`. The record is `docs/runbooks/go-live.md`. There is no dual-write and no automatic import of `localStorage`. `DATABASE_URL_UNPOOLED` stays in Doppler for migrate-only use and is not placed on the Railway app service. Do not run another production migrate without a new typed yes. No mailbox product is required on mechart.app for the app to run.

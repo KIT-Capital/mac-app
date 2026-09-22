@@ -1,6 +1,6 @@
 # Architecture
 
-**Tier: CONTRACT** · Last verified: 2026-09-17
+**Tier: CONTRACT** · Last verified: 2026-09-22
 
 Mechanical Art Capital is a single Next.js 16 App Router app (`mechanical-art-capital`). It is not the Kit Vite/Express/tRPC reference. Do not rewrite the framework without a separate approved project.
 
@@ -10,20 +10,21 @@ Status labels used below: **implemented**, **verified**, **incomplete**, **propo
 
 - **Collector** — one UI plane on phone, iPad, and desktop (`CollectorShell`). **Implemented.**
 - **Desk** — 16:9 admin console at `/admin/*` (`DeskShell`). Not linked from collector chrome. **Implemented.**
-- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) remains the development and Playwright default and the development rollback store, with `user` always stored as `null`. The `MAC_LIVE_BOOK` owner switch moves repo-book reads and operation-level writes together to Neon after verified collector or desk access; it may be on in development, staging, and production, and production requires it. In live mode desk pricing/custody settings, catalog references, and agreement shells are server-authoritative Neon rows; empty catalog/shell tables stay empty and an absent settings singleton is returned as Scenario 60/default constants without inserting it. Appearance and other personal preferences remain profile/client state. New data-URL previews remain browser-local. Do not delete or auto-migrate the browser book.
+- **Collector/desk state** — browser `localStorage` (`lib/store.tsx`, key `mac-app-state-v3`) remains the development and Playwright default and the development rollback store, with `user` always stored as `null`. The `MAC_LIVE_BOOK` owner switch moves repo-book reads and operation-level writes together to Neon after verified collector or desk access; it may be on in development, staging, and production, and production requires it. In live mode desk pricing/custody settings, catalog references, and agreement shells are server-authoritative Neon rows; empty catalog/shell tables stay empty and an absent settings singleton is returned as Scenario 60/default constants without inserting it. Appearance and other personal preferences remain profile/client state. New data-URL previews remain browser-local. Railway staging and production have `MAC_LIVE_BOOK` on (2026-09-22). Development and Playwright keep the flag off. Do not delete or auto-migrate the browser book.
 - **Store modes** — `unknown` (not yet answered), `browser`, `live`, and **`unavailable`**. The server is authoritative. `unavailable` means a staging or production live prerequisite is missing: `/api/live-book` answers `503 { mode: "unavailable", error }`, the store publishes an empty hydrated state with no user, refuses writes without a fetch, and stops every automatic re-check (focus, visibility, new subscribers); `components/app-frame.tsx` renders `components/unavailable-page.tsx` in place of every route so no page-level fetch fires. "Try again" is one full reload. **Implemented.**
 - **Health** — `GET /api/health` (`app/api/health/route.ts`, helper `lib/health.mjs`) is the Railway health check: `force-dynamic`, `no-store`, `{ ok, appEnv, checks: { database, liveBook } }` with codes only. **Implemented.**
-- **Monitoring** — `@sentry/nextjs` initializes browser, Node, and edge runtimes when their DSNs are present. Uncaught request/render errors and explicit mail, R2, and checksum failures are captured; `/api/health` transactions are dropped. `lib/observability.mjs` removes cookies, tokens, signed URLs, recipient addresses, and object keys before events leave the app. Source maps upload only when the build receives the owner-managed Sentry token and project names. Code is **implemented**; project creation, owner email alert, and a real Railway Development event are **pending owner verification**.
+- **Monitoring** — `@sentry/nextjs` initializes browser, Node, and edge runtimes when their DSNs are present. Uncaught request/render errors and explicit mail, R2, and checksum failures are captured; `/api/health` transactions are dropped. `lib/observability.mjs` removes cookies, tokens, signed URLs, recipient addresses, and object keys before events leave the app. Source maps upload only when the build receives the owner-managed Sentry token and project names. Code is **implemented**. A Railway Development event reached Sentry on 2026-09-22 and the owner received the alert email. Source-map upload is still **pending** the owner-managed `SENTRY_AUTH_TOKEN`.
 - **Official books** — QuickBooks (cash) and third-party inventory. This app is the repo book / analytics surface. It does not post ledgers or sync inventory.
 - **Photos** — client-side resize to JPEG data URLs (`lib/image.ts`). **Implemented.** These are previews, not originals. Recovery of discarded originals is impossible. Server originals go through `lib/storage` (memory in tests, R2 when configured). No server file proxy.
 - **Mail** — Next.js `/api/mail` via Resend, or an in-memory preview outbox when no key is set. **Implemented.**
 - **WhatsApp** — Twilio Messages API for opted-in retail notices and a Desk inbox at `/admin/whatsapp`. **Implemented.** Desk roles are not WhatsApp users. Copy omits piece names, dollars, and login secrets.
 - **Desk session** — HMAC cookie `mac_desk` (`lib/desk-session.ts`). **Implemented.** `proxy.ts` returns 403 for `/admin` without a valid cookie. Moving the secret is a separate security plan.
-- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses the isolated `development` branch. **Verified** connectivity. Stage 1–5 and 7 plus the live operations-book and shared desk-data tables exist on `development` only. No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI uses the browser store by default and the scoped Neon path only when the owner switch is enabled. Decision `0002`.
+- **Neon Postgres** — project **MAC App** (`withered-lake-05570428`). Default branch `production`. Local work uses the isolated `development` branch. **Verified** connectivity. Stage 1–5 and 7 plus the live operations-book and shared desk-data tables exist on development, staging, and production (journal through `0038`). No ledger tables — Stage 6 is deferred and is not this product’s books. The collector/desk UI uses the browser store when the flag is off and the Neon path when it is on. Staging and production have the flag on. Decision `0002`.
 - **Doppler** — KIT Capital project `mac-app`, configs `dev` (development), `stg` (staging), and `prd` (production). Local `npm run dev` and `npm run db:ping` run through `doppler run`. **Verified** for Neon key names only.
-- **Identity** — custom `lib/auth.ts` today. WorkOS AuthKit is **proposed**. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
+- **Identity** — MAC-owned password, email, and SMS. WorkOS AuthKit is not the login. Neon Auth stays **disabled** (`neon.ts` `auth: false`).
 - **Verified collector access** — signed email verification and
-  `mac_collector` session primitives exist behind default-off `MAC_LIVE_BOOK`.
+  `mac_collector` session primitives are on for Railway staging and production.
+  Development and Playwright leave `MAC_LIVE_BOOK` off.
   Enabled use runs in development, staging, and production with an HTTPS origin
   outside development; login and signup request a verification code by email, or
   by SMS when Twilio Verify keys are set. Opted-in collectors and dealers may
@@ -50,7 +51,7 @@ lib/                 auth, store, mail, theme, env mapping, production readiness
 instrumentation.ts   Neon mapping guard + production readiness on Node server start
 instrumentation-client.ts browser Sentry initialization and navigation tracing
 lib/observability.mjs Sentry capture helpers and sensitive-data scrubber
-drizzle/             development-only migrations (probe through report snapshots)
+drizzle/             journal `0000`–`0038`, applied on development, staging, and production
 e2e/                 Playwright
 neon.ts              Neon config-as-code (Auth off)
 tools/harness/       structural check, neon-ping, drizzle migrate/ping, start wrapper

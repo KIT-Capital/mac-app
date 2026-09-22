@@ -35,7 +35,8 @@ Collectors must be 18+ and accept privacy consent at signup.
 
 Purchase caps, Scenario 60 fees, typical term, membership price, and vault copy
 live in Neon desk settings when live mode is enabled and in `localStorage` in
-browser mode. If the live settings singleton does not exist, the server returns
+browser mode. Railway staging and production run in live mode. Development and
+Playwright stay in browser mode. If the live settings singleton does not exist, the server returns
 `DEFAULT_SETTINGS` and Scenario 60 constants without inserting defaults. Catalog
 references and agreement shells likewise stay empty until the desk creates them;
 production never receives demo desk data. Appearance and personal notification
@@ -73,12 +74,11 @@ Every **executed** agreement is read with the same six labels on desk and collec
 
 ## Production records
 
-Required for a production repo desk. Server libraries, live-book tables, verified
-collector access, and operation-level handlers exist on Neon `development` only.
-The browser book remains the default and rollback source until the owner enables
-`MAC_LIVE_BOOK` after a tested staff import. The switch moves reads and writes
-together; there is no dual-write or automatic migration. Browser data is not
-production evidence.
+Required for a production repo desk. Railway staging and production run the live
+book: the journal through `0038` was applied on 2026-09-22 and `MAC_LIVE_BOOK`
+is on. Development and Playwright keep the browser book. That browser book is
+not production evidence. The switch moves reads and writes together; there is
+no dual-write or automatic migration.
 
 1. **Customers and collections** — durable server records; identity, serial/reference, provenance, condition, valuation history, ownership, custody, contract links; snapshots used in signed agreements; collectors see only their rows; staff see what their role allows.
 2. **Photos and documents** — exact original bytes in private MAC storage; thumbnails separate; checksum, uploader, server receipt time; existing JPEG data URLs are **previews only**.
