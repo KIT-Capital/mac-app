@@ -53,7 +53,7 @@ flowchart TB
   M --- book
 ```
 
-**Shipped today:** `collector`, `dealer`, `admin`, `appraiser`, `super_admin`. Collectors and dealers self-identify on signup and may change on profile; that tag is **frozen on each repo** at apply and at renew. Collectors sign in with a one-time email or SMS code (no password). Desk uses a password, and when live identity is on, a one-time email code as well. First-login for seeded desk people is a set-password link. There is no hidden “MAC desk staff” control on login. Retail WhatsApp notices and the Desk inbox ship with this unit (opt-in on profile; no WhatsApp login).
+**Shipped today:** `collector`, `dealer`, `admin`, `appraiser`, `super_admin`. Collectors and dealers self-identify on signup and may change on profile; that tag is **frozen on each repo** at apply and at renew. Collectors sign in with a one-time email or SMS code (no password). Desk uses a password, and when live identity is on, a one-time email code as well, on `/login/staff`. First-login for seeded desk people is a set-password link. There is no hidden “MAC desk staff” control on the collector sign-in page. Retail WhatsApp notices and the Desk inbox ship with this unit (opt-in on profile; no WhatsApp login).
 
 **Approved, not yet shipped** (`2026-09-19` roles plan leftover desk-stores units): Desk users are created only inside the Desk. Bottom-menu **Desk** for desk emails. Master super admin is Ricardo Cidale. Seeded desk people: Dov Tuzman (appraiser), Rosario David (admin) (`@mechartcap.com`). Appraiser (and super admin) own appraisal numbers and MAC sign. Admin cannot change those numbers or appraiser/super-admin rows.
 

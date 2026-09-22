@@ -100,6 +100,7 @@ describe("mail delivery boundaries", () => {
 
   it("delivers access mail without retaining its code in the desk outbox", async () => {
     let sendOptions: { idempotencyKey?: string } | undefined;
+    let sentText = "";
     const delivered = await dispatchCollectorAccessMail(
       {
         to: "collector@example.com",
@@ -113,7 +114,8 @@ describe("mail delivery boundaries", () => {
           RESEND_API_KEY: "test-api-key",
           MAC_INTERNAL_EMAIL: INTERNAL_EMAIL,
         },
-        sendEmail: async (_message, options) => {
+        sendEmail: async (message, options) => {
+          sentText = message.text;
           sendOptions = options;
           return {
             data: { id: "resend-test-id" },
@@ -127,6 +129,25 @@ describe("mail delivery boundaries", () => {
     assert.deepEqual(sendOptions, { idempotencyKey: "collector-access/token-row-123" });
     assert.equal(listOutbox().some((item) => item.kind === "access"), false);
     assert.equal(listOutbox().some((item) => item.text.includes("424242")), false);
+    assert.match(sentText, /Sign-in code/);
+    assert.match(sentText, /do not need a password/i);
+    assert.doesNotMatch(sentText, /admin desk/i);
+  });
+
+  it("tells an invited collector where the later code goes", async () => {
+    const result = await dispatchMail(
+      {
+        kind: "invite",
+        name: "Ricardo Cidale",
+        email: "ricardo@cidale.org",
+        role: "collector",
+      },
+      { env: { MAC_INTERNAL_EMAIL: INTERNAL_EMAIL } },
+    );
+    assert.match(result.messages[0].text, /Sign-in code/);
+    assert.match(result.messages[0].text, /do not need a password/i);
+    assert.match(result.messages[0].text, /second email/i);
+    assert.doesNotMatch(result.messages[0].text, /admin desk/i);
   });
 
   it("refuses the retired financing alias and still sends request notices", async () => {
