@@ -238,13 +238,15 @@ Conflict: `neon checkout` can pull `DATABASE_URL` into `.env.local` and fight Do
 
 ## Verification of this pass
 
-- Branches: `production` (default, no product migrations from this plan),
+Recorded 2026-09-15, before staging and production were migrated:
+
+- Branches at that time: `production` (default, no product migrations yet),
   `development` (Stages 1–5, 7, and live-book tables), and `staging`
-  (no product migration from this plan).
+  (no product migration yet).
 - `.neon` branch: `development`.
 - Doppler `dev` injects `NEON_BRANCH=development`; `prd` injects `production`.
 - `npm run db:ping` and `npm run db:drizzle-ping` connected to `neondb` / development without printing URLs.
 - `npm run db:migrate` refused staging/production in unit tests and applies approved migrations only on `development`.
 - Playwright e2e strips `RESEND_API_KEY` so inquiries stay in the preview outbox.
-- No production migration. Browser store remains the default and rollback source;
-  the development live-book adapter is ready but the owner flag remains off.
+
+On 2026-09-22 the journal through `0038` was applied on staging and production, and `MAC_LIVE_BOOK` was already on for both. Development and Playwright still leave the flag off. The checklist is `docs/runbooks/go-live.md`.
