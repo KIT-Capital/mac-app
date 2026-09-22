@@ -504,6 +504,23 @@ describe("object-manifest-check report", () => {
     assert.deepEqual(store.calls.head, [key]);
   });
 
+  it("still rejects a non-staging key when production read is allowed on a staging prefix", async () => {
+    const store = fakeStore({
+      "production/agreements/cus_1/doc_1.pdf": { body: pdfBody },
+    });
+    const report = await checkObjectManifest({
+      loader: fixtureLoader({
+        agreements: [agreementRow({ object_key: "production/agreements/cus_1/doc_1.pdf" })],
+      }),
+      store,
+      keyPrefix: "staging/",
+      allowProductionRead: true,
+    });
+
+    assert.equal(report.counts.mismatch, 1);
+    assert.deepEqual(store.calls.head, []);
+  });
+
   it("rejects a staging-prefixed key without object I/O by default", async () => {
     const store = fakeStore({
       "staging/agreements/cus_1/doc_1.pdf": { body: pdfBody },
@@ -863,6 +880,38 @@ describe("object-manifest-check access guard", () => {
       previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: "" }),
       "MANIFEST_PARENT_BRANCH_INVALID",
     );
+  });
+
+  it("checks staging object keys when the parent branch is staging", async () => {
+    const key = "staging/agreements/cus_1/doc_1.pdf";
+    const store = fakeStore({ [key]: { body: pdfBody } });
+    const report = await runObjectManifestCheck({
+      env: previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: stagingBranchId }),
+      createLoader: () => fixtureLoader({
+        agreements: [agreementRow({ object_key: key })],
+      }),
+      createStore: () => store,
+    });
+
+    assert.equal(report.counts.mismatch, 0);
+    assert.deepEqual(store.calls.head, [key]);
+  });
+
+  it("keeps the staging prefix when a staging parent is combined with production read", async () => {
+    const store = fakeStore({
+      "development/agreements/cus_1/doc_1.pdf": { body: pdfBody },
+    });
+    const report = await runObjectManifestCheck({
+      env: previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: stagingBranchId }),
+      argv: ["--allow-production-read"],
+      createLoader: () => fixtureLoader({
+        agreements: [agreementRow()],
+      }),
+      createStore: () => store,
+    });
+
+    assert.equal(report.counts.mismatch, 1);
+    assert.deepEqual(store.calls.head, []);
   });
 
   it("accepts a staging parent branch before creating clients", async () => {

@@ -218,8 +218,8 @@ async function verifyEntry(store, entry, options) {
   if (!entry.key || !validChecksum(entry.checksum) || entry.bytes === null) {
     return { state: "mismatch" };
   }
-  const keyPrefix = options.keyPrefix ?? "development/";
-  if (!options.allowProductionRead && !entry.key.startsWith(keyPrefix)) {
+  const keyPrefix = options.keyPrefix ?? (options.allowProductionRead ? null : "development/");
+  if (keyPrefix && !entry.key.startsWith(keyPrefix)) {
     return { state: "mismatch" };
   }
   try {
