@@ -25,7 +25,7 @@ This file is the checklist. It does not migrate a database, change a Railway var
 
 ## Staging
 
-- [ ] Owner confirms `mechartcap.com` is verified in Resend for `info@mechartcap.com`.
+- [x] Owner confirms `mechartcap.com` is verified in Resend for `info@mechartcap.com` (2026-09-22). Resend status verified, sending enabled, DNS verified the same day. Doppler `stg` and `prd`, and Railway staging and production, send as `Mechanical Art Capital <info@mechartcap.com>`. The `mechart.app` grey-cloud check stays open.
 - [x] Doppler `stg` and Railway staging are the staging database. The migrate harness accepted the target. Health after the migrate: `{"ok":true,"appEnv":"staging","checks":{"database":"ok","liveBook":"ok"}}`.
 - [x] Journal applied 2026-09-22 with `npm run db:migrate:staging`. Applied count 39, through `0038_special_obadiah_stane`. Endpoint `ep-calm-heart-a5ttpc4d`. Staff: Ricardo Cidale super admin, Dov Tuzman appraiser, Rosario David admin.
 - [x] Railway staging was already on current `main` (`2e5a8e9`) and stayed healthy after the migrate.
