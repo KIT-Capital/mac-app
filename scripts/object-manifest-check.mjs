@@ -19,6 +19,20 @@ const DEFAULT_IO_TIMEOUT_MS = 10_000;
 const MAX_LEGACY_PDF_BYTES = 25 * 1024 * 1024;
 const SHA256_HEX = /^[a-f0-9]{64}$/i;
 export const MANIFEST_DEVELOPMENT_BRANCH_ID = "br-summer-truth-a52brhnv";
+export const MANIFEST_STAGING_BRANCH_ID = "br-sweet-poetry-a5j7m69j";
+
+const KEY_PREFIX_BY_PARENT = {
+  [MANIFEST_DEVELOPMENT_BRANCH_ID]: "development/",
+  [MANIFEST_STAGING_BRANCH_ID]: "staging/",
+};
+
+/**
+ * @param {string | undefined} parentId
+ * @returns {string | null}
+ */
+export function manifestKeyPrefix(parentId) {
+  return KEY_PREFIX_BY_PARENT[(parentId ?? "").trim()] ?? null;
+}
 
 /**
  * @param {string[]} argv
@@ -80,7 +94,7 @@ function collectPreviewIdentityErrors(env, parsed, errors) {
   const endpointId = (env.MANIFEST_NEON_ENDPOINT_ID ?? "").trim();
 
   if (projectId !== NEON_PROJECT_ID) errors.push("MANIFEST_PROJECT_INVALID");
-  if (parentId !== MANIFEST_DEVELOPMENT_BRANCH_ID) errors.push("MANIFEST_PARENT_BRANCH_INVALID");
+  if (!manifestKeyPrefix(parentId)) errors.push("MANIFEST_PARENT_BRANCH_INVALID");
   if (!branchId) errors.push("MANIFEST_BRANCH_ID_REQUIRED");
   else if (branchId === parentId) errors.push("MANIFEST_BRANCH_INVALID");
   if (!endpointId) errors.push("MANIFEST_ENDPOINT_ID_REQUIRED");
@@ -204,7 +218,8 @@ async function verifyEntry(store, entry, options) {
   if (!entry.key || !validChecksum(entry.checksum) || entry.bytes === null) {
     return { state: "mismatch" };
   }
-  if (!options.allowProductionRead && !entry.key.startsWith("development/")) {
+  const keyPrefix = options.keyPrefix ?? (options.allowProductionRead ? null : "development/");
+  if (keyPrefix && !entry.key.startsWith(keyPrefix)) {
     return { state: "mismatch" };
   }
   try {
@@ -250,6 +265,7 @@ async function verifyEntry(store, entry, options) {
  *   store: object,
  *   appEnv?: string | null,
  *   allowProductionRead?: boolean,
+ *   keyPrefix?: string,
  *   ioTimeoutMs?: number,
  * }} input
  */
@@ -258,6 +274,7 @@ export async function checkObjectManifest(input) {
   const ioTimeoutMs = input.ioTimeoutMs ?? DEFAULT_IO_TIMEOUT_MS;
   const verifyOptions = {
     allowProductionRead: input.allowProductionRead === true,
+    keyPrefix: input.keyPrefix,
     ioTimeoutMs,
   };
   const counts = {
@@ -384,6 +401,7 @@ export async function runObjectManifestCheck(input = {}) {
       store,
       appEnv: access.appEnv,
       allowProductionRead: args.allowProductionRead,
+      keyPrefix: manifestKeyPrefix(env.MANIFEST_NEON_PARENT_BRANCH_ID) ?? undefined,
       ioTimeoutMs: input.ioTimeoutMs,
     });
   } catch {
