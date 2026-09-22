@@ -84,4 +84,4 @@ Preview GETs use signed URLs; the private bucket remains non-public.
 
 ## What this stack does not add
 
-The running Railway app still has no application database connection. Collector state remains in the browser. Neon `development` holds repository tables; production stays empty. No mailbox product is required on mechart.app for the app to run. Do not attach production `DATABASE_URL` until cutover is approved.
+Collector state remains in the browser until `MAC_LIVE_BOOK` is turned on. Neon `development` holds repository tables. Staging and production have not been migrated. The owner checklist is `docs/runbooks/go-live.md`. No mailbox product is required on mechart.app for the app to run. Do not attach production `DATABASE_URL` or run the production migrate until the owner confirms that step.

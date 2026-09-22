@@ -8,7 +8,7 @@ origin: owner brief 2026-09-15 (production repo desk)
 
 # Production persistence
 
-**Status:** active · live-book adapter ready on Neon `development` · browser store remains default · owner flag off · no production migration
+**Status:** active · live-book adapter ready on Neon `development` · browser store remains default · owner flag off · staging and production have not been migrated · checklist is `docs/runbooks/go-live.md`
 
 Keep Next.js, React, TypeScript, Tailwind, and shadcn. Do not rewrite the framework. Do not run production migrations or deploy from this plan.
 
