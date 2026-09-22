@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Build web lockups from official Logo-FF (Illustrator PDF / PSD).
+"""Refresh app icons from the sharp Logo-FF mark already in public/brand.
 
-Light: black gear, gray arc, gold jeweled pinions, MECHANICAL ART CAPITAL.
-Dark: black ink becomes solid white. Gray, gold, and jewels stay.
-Do not sit the mark on a plate, and do not outline-invert the gear.
-The checked-in SVG is a sharp redraw: the largest jewel is blue.
-Running this script replaces those files from the official PDF.
+The lockup SVG and gear PNGs are the source. Do not rebuild them from the
+official PDF: that trace is blurry, and the largest jewel is now blue.
 """
 
 from __future__ import annotations
@@ -183,28 +180,11 @@ def resolve_source() -> tuple[np.ndarray, str | None]:
 
 
 def main() -> None:
-    lockup, svg_text = resolve_source()
-    lockup = trim_alpha(lockup, pad=16)
-    save_png(lockup, OUT / "brand/logo-ff.png", 1600)
-
-    mark = gear_crop(lockup)
-    save_png(mark, OUT / "brand/logo-ff-mark.png", 800)
-
-    dark = on_dark_raster(lockup)
-    save_png(dark, OUT / "brand/logo-ff-on-dark.png", 1600)
-    save_png(on_dark_raster(mark), OUT / "brand/logo-ff-mark-on-dark.png", 800)
-
-    if svg_text:
-        page = re.search(r'viewBox="0 0 ([0-9.]+) ([0-9.]+)"', svg_text)
-        page_w = float(page.group(1)) if page else 600.0
-        page_h = float(page.group(2)) if page else 400.0
-        official = Path("/tmp/logo-ff-official.png")
-        full = load_rgba(official) if official.exists() else lockup
-        vb = content_viewbox(full, page_w, page_h)
-        cleaned = tight_svg(svg_text, vb)
-        (OUT / "brand/logo-ff.svg").write_text(cleaned)
-        (OUT / "brand/logo-ff-on-dark.svg").write_text(on_dark_svg(cleaned))
-        print(f"wrote SVG lockups viewBox={vb} bytes={len(cleaned)}")
+    # The sharp drawing in public/brand is the logo. Rebuilding it from the
+    # official PDF would put back the blurry trace and the red largest jewel.
+    mark_path = OUT / "brand/logo-ff-mark.png"
+    print(f"keeping sharp Logo-FF; largest jewel is blue ({mark_path})")
+    mark = load_rgba(mark_path)
 
     square_icon(mark, 192, (255, 255, 255, 255)).convert("RGB").save(OUT / "icon.png", "PNG", optimize=True)
     square_icon(mark, 180, (255, 255, 255, 255)).convert("RGB").save(
