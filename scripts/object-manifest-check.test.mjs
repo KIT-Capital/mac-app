@@ -19,6 +19,7 @@ const productionUrl = `postgresql://u:p@${ENDPOINT_BY_APP_ENV.production}-pooler
 const previewEndpointId = "ep-preview-drill-a5abc123";
 const previewUrl = `postgresql://u:p@${previewEndpointId}-pooler.us-east-2.aws.neon.tech/neondb`;
 const developmentBranchId = "br-summer-truth-a52brhnv";
+const stagingBranchId = "br-sweet-poetry-a5j7m69j";
 const previewBranchId = "br-preview-restore-a5xyz";
 const legacyGetCapBytes = 25 * 1024 * 1024;
 
@@ -488,6 +489,21 @@ describe("object-manifest-check report", () => {
     assert.deepEqual(store.calls.head, ["development/originals/cus_1/pho_1"]);
   });
 
+  it("heads a staging-prefixed key when the staging prefix is allowed", async () => {
+    const key = "staging/agreements/cus_1/doc_1.pdf";
+    const store = fakeStore({ [key]: { body: pdfBody } });
+    const report = await checkObjectManifest({
+      loader: fixtureLoader({
+        agreements: [agreementRow({ object_key: key })],
+      }),
+      store,
+      keyPrefix: "staging/",
+    });
+
+    assert.equal(report.counts.mismatch, 0);
+    assert.deepEqual(store.calls.head, [key]);
+  });
+
   it("rejects a staging-prefixed key without object I/O by default", async () => {
     const store = fakeStore({
       "staging/agreements/cus_1/doc_1.pdf": { body: pdfBody },
@@ -847,6 +863,19 @@ describe("object-manifest-check access guard", () => {
       previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: "" }),
       "MANIFEST_PARENT_BRANCH_INVALID",
     );
+  });
+
+  it("accepts a staging parent branch before creating clients", async () => {
+    const report = await runObjectManifestCheck({
+      env: previewEnv({ MANIFEST_NEON_PARENT_BRANCH_ID: stagingBranchId }),
+      createLoader: () => {
+        throw new Error("loader should be created only after access passes");
+      },
+      createStore: () => matchingStore(),
+    });
+    assert.equal(report.outcome, "refused");
+    assert.equal(report.errors.includes("MANIFEST_PARENT_BRANCH_INVALID"), false);
+    assert.ok(report.errors.includes("MANIFEST_CLIENT_UNAVAILABLE"));
   });
 
   it("refuses a mismatched parent branch id before creating clients", async () => {

@@ -8,7 +8,7 @@ The drill is read-only against objects: `scripts/object-manifest-check.mjs` only
 
 ## Rules
 
-- **Development only.** The drill restores the Neon `development` branch. Production is never the source and never the target.
+- **Development or staging parent.** A preview may be created from the Neon `development` branch (`br-summer-truth-a52brhnv`) or the Neon `staging` branch (`br-sweet-poetry-a5j7m69j`). Object keys must use that parent's prefix (`development/` or `staging/`). Production is never the source and never the target. The live staging endpoint is still refused. A staging drill is recorded only after it runs; the records below are development drills.
 - **Every Neon create and delete step is an owner-confirmed gate.** The agent does not create or delete a branch without the owner's typed yes in the session.
 - **No connection strings anywhere in the record.** Do not paste, request, or log a raw URL. The restored preview branch URL is supplied only as the process-only name `MANIFEST_DATABASE_URL`. It is never stored in Doppler, Railway, this repo, the record below, a chat message, or a log file.
 - **Do not use `DATABASE_URL` for this drill.** Doppler `dev` still supplies R2 credentials, but the checker ignores `DATABASE_URL`. An inline assignment of `DATABASE_URL` does not retarget the check, and it would also put the credential in command history.
