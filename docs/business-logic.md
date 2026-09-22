@@ -35,7 +35,8 @@ Collectors must be 18+ and accept privacy consent at signup.
 
 Purchase caps, Scenario 60 fees, typical term, membership price, and vault copy
 live in Neon desk settings when live mode is enabled and in `localStorage` in
-browser mode. If the live settings singleton does not exist, the server returns
+browser mode. Railway staging and production run in live mode. Development and
+Playwright stay in browser mode. If the live settings singleton does not exist, the server returns
 `DEFAULT_SETTINGS` and Scenario 60 constants without inserting defaults. Catalog
 references and agreement shells likewise stay empty until the desk creates them;
 production never receives demo desk data. Appearance and personal notification

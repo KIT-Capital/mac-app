@@ -203,7 +203,8 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
 
 - Unset `MAC_LIVE_BOOK` returns browser mode before opening Neon. Enabled use is
   available in development, staging, and production and requires the verified
-  collector-access configuration.
+  collector-access configuration. Railway staging and production have the flag
+  on. Development and Playwright leave it off.
 - `GET` requires exactly one valid desk or collector session and returns
   `Cache-Control: private, no-store`. Desk reads all rows; a collector session is
   bound to immutable customer ID and email and reads only that customer.

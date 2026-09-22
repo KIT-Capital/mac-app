@@ -8,7 +8,7 @@ origin: owner brief 2026-09-15 (production repo desk)
 
 # Production persistence
 
-**Status:** active · live-book adapter ready on Neon `development` · browser store remains default · owner flag off · staging and production have not been migrated · checklist is `docs/runbooks/go-live.md`
+**Status:** active · journal `0000`–`0038` applied on development, staging, and production (2026-09-22) · `MAC_LIVE_BOOK` on for Railway staging and production · development and Playwright stay in the browser · checklist is `docs/runbooks/go-live.md`
 
 Keep Next.js, React, TypeScript, Tailwind, and shadcn. Do not rewrite the framework. Do not run production migrations or deploy from this plan.
 
@@ -38,13 +38,13 @@ This app is the **repo operations book / analytics**. Official cash is QuickBook
 | Branch `production` | Verified | Default; local must not target it |
 | Doppler `dev` / `prd` | Verified | Plus `APP_ENV`; see env-separation plan |
 | `npm run db:ping` | Verified | `neondb` / Postgres 18.6 |
-| Drizzle Stage 1 | Verified | `mac_schema_probe` on `development` only; production and staging have no tables |
+| Drizzle Stage 1 | Verified | Journal through `0038` on development, staging, and production |
 | Neon Auth | Disabled | Keep off |
-| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; browser is default; Stage 6 deferred / not this product’s books; mock signing |
-| Drizzle `customers` / `timepieces` | Verified | `development` only; UI defaults to `localStorage`, with default-off live-book adapter |
-| Drizzle applications / agreements / archives / reports | Verified | `development` only; mock signing adapter; no ledger |
+| WorkOS, R2, ledger, signing | Partial | R2 put adapter exists; Stage 6 deferred / not this product’s books; mock signing. Neon Auth and WorkOS stay off |
+| Drizzle `customers` / `timepieces` | Verified | Tables exist on development, staging, and production. The development UI stays on `localStorage` while the flag is off |
+| Drizzle applications / agreements / archives / reports | Verified | Same journal on development, staging, and production; no ledger |
 | Desk-credential security PR | Proposed | Separate approval boundary |
-| Browser → server cutover | Ready, default off | Tested staff import and owner flag exist; no production cutover |
+| Browser → server cutover | On for staging and production | Development flag remains off. No dual-write and no automatic `localStorage` import |
 
 ## Problem frame
 
