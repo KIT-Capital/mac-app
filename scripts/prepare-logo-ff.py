@@ -4,6 +4,8 @@
 Light: black gear, gray arc, gold jeweled pinions, MECHANICAL ART CAPITAL.
 Dark: black ink becomes solid white. Gray, gold, and jewels stay.
 Do not sit the mark on a plate, and do not outline-invert the gear.
+The checked-in SVG is a sharp redraw: the largest jewel is blue.
+Running this script replaces those files from the official PDF.
 """
 
 from __future__ import annotations
