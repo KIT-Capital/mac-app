@@ -37,7 +37,7 @@ function SetPasswordForm() {
       setBusy(false);
       return;
     }
-    router.replace("/login");
+    router.replace("/login/staff");
   }
 
   return (
@@ -47,7 +47,7 @@ function SetPasswordForm() {
           <MacLockup onDark size="hero" />
           <h1 className="mt-8 text-xl font-medium">Set your desk password</h1>
           <p className="mt-2 text-sm text-mac-muted">
-            Choose a password of at least 12 characters, then sign in with that password and a one-time email code.
+            Choose a password of at least 12 characters, then sign in on the staff page with that password and a one-time email code.
           </p>
         </div>
         <form onSubmit={onSubmit} className="mt-8 space-y-4">

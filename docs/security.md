@@ -13,7 +13,7 @@ Custom, in `lib/auth.ts`. No WorkOS, Clerk, or NextAuth.
   promise a Mechanical Art Capital from-number. Email codes still work if SMS
   is unset.
 - **No remembered login** — the signed-in `user` is never written to `localStorage`. It lives in tab `sessionStorage` only (`lib/session-persist.mjs`). Live-book authorization adds a signed, HttpOnly, session-only `mac_collector` cookie after collector Sign In or development live registration and clears it on Sign Out. A new browser session still starts at splash / Sign In.
-- **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first. The login form always shows the password box; there is no hidden “MAC desk staff” reveal.
+- **Desk** — preset emails in source (`admin@mechartcap.com`, `desk@mechartcap.com`) with a shared demo password. This is a known exception. Do not rotate or remove those credentials in a Kit equip change. A separate security PR must move them to Doppler/Railway secrets first. Collectors never see a password box. Staff sign in at `/login/staff`, reached by a quiet Staff link on the collector sign-in page, not from collector navigation. There is no hidden “MAC desk staff” reveal.
 ### Verified collector access
 
 `MAC_LIVE_BOOK` defaults off and accepts only `1`, `true`, or `on`. While off,

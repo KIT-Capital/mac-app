@@ -11,6 +11,12 @@ import {
 } from "@/lib/mail-types";
 import { routeInternalRecipients } from "@/lib/internal-mail.mjs";
 import {
+  ACCESS_CODE_INTRO,
+  DESK_ACCESS_CODE_INTRO,
+  DESK_SET_PASSWORD_INTRO,
+  inviteIntro,
+} from "@/lib/login-copy.mjs";
+import {
   composeCollectorDeclineNotice,
   composeRequestNotices,
 } from "@/lib/request-notice-mail.mjs";
@@ -150,10 +156,12 @@ export async function dispatchCollectorAccessMail(
     subject: isCode
       ? "Your Mechanical Art Capital sign-in code"
       : "Set your Mechanical Art Capital desk password",
-    heading: isCode ? `${greeting}, enter your code` : `${greeting}, set your desk password`,
+    heading: isCode ? `${greeting}, your sign-in code` : `${greeting}, set your desk password`,
     intro: isCode
-      ? "Enter this code in the app. It lasts 15 minutes and works once."
-      : "Use the secure link below to set your desk password. It lasts 15 minutes and works once.",
+      ? input.action === "desk_login"
+        ? DESK_ACCESS_CODE_INTRO
+        : ACCESS_CODE_INTRO
+      : DESK_SET_PASSWORD_INTRO,
     rows: [["Email", input.to]],
     body: input.code ?? input.url ?? "",
   });
@@ -223,7 +231,7 @@ function composeMail(request: MailRequest): ComposedMail[] {
           to: [request.email],
           subject: `You are invited to Mechanical Art Capital as ${request.role || "collector"}`,
           heading: `${greeting}, you have been invited`,
-          intro: `The desk added you as ${request.role || "collector"}. Sign in with this email to open the collector app or the admin desk.`,
+          intro: inviteIntro(request.role),
           rows: [
             ["Role", request.role || "collector"],
             ["Email", request.email],

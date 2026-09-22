@@ -1,10 +1,9 @@
 "use client";
 
-import type { DeskRole } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { ArrowLeft, Eye, EyeOff, Lock, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { MacLockup } from "@/components/mac-logo";
 import { LOGIN_EMAIL_NOTICE, LOGIN_SMS_NOTICE } from "@/lib/login-copy.mjs";
 import { useStore } from "@/lib/store";
@@ -15,61 +14,18 @@ export default function LoginPage() {
   const [channel, setChannel] = useState<"email" | "phone">("email");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [awaitingCode, setAwaitingCode] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const light = (user?.preferences.appearance ?? settings.appearance) === "light";
-
-  async function completeDesk(session: Response) {
-    const authenticated = await session.json() as {
-      role: DeskRole;
-      mustRotate?: boolean;
-      needsCode?: boolean;
-    };
-    if (authenticated.needsCode) {
-      setAwaitingCode(true);
-      setNotice("Check your email to continue. It lasts 15 minutes and works once.");
-      setBusy(false);
-      return;
-    }
-    if (authenticated.mustRotate) {
-      router.replace("/admin/password");
-      return;
-    }
-    signIn({ email: email.trim(), role: authenticated.role });
-    router.replace("/admin");
-  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setNotice("");
     setBusy(true);
-
-    if (password.trim()) {
-      const session = await fetch("/api/desk-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, code: code.trim() || undefined }),
-        cache: "no-store",
-        credentials: "include",
-      }).catch(() => null);
-      if (session?.status === 202) {
-        await completeDesk(session);
-        return;
-      }
-      if (!session?.ok) {
-        setError("Desk session could not start.");
-        setBusy(false);
-        return;
-      }
-      await completeDesk(session);
-      return;
-    }
 
     if (awaitingCode || code.trim()) {
       const verified = await fetch("/api/collector-session/verify", {
@@ -238,53 +194,20 @@ export default function LoginPage() {
           </div>
         )}
 
-        {channel === "email" ? (
-          <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
-            <div className="flex items-center justify-between">
-              <label htmlFor="login-password" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
-                Password
-              </label>
-              <Lock className="h-3.5 w-3.5 text-mac-faint" />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                id="login-password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
-                placeholder="Desk only"
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="text-mac-faint hover:text-mac-fg"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {awaitingCode ? (
-          <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
-            <label htmlFor="login-code" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
-              Sign-in code
-            </label>
-            <input
-              id="login-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="mt-1 w-full bg-transparent text-[15px] tracking-[0.3em] text-mac-fg outline-none placeholder:text-mac-faint"
-              placeholder="000000"
-              required
-            />
-          </div>
-        ) : null}
+        <div className="rounded-xl border border-mac-line bg-mac-card p-3 transition focus-within:border-mac-gold focus-within:ring-1 focus-within:ring-mac-gold/50">
+          <label htmlFor="login-code" className="text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">
+            Sign-in code
+          </label>
+          <input
+            id="login-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="mt-1 w-full bg-transparent text-[15px] tracking-[0.3em] text-mac-fg outline-none placeholder:text-mac-faint"
+            placeholder="000000"
+          />
+        </div>
 
         <p className="text-center text-[12px] text-mac-muted">
           <button
@@ -310,7 +233,7 @@ export default function LoginPage() {
           disabled={busy}
           className="mac-tap mt-2 flex h-12 w-full items-center justify-center rounded-none bg-mac-navy text-[13px] font-bold tracking-[0.18em] text-white uppercase shadow-md transition hover:bg-[#133758] active:scale-[0.99]"
         >
-          {busy ? "Please wait…" : password.trim() || awaitingCode ? "Sign in" : "Send code"}
+          {busy ? "Please wait…" : awaitingCode || code.trim() ? "Sign in" : "Send code"}
         </button>
       </form>
 
@@ -320,6 +243,9 @@ export default function LoginPage() {
           <Link href="/signup" className="font-semibold text-mac-gold underline underline-offset-4">
             Sign up
           </Link>
+        </p>
+        <p className="mt-4 text-[11px] text-mac-faint">
+          <Link href="/login/staff">Staff</Link>
         </p>
       </div>
     </main>

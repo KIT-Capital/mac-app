@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 import { ScreenHeader } from "@/components/screen-header";
 import { isReservedDeskEmail } from "@/lib/auth";
 import type { RetailRole } from "@/lib/types";
+import { LOGIN_EMAIL_NOTICE } from "@/lib/login-copy.mjs";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
@@ -93,7 +94,7 @@ export default function SignupPage() {
       | null;
     if (access?.mode === "live" && access.accepted) {
       setAwaitingCode(true);
-      setNotice("Check your email for a sign-in code. It lasts 15 minutes and works once.");
+      setNotice(LOGIN_EMAIL_NOTICE);
       setBusy(false);
       return;
     }

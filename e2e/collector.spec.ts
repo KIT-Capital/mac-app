@@ -25,19 +25,27 @@ test.describe("collector app", () => {
     await expect(page.getByRole("link", { name: "Sign In" })).toBeVisible();
   });
 
-  test("collector sign-in uses email and a desk password box without a hidden reveal", async ({ page }) => {
+  test("collector sign-in asks for a code and keeps the password on the staff page", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByLabel("Email Address")).toHaveValue("");
-    await expect(page.locator("#login-password")).toBeVisible();
+    await expect(page.getByLabel("Sign-in code")).toBeVisible();
+    await expect(page.locator("#login-password")).toHaveCount(0);
     await expect(page.getByText(/continue with google|continue with apple/i)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "MAC desk staff" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Staff" })).toHaveAttribute("href", "/login/staff");
     await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Use phone" })).toBeVisible();
     await page.getByRole("button", { name: "Use phone" }).click();
     await expect(page.getByLabel("Phone Number")).toBeVisible();
     await expect(page.getByLabel("Email Address")).toHaveCount(0);
     await expect(page.locator("#login-password")).toHaveCount(0);
+    await expect(page.getByLabel("Sign-in code")).toBeVisible();
     await expect(page.getByRole("button", { name: "Use email" })).toBeVisible();
+
+    await page.goto("/login/staff");
+    await expect(page.getByRole("heading", { name: "Staff sign-in" })).toBeVisible();
+    await expect(page.locator("#login-password")).toBeVisible();
+    await expect(page.getByText(/Desk only/i)).toHaveCount(0);
   });
 
   test("an unusable verification link shows one safe retry path", async ({ page }) => {

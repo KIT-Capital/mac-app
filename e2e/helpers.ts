@@ -7,9 +7,10 @@ export const APPRAISER = "desk@mechartcap.com";
 export const DESK_PASSWORD = process.env.DESK_DEVELOPMENT_PASSWORD ?? "";
 
 export async function signIn(page: Page, email: string, password: string) {
-  await page.goto("/login");
+  const desk = ["admin@mechartcap.com", "desk@mechartcap.com"].includes(email.toLowerCase());
+  await page.goto(desk ? "/login/staff" : "/login");
   await page.getByLabel("Email Address").fill(email);
-  if (["admin@mechartcap.com", "desk@mechartcap.com"].includes(email.toLowerCase())) {
+  if (desk) {
     await page.locator("#login-password").fill(password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     return;
