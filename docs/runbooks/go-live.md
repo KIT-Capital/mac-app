@@ -19,8 +19,8 @@ This file is the checklist. It does not migrate a database, change a Railway var
 ## Already done
 
 - [x] Restore drill passed on a development preview (2026-09-21). Record: `docs/runbooks/restore-drill.md`. The preview branch was deleted.
-- [x] Sentry project exists on the Norfolk AI team. Development keys are in Doppler `dev`. Staging and production keys are not set yet.
-- [ ] A Railway Development error has reached Sentry, and the owner mailbox alert rule exists.
+- [x] Sentry project exists on the Norfolk AI team. Doppler `dev` and Railway Development use `javascript-nextjs-uz`. Doppler `stg` and `prd` use `javascript-nextjs-e0`.
+- [x] A Railway Development error reached Sentry on 2026-09-22 (`JAVASCRIPT-NEXTJS-UZ-2`, `https://mac-app-development.up.railway.app/api/debug-sentry`). The owner received the email from "Send a notification for high priority issues". The smoke route was removed in PR #90.
 - [ ] `SENTRY_AUTH_TOKEN` is set for source-map upload. It is build-only and is never a `NEXT_PUBLIC_*` name.
 
 ## Staging
