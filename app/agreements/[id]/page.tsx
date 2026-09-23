@@ -99,7 +99,6 @@ export default function AgreementDetailPage() {
   const [docError, setDocError] = useState("");
   const [mailBusy, setMailBusy] = useState(false);
   const [mailNote, setMailNote] = useState("");
-  const [otherAddress, setOtherAddress] = useState("");
   const pageOpen = useRef(true);
   useEffect(() => () => {
     pageOpen.current = false;
@@ -210,7 +209,7 @@ export default function AgreementDetailPage() {
     tab.location.href = body.url;
   }
 
-  async function emailStoredDocument(documentId: string, recipientKind: "self" | "other") {
+  async function emailStoredDocument(documentId: string) {
     if (mailBusy) return;
     setMailBusy(true);
     setMailNote("");
@@ -224,10 +223,7 @@ export default function AgreementDetailPage() {
         body: JSON.stringify({
           action: "email",
           documentId,
-          recipientKind,
-          ...(recipientKind === "other"
-            ? { address: otherAddress.trim(), confirmAddress: otherAddress.trim() }
-            : {}),
+          recipientKind: "self",
         }),
       });
       const body = (await response.json().catch(() => null)) as { send?: { result?: string }; error?: string } | null;
@@ -236,17 +232,12 @@ export default function AgreementDetailPage() {
         return;
       }
       if (!response.ok || body?.send?.result !== "accepted") {
-        setDocError(
-          body?.error === "DOCUMENT_RECIPIENT_UNCONFIRMED"
-            ? "Enter an email address."
-            : body?.error === "DOCUMENT_SEND_THROTTLED"
-              ? "Wait before sending again."
-              : "Could not email the stored PDF.",
-        );
+        setDocError(body?.error === "DOCUMENT_SEND_THROTTLED"
+          ? "Wait before sending again."
+          : "Could not email the stored PDF.");
         return;
       }
-      setMailNote("The stored PDF was accepted for delivery.");
-      if (recipientKind === "other") setOtherAddress("");
+      setMailNote(user?.email ? `A copy is on its way to ${user.email}.` : "The stored PDF was accepted for delivery.");
     } catch {
       setDocError("Could not email the stored PDF.");
     } finally {
@@ -681,31 +672,16 @@ export default function AgreementDetailPage() {
             </ul>
             {documents.some((row) => row.status === "stored") ? (
               <div className="mt-3 space-y-2">
+                <p className="text-[13px] text-mac-fg">
+                  A copy goes to {user?.email || "the email on your account"}.
+                </p>
                 <button
                   type="button"
                   className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
                   disabled={mailBusy}
-                  onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "self")}
+                  onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "")}
                 >
                   Email me a copy
-                </button>
-                <label className="block border-b border-mac-line py-2">
-                  <span className="text-[12px] text-mac-faint">Send a copy to</span>
-                  <input
-                    type="email"
-                    className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none"
-                    value={otherAddress}
-                    onChange={(event) => setOtherAddress(event.target.value)}
-                    autoComplete="email"
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
-                  disabled={mailBusy || !otherAddress.trim()}
-                  onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "other")}
-                >
-                  Send
                 </button>
               </div>
             ) : null}
