@@ -113,8 +113,8 @@ flowchart TD
   apply[Retail request: ticked current pieces + term + amount up to the cap]
   draft[With MAC: pieces reserved, proposal PDF v1]
   checks[Desk confirms or declines - never reprices]
-  seller[Your turn: retail signs or declines]
-  mac[MAC signs last - appraiser or super admin]
+  seller[Collector writes their name to accept the terms]
+  mac[Paper signed at delivery, then MAC completes the purchase]
   active[Activated: open or later past due]
   buy[Whole-collection buyback]
   liqStart[Staff: in liquidation]
@@ -126,6 +126,7 @@ flowchart TD
   newRepo[New 12-month repo at that month's dollars]
 
   apply --> draft
+  draft --> seller
   draft --> checks
   checks --> seller
   seller --> mac
@@ -148,9 +149,9 @@ Signing does not write a book end. A book end does not change the signature flag
 
 **Shipped:** collector HTML Sign or desk Mark signed on legacy and executed rows. A repo appears in the book only once it has an execution date, and its term clock runs from that date; rows written before the request model were mapped once to executed on the day they were created, so Hale still reads **past due**.
 
-**Shipped 2026-09-20 (U10):** Apply creates a **request**, not a repo. The collector ticks accepted pieces whose Accept is current (seven days), keeps the Desk's typical term, and sends an amount at or below the maximum for those pieces; the pieces are reserved and a proposal PDF is recorded. The Desk **confirms or declines**; the collector may decline or withdraw. Confirm returns the request at the same amount ("Your turn"). Every proposal states that MAC accepts only after physical inspection and other checks, will re-appraise each timepiece, and reserves the right not to execute.
+**Shipped 2026-09-20 (U10):** Apply creates a **request**, not a repo. The collector ticks accepted pieces whose Accept is current (seven days), keeps the Desk's typical term, and sends an amount at or below the maximum for those pieces; the pieces are reserved and a proposal PDF is recorded. The collector writes their name on those terms; that acceptance moves the request to intake. The Desk may still decline before that acceptance. Confirm, when it happens first, returns the request at the same amount ("Your turn"). Every proposal states that MAC accepts only after physical inspection and other checks, will re-appraise each timepiece, and reserves the right not to execute. MAC and the collector sign the paper agreement when the timepieces are delivered.
 
-**Shipped 2026-09-20 (U6):** The collector picker shows a live offer card (maximum and buyback schedule). Agreements group under Your turn / With MAC / Active / Closed. A confirmed request's only primary action is Sign; an inspection return uses "Accept the inspected amount and sign". Closed requests offer Start again. An Accept older than seven days reads "Appraisal expired — send again" and stays off the picker.
+**Shipped 2026-09-20 (U6):** The collector picker shows a live offer card (maximum and buyback schedule). Agreements group under Your turn / With MAC / Active / Closed. The collector accepts the terms by writing their name. An inspection return uses "Accept the inspected amount and sign". Closed requests offer Start again. An Accept older than seven days reads "Appraisal expired — send again" and stays off the picker.
 
 **Shipped 2026-09-20 (U11):** MAC signs last; desk checklist first; only an appraiser or super admin signs for MAC; admin cannot. Software sign is not counsel approval. E-sign vendor still deferred.
 

@@ -92,16 +92,14 @@ export default function AgreementDetailPage() {
   const [bookMode, setBookMode] = useState<"browser" | "live" | "unavailable">("browser");
   const [documents, setDocuments] = useState<ListedDocument[]>([]);
   const [threadEvents, setThreadEvents] = useState<RetailThreadEvent[]>([]);
-  const [signing, setSigning] = useState(false);
   const [typedName, setTypedName] = useState("");
-  const [attested, setAttested] = useState(false);
-  const [delivery, setDelivery] = useState(INTAKE_DELIVERY);
+  const [deliveryChoice, setDeliveryChoice] = useState<string | null>(null);
+  const delivery = deliveryChoice ?? agreement?.delivery ?? INTAKE_DELIVERY;
   const [signError, setSignError] = useState("");
   const [docError, setDocError] = useState("");
   const [mailBusy, setMailBusy] = useState(false);
   const [mailNote, setMailNote] = useState("");
   const [otherAddress, setOtherAddress] = useState("");
-  const [confirmAddress, setConfirmAddress] = useState("");
   const pageOpen = useRef(true);
   useEffect(() => () => {
     pageOpen.current = false;
@@ -227,7 +225,9 @@ export default function AgreementDetailPage() {
           action: "email",
           documentId,
           recipientKind,
-          ...(recipientKind === "other" ? { address: otherAddress, confirmAddress } : {}),
+          ...(recipientKind === "other"
+            ? { address: otherAddress.trim(), confirmAddress: otherAddress.trim() }
+            : {}),
         }),
       });
       const body = (await response.json().catch(() => null)) as { send?: { result?: string }; error?: string } | null;
@@ -238,7 +238,7 @@ export default function AgreementDetailPage() {
       if (!response.ok || body?.send?.result !== "accepted") {
         setDocError(
           body?.error === "DOCUMENT_RECIPIENT_UNCONFIRMED"
-            ? "Type the same email twice to confirm it."
+            ? "Enter an email address."
             : body?.error === "DOCUMENT_SEND_THROTTLED"
               ? "Wait before sending again."
               : "Could not email the stored PDF.",
@@ -246,10 +246,7 @@ export default function AgreementDetailPage() {
         return;
       }
       setMailNote("The stored PDF was accepted for delivery.");
-      if (recipientKind === "other") {
-        setOtherAddress("");
-        setConfirmAddress("");
-      }
+      if (recipientKind === "other") setOtherAddress("");
     } catch {
       setDocError("Could not email the stored PDF.");
     } finally {
@@ -339,7 +336,8 @@ export default function AgreementDetailPage() {
   const canStartAgain = request && word === "Closed";
   const signTitle = (agreement.version ?? 1) > 1
     ? "Accept the inspected amount and sign"
-    : "Sign";
+    : "Accept these terms";
+  const acceptedName = agreement.signatures?.find((signature) => signature.party === "collector")?.typedName;
   const released = releasedWatchIds(agreement)
     .map((id) => timepieces.find((item) => item.id === id))
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
@@ -358,8 +356,8 @@ export default function AgreementDetailPage() {
 
   async function onSign() {
     if (!agreement || requestBusy) return;
-    if (!attested || !typedName.trim()) {
-      setSignError("Type your name and confirm you are signing.");
+    if (!typedName.trim()) {
+      setSignError("Write your name to accept these terms.");
       return;
     }
     setRequestBusy(true);
@@ -400,11 +398,9 @@ export default function AgreementDetailPage() {
       setSignError(
         result.error === "DOCUMENT_STALE" || result.error === "DOCUMENT_NOT_READY"
           ? "This agreement is still preparing. Try again in a moment."
-          : "That could not be signed. Refresh and try again.",
+          : "That could not be recorded. Refresh and try again.",
       );
-      return;
     }
-    setSigning(false);
   }
 
   return (
@@ -418,37 +414,6 @@ export default function AgreementDetailPage() {
             <p className="mt-2 text-[13px] text-mac-fg">{retailRequestLine({ ...agreement, events: visibleEvents })}</p>
             {agreement.delivery ? (
               <p className="mt-1 text-[12px] text-mac-muted">{agreement.delivery}</p>
-            ) : null}
-            {canSign && !signing ? (
-              <div className="mt-3">
-                <PillButton
-                  variant="gold"
-                  onClick={() => {
-                    setTypedName(user?.name || "");
-                    setDelivery(INTAKE_DELIVERY);
-                    setAttested(false);
-                    setSignError("");
-                    setSigning(true);
-                  }}
-                >
-                  {signTitle}
-                </PillButton>
-              </div>
-            ) : null}
-            {signing ? (
-              <RequestSignSheet
-                title={signTitle}
-                typedName={typedName}
-                onTypedNameChange={setTypedName}
-                attested={attested}
-                onAttestedChange={setAttested}
-                delivery={delivery}
-                onDeliveryChange={setDelivery}
-                busy={requestBusy}
-                error={signError}
-                onSubmit={() => void onSign()}
-                onCancel={() => setSigning(false)}
-              />
             ) : null}
             {canStartAgain ? (
               <Link
@@ -517,13 +482,24 @@ export default function AgreementDetailPage() {
 
         {request ? <RequestThread events={visibleEvents} /> : null}
 
-        <article className="space-y-4 rounded-2xl bg-white p-5 text-[#1a1a1a] shadow-md font-sans">
-          <h2 className="text-center text-sm font-semibold tracking-[0.12em] uppercase">
-            Repurchase agreement
-          </h2>
-          <p className="text-center text-[12px] font-semibold text-mac-navy">
-            {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
-          </p>
+        <article className="space-y-5 rounded-2xl bg-mac-parchment p-6 text-[15px] leading-relaxed text-[#1a2744] shadow-md">
+          <header className="text-center">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[#1a2744]/55 uppercase">
+              Mechanical Art Capital
+            </p>
+            <h2 className="mt-2 text-[18px] font-semibold tracking-[0.08em] uppercase">
+              Repurchase agreement
+            </h2>
+            <p className="mt-2 text-[12px] font-medium text-[#1a2744]/70">
+              {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
+            </p>
+          </header>
+          {request ? (
+            <p className="text-[14px] leading-relaxed text-[#3a342c]">
+              This is a sale and repurchase of your timepieces. Read the terms, then write your
+              name. You and MAC sign the paper when the pieces are delivered.
+            </p>
+          ) : null}
           {snapshot.ok && snapshot.value ? (
             <>
               {snapshot.value.facts.map((line) => (
@@ -531,17 +507,17 @@ export default function AgreementDetailPage() {
               ))}
               {snapshot.value.clauses.map((clause) => (
                 <section key={clause.number}>
-                  <h3 className="mb-1 text-xs font-semibold tracking-[0.12em] uppercase">
+                  <h3 className="mb-1 text-[12px] font-semibold tracking-[0.12em] text-[#1a2744] uppercase">
                     {clause.number}. {clause.heading}
                   </h3>
-                  <p>{clause.body}</p>
+                  <p className="text-[#3a342c]">{clause.body}</p>
                 </section>
               ))}
               <div>
-                <h3 className="mb-2 text-xs font-semibold tracking-[0.12em] uppercase">
+                <h3 className="mb-2 text-[12px] font-semibold tracking-[0.12em] text-[#1a2744] uppercase">
                   Monthly repurchase schedule
                 </h3>
-                <table className="w-full text-left text-[12px]">
+                <table className="w-full text-left text-[13px]">
                   <thead>
                     <tr>
                       <th className="pb-1">Month</th>
@@ -646,20 +622,41 @@ export default function AgreementDetailPage() {
           {agreement.signedAt ? (
             <p className="font-semibold text-emerald-800">Signed {agreement.signedAt}</p>
           ) : null}
+          {request && canSign ? (
+            <RequestSignSheet
+              title={signTitle}
+              typedName={typedName}
+              onTypedNameChange={setTypedName}
+              delivery={delivery}
+              onDeliveryChange={setDeliveryChoice}
+              busy={requestBusy}
+              error={signError}
+              onSubmit={() => void onSign()}
+            />
+          ) : null}
+          {request && acceptedName && !canSign ? (
+            <p className="border-t border-[#1a2744]/15 pt-5 text-[14px] text-[#1a2744]">
+              Accepted as {acceptedName}. You and MAC sign the paper agreement when the timepieces
+              are delivered.
+            </p>
+          ) : null}
         </article>
         {bookMode === "live" && documents.length ? (
           <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
-            <h3 className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Stored document</h3>
+            <h3 className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Agreement PDF</h3>
+            <p className="mt-1 text-[13px] text-mac-fg">
+              A legal document. You and MAC sign the paper when the timepieces are delivered.
+            </p>
             <p className="mt-1 text-[12px] text-mac-muted">
               {counselLabelForStage(documents.find((row) => row.status === "stored")?.stage
                 ?? documents[0]?.stage)}
             </p>
             <ul className="mt-3 space-y-2">
               {documents.map((row) => (
-                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-mac-muted">
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-mac-muted">
                   <span>
-                    Version {row.version} · {row.stage ?? "document"} · {row.status === "building" ? "PDF preparing" : row.status}
-                    {row.checksum ? ` · ${row.checksum.slice(0, 8)}` : ""}
+                    Version {row.version}
+                    {row.status === "building" ? " · preparing" : ""}
                   </span>
                   {row.status === "stored" ? (
                     <span className="flex gap-3">
@@ -690,33 +687,25 @@ export default function AgreementDetailPage() {
                   disabled={mailBusy}
                   onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "self")}
                 >
-                  Email me
+                  Email me a copy
                 </button>
-                <label className="block text-[11px] text-mac-faint">
-                  Other email
+                <label className="block border-b border-mac-line py-2">
+                  <span className="text-[12px] text-mac-faint">Send a copy to</span>
                   <input
-                    className="mt-1 w-full bg-transparent text-[13px] text-mac-fg outline-none"
+                    type="email"
+                    className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none"
                     value={otherAddress}
                     onChange={(event) => setOtherAddress(event.target.value)}
-                    autoComplete="off"
-                  />
-                </label>
-                <label className="block text-[11px] text-mac-faint">
-                  Confirm other email
-                  <input
-                    className="mt-1 w-full bg-transparent text-[13px] text-mac-fg outline-none"
-                    value={confirmAddress}
-                    onChange={(event) => setConfirmAddress(event.target.value)}
-                    autoComplete="off"
+                    autoComplete="email"
                   />
                 </label>
                 <button
                   type="button"
                   className="text-[11px] font-bold tracking-[0.14em] text-mac-gold uppercase"
-                  disabled={mailBusy}
+                  disabled={mailBusy || !otherAddress.trim()}
                   onClick={() => void emailStoredDocument(documents.find((row) => row.status === "stored")?.id ?? "", "other")}
                 >
-                  Email this address
+                  Send
                 </button>
               </div>
             ) : null}

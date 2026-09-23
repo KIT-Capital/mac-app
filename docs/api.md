@@ -229,9 +229,10 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   (any desk role, `decision: confirm | decline` — never an amount),
   `request.decline` and `request.withdraw` (retail owner; withdraw is five
   attempts per customer per day including refusals, else `THROTTLED`),
-  `request.flagCustomerSuccess` (desk, internal), `request.signCollector`
-  (retail owner, from `returned`: typed name, the displayed `snapshotHash`,
-  optional delivery; a failed proposal is recovered on the sign call itself),
+  `request.flagCustomerSuccess` (desk, internal),   `request.signCollector`
+  (retail owner, from `submitted` or `returned`: typed name, the displayed
+  `snapshotHash`, optional delivery; a failed proposal is recovered on the
+  sign call itself),
   `request.recordDelivery` (any desk, from `collector_signed`),
   `request.inspect` (appraiser or super admin: per-piece confirm / refuse /
   drop plus inspected cents, or decline), `request.executeMac` (appraiser or
