@@ -107,6 +107,18 @@ test.describe("collector app", () => {
     await expect(page).toHaveURL(/\/collection$/);
   });
 
+  test("signup refuses a phone that omits the country code", async ({ page }) => {
+    await page.goto("/signup");
+    await page.getByLabel("Full Legal Name").fill("Ada Locke");
+    await page.getByLabel("Email Address").fill("ada.nocode@example.com");
+    await page.getByLabel("Direct Phone Number").fill("2125550199");
+    await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
+    await page.getByRole("checkbox", { name: /privacy policy/i }).check();
+    await page.getByRole("button", { name: "Create Account" }).click();
+    await expect(page.getByText(/Start the phone number with the country code/i)).toBeVisible();
+    await expect(page).toHaveURL(/\/signup$/);
+  });
+
   test("Hale collection shows demo pieces and photographs", async ({ page }) => {
     await signInHale(page);
     await expect(page.getByText("Richard Mille")).toBeVisible();
@@ -589,6 +601,8 @@ test.describe("collector app", () => {
     await expect(page.getByLabel("Your name")).toBeVisible();
     await expect(page.getByRole("button", { name: "Accept these terms", exact: true })).toBeVisible();
     await expect(page.getByText("Confirm other email")).toHaveCount(0);
+    await expect(page.getByText("Send a copy to")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Email this address" })).toHaveCount(0);
     // Internal states and loan-adjacent words never reach a collector (R29).
     await expect(page.getByText(/originated|submitted|advance|principal|borrower/i)).toHaveCount(0);
     await expect(page.getByText(/\b(inspecting|collector_signed)\b/i)).toHaveCount(0);
