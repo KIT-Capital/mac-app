@@ -53,6 +53,8 @@ Changing money math needs owner approval and the full review required by
 
 Every **executed** agreement is read with the same six labels on desk and collector: **open**, **past due**, **bought back**, **in liquidation**, **liquidated**, **renewed**. Unexecuted requests are not on this book; they use request words (With MAC / Your turn / Closed). Pieces stay listed on `watchIds` and do not get their own book labels. A timepiece on an **open**, **past due**, or **in liquidation** repo cannot join another live repo. After **bought back**, **liquidated**, or **renewed**, those pieces are free unless a renewal moved them to the successor.
 
+After Apply, the collector writes their name on the terms. That acceptance moves the request to intake. MAC and the collector sign the paper agreement when the timepieces are delivered. There is no electronic signature service. The Desk may still decline a request that has not been accepted.
+
 - Signature stays `draft` / `pending_signature` / `signed`. Signing does not write a book end. A book end does not change the signature flag.
 - Staff persist one current generic end: kind (`bought_back` | `in_liquidation` | `liquidated`), calendar date, and dollar amount. Staff may overwrite or clear that end. There is no end history in this app. Paid close is **bought back**. Admin **Renew** is the only path to **renewed**: it closes a live repo at that month’s Scenario 60 repurchase dollars and atomically opens a new 12-month repo with the same pieces at that scheduled amount. The collector may add free pieces; they may raise the sale amount only up to the desk LTV cap. Renewal does not post cash.
 - In live mode every newly created or renewed repo freezes a scale derived inside

@@ -29,3 +29,7 @@ Staff already shipped this flow (appraisal attempts, request transitions, inspec
 ## Reversal conditions
 
 Counsel-required executed-document vocabulary on the snapshot itself, or an owner-approved change to which dollar drives the purchase cap.
+
+## Amendment (2026-09-22)
+
+The collector writes their name on the terms as acceptance. That acceptance moves the request to intake. There is no electronic signature service. MAC and the collector sign the paper agreement when the timepieces are delivered. The Desk may still decline a request that has not been accepted.

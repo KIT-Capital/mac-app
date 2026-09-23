@@ -103,11 +103,13 @@ export async function openDeskBook(page: Page) {
   await page.getByRole("tab", { name: "Book" }).click();
 }
 
-export async function signHaleCollectorRequest(page: Page, opener = "Sign") {
-  await page.getByRole("button", { name: opener, exact: true }).click();
-  await page.getByLabel("Typed name").fill("Jonathan Hale");
-  await page.getByText("I have read this agreement and I am signing it").click();
-  await page.getByRole("button", { name: opener, exact: true }).click();
+export async function signHaleCollectorRequest(page: Page, buttonName = "Accept these terms") {
+  const name = page.getByLabel("Your name");
+  if (!(await name.isVisible())) {
+    await page.getByRole("button", { name: buttonName, exact: true }).click();
+  }
+  await name.fill("Jonathan Hale");
+  await page.getByRole("button", { name: buttonName, exact: true }).click();
   await expect(page.getByText("Awaiting inspection.")).toBeVisible();
 }
 

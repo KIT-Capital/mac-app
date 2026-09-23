@@ -584,6 +584,9 @@ test.describe("collector app", () => {
     await expect(page.getByRole("button", { name: "Sign Repurchase Agreement" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ask for less" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Withdraw" })).toBeVisible();
+    await expect(page.getByLabel("Your name")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Accept these terms", exact: true })).toBeVisible();
+    await expect(page.getByText("Confirm other email")).toHaveCount(0);
     // Internal states and loan-adjacent words never reach a collector (R29).
     await expect(page.getByText(/originated|submitted|advance|principal|borrower/i)).toHaveCount(0);
     await expect(page.getByText(/\b(inspecting|collector_signed)\b/i)).toHaveCount(0);
