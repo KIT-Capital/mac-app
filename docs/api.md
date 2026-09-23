@@ -175,7 +175,8 @@ still answers **403** `PDF_ORIGIN_FORBIDDEN`.
   known customer with Twilio Verify configured receives an SMS. Live collector
   access does not require Twilio keys; email codes still work if SMS is unset. Copy does not promise a MAC-branded
   from-number.
-- `action: "register"` accepts bounded `name`, normalized `email`, and `phone`.
+- `action: "register"` accepts bounded `name`, normalized `email`, and a required
+  `phone` that starts with the country code. The phone is stored in international form.
   The details stay in the hashed-token row and no customer exists before confirmation.
 - Live mail sends a six-digit code, not a clickable URL. JSON
   `POST /api/collector-session/verify` with `{ email, code }` consumes the code

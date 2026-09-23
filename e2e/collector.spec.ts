@@ -85,6 +85,7 @@ test.describe("collector app", () => {
     await page.goto("/signup");
     await page.getByLabel("Full Legal Name").fill("Ada Locke");
     await page.getByLabel("Email Address").fill("ada@example.com");
+    await page.getByLabel("Direct Phone Number").fill("+1 212 555 0199");
     await expect(page.getByText("Watch business")).toBeVisible();
     await page.getByRole("radio", { name: /Watch business/i }).check();
     await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
@@ -524,6 +525,7 @@ test.describe("collector app", () => {
     await page.goto("/signup");
     await page.getByLabel("Full Legal Name").fill("Desk Pretender");
     await page.getByLabel("Email Address").fill("admin@mechartcap.com");
+    await page.getByLabel("Direct Phone Number").fill("+1 212 555 0199");
     await page.getByRole("checkbox", { name: /at least 18 years old/i }).check();
     await page.getByRole("checkbox", { name: /privacy policy/i }).check();
     await page.getByRole("button", { name: "Create Account" }).click();

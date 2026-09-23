@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { Field, PillButton } from "@/components/field";
 import { WatchPhoto } from "@/components/watch-photo";
 import { isReservedDeskEmail } from "@/lib/auth";
+import { requireCountryCodePhone } from "@/lib/phone.mjs";
 import { isRetailRole } from "@/lib/roles.mjs";
 import type { RetailRole } from "@/lib/types";
 import { readImagePreview } from "@/lib/image";
@@ -31,7 +32,17 @@ export default function SettingsPage() {
       setSaved(false);
       return;
     }
-    updateProfile({ name, email, phone, role: partyKind });
+    let normalizedPhone = phone;
+    if (isRetailRole(user?.role)) {
+      try {
+        normalizedPhone = requireCountryCodePhone(phone);
+      } catch {
+        setError("Start the phone number with the country code, such as +1.");
+        setSaved(false);
+        return;
+      }
+    }
+    updateProfile({ name, email, phone: normalizedPhone, role: partyKind });
     setError("");
     setSaved(true);
   }
@@ -86,9 +97,16 @@ export default function SettingsPage() {
         <Field label="Direct Email">
           <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
         </Field>
-        <Field label="Verified Phone">
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-transparent text-[15px] text-mac-fg outline-none" />
+        <Field label="Phone">
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full bg-transparent text-[15px] text-mac-fg outline-none"
+            placeholder="+1 212 555 0100"
+            autoComplete="tel"
+          />
         </Field>
+        <p className="text-[12px] text-mac-muted">Start the phone number with the country code, such as +1.</p>
         {isRetailRole(user?.role) ? (
           <fieldset className="space-y-3">
             <legend className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-mac-champagne uppercase">

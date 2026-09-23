@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { isReservedDeskEmail } from "@/lib/auth";
 import type { RetailRole } from "@/lib/types";
 import { LOGIN_EMAIL_NOTICE } from "@/lib/login-copy.mjs";
+import { requireCountryCodePhone } from "@/lib/phone.mjs";
 import { sendAppEmail } from "@/lib/send-mail";
 import { useStore } from "@/lib/store";
 
@@ -28,6 +29,13 @@ export default function SignupPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    let normalizedPhone = "";
+    try {
+      normalizedPhone = requireCountryCodePhone(phone);
+    } catch {
+      setError("Start the phone number with the country code, such as +1.");
+      return;
+    }
     if (awaitingCode) {
       setBusy(true);
       const verified = await fetch("/api/collector-session/verify", {
@@ -50,7 +58,7 @@ export default function SignupPage() {
         signUp({
           name,
           email,
-          phone: phone || "+1 (212) 555-0100",
+          phone: normalizedPhone,
           member: false,
           role: partyKind,
         });
@@ -80,7 +88,7 @@ export default function SignupPage() {
     const registration = await fetch("/api/collector-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "register", name, email, phone, role: partyKind }),
+      body: JSON.stringify({ action: "register", name, email, phone: normalizedPhone, role: partyKind }),
       cache: "no-store",
       credentials: "include",
     }).catch(() => null);
@@ -106,11 +114,11 @@ export default function SignupPage() {
     signUp({
       name,
       email,
-      phone: phone || "+1 (212) 555-0100",
+      phone: normalizedPhone,
       member: false,
       role: partyKind,
     });
-    await sendAppEmail({ kind: "welcome", name, email, phone });
+    await sendAppEmail({ kind: "welcome", name, email, phone: normalizedPhone });
     setBusy(false);
     router.push("/collection/setup");
   }
@@ -206,8 +214,11 @@ export default function SignupPage() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="mt-1 w-full bg-transparent text-[15px] text-mac-fg outline-none placeholder:text-mac-faint"
-              placeholder="+1 (212) 555-0100"
+              placeholder="+1 212 555 0100"
+              autoComplete="tel"
+              required
             />
+            <span className="mt-1 block text-[11px] text-mac-faint">Start with the country code, such as +1.</span>
           </div>
 
           <fieldset className="space-y-3 rounded-xl border border-mac-line bg-mac-card p-3">
