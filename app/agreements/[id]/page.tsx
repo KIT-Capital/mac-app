@@ -34,6 +34,20 @@ type ListedDocument = {
   snapshotHash?: string;
 };
 
+function agreementDocumentLabel(row: ListedDocument) {
+  if (row.stage === "collector_signed") return "Your acceptance";
+  if (row.stage === "executed") return "Signed agreement";
+  if (row.stage === "proposal") return "Proposal";
+  return `Version ${row.version}`;
+}
+
+function visibleAgreementDocuments(rows: ListedDocument[]) {
+  const stored = new Set(
+    rows.filter((row) => row.status === "stored").map((row) => `${row.stage ?? ""}:${row.version}`),
+  );
+  return rows.filter((row) => row.status !== "failed" || !stored.has(`${row.stage ?? ""}:${row.version}`));
+}
+
 type LoadedDocuments = {
   mode: "browser" | "live" | "unavailable";
   documents: ListedDocument[];
@@ -473,20 +487,21 @@ export default function AgreementDetailPage() {
 
         {request ? <RequestThread events={visibleEvents} /> : null}
 
-        <article className="space-y-5 rounded-2xl bg-mac-parchment p-8 text-justify text-[15px] leading-7 text-[#1a2744] shadow-md [font-family:Georgia,'Iowan_Old_Style','Palatino_Linotype',Palatino,serif]">
-          <header className="text-center">
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-[#1a2744]/55 uppercase">
+        <article className="space-y-5 rounded-2xl bg-mac-parchment p-8 text-justify text-[15px] leading-7 text-mac-navy shadow-md [font-family:Georgia,'Iowan_Old_Style','Palatino_Linotype',Palatino,serif]">
+          <header className="border-b border-mac-navy/20 pb-5 text-center">
+            <p className="text-[11px] font-semibold tracking-[0.22em] text-mac-navy uppercase">
               Mechanical Art Capital
             </p>
-            <h2 className="mt-2 text-[18px] font-semibold tracking-[0.08em] uppercase">
-              Repurchase agreement
+            <div className="mx-auto mt-3 h-0.5 w-16 bg-mac-gold" />
+            <h2 className="mt-4 text-[17px] font-semibold tracking-[0.14em] text-mac-navy uppercase">
+              Sale and Repurchase Agreement
             </h2>
-            <p className="mt-2 text-[12px] font-medium text-[#1a2744]/70">
+            <p className="mt-2 text-[12px] italic text-mac-navy/70">
               {AGREEMENT_FACE_LABEL}
             </p>
           </header>
           {request ? (
-            <p className="text-[14px] leading-relaxed text-[#3a342c]">
+            <p className="text-[14px] leading-relaxed text-mac-navy/80">
               This is a sale and repurchase of your timepieces. Read the terms, then write your
               name. You and MAC sign the paper when the pieces are delivered.
             </p>
@@ -498,15 +513,15 @@ export default function AgreementDetailPage() {
               ))}
               {snapshot.value.clauses.map((clause) => (
                 <section key={clause.number}>
-                  <h3 className="mb-1 text-[12px] font-semibold tracking-[0.12em] text-[#1a2744] uppercase">
+                  <h3 className="mb-1 text-[12px] font-semibold tracking-[0.12em] text-mac-navy uppercase">
                     {clause.number}. {clause.heading}
                   </h3>
-                  <p className="text-[#3a342c]">{clause.body}</p>
+                  <p>{clause.body}</p>
                 </section>
               ))}
               <div>
-                <h3 className="mb-2 text-[12px] font-semibold tracking-[0.12em] text-[#1a2744] uppercase">
-                  Monthly repurchase schedule
+                <h3 className="mb-2 text-center text-[12px] font-semibold tracking-[0.16em] text-mac-navy uppercase">
+                  Schedule A · Monthly repurchase prices
                 </h3>
                 <table className="mx-auto w-full max-w-xl border-collapse text-center text-[13px]">
                   <thead>
@@ -626,7 +641,7 @@ export default function AgreementDetailPage() {
             />
           ) : null}
           {request && acceptedName && !canSign ? (
-            <p className="border-t border-[#1a2744]/15 pt-5 text-[14px] text-[#1a2744]">
+            <p className="border-t border-mac-navy/15 pt-5 text-[14px] text-mac-navy">
               Accepted as {acceptedName}. You and MAC sign the paper agreement when the timepieces
               are delivered.
             </p>
@@ -636,16 +651,16 @@ export default function AgreementDetailPage() {
           <section className="mt-4 rounded-xl border border-mac-line bg-mac-card p-3">
             <h3 className="text-[10px] font-bold tracking-wider text-mac-gold uppercase">Agreement PDF</h3>
             <p className="mt-1 text-[13px] text-mac-fg">
-              A legal document. You and MAC sign the paper when the timepieces are delivered.
+              The paper agreement. You and MAC sign it when the timepieces are delivered.
             </p>
             <p className="mt-1 text-[12px] text-mac-muted">
               {AGREEMENT_FACE_LABEL}
             </p>
             <ul className="mt-3 space-y-2">
-              {documents.map((row) => (
+              {visibleAgreementDocuments(documents).map((row) => (
                 <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-mac-muted">
                   <span>
-                    Version {row.version}
+                    {agreementDocumentLabel(row)}
                     {row.status === "building" ? " · preparing" : ""}
                   </span>
                   {row.status === "stored" ? (
