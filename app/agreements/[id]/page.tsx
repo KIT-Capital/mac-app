@@ -11,7 +11,7 @@ import { WatchPhoto } from "@/components/watch-photo";
 import { COMPANY, hasApplication, money } from "@/lib/catalog";
 import { bookLabel, isRequestExpired } from "@/lib/contract/repo-book.mjs";
 import { repurchaseDollars, repurchaseSchedule, resolveScale } from "@/lib/contract/repo-scale.mjs";
-import { buildAgreementSnapshot, counselLabelForStage, documentStageForAgreementStatus } from "@/lib/contract/repo-agreement-snapshot.mjs";
+import { AGREEMENT_FACE_LABEL, buildAgreementSnapshot, documentStageForAgreementStatus } from "@/lib/contract/repo-agreement-snapshot.mjs";
 import {
   isRequestRow,
   nextAllowedActions,
@@ -473,7 +473,7 @@ export default function AgreementDetailPage() {
 
         {request ? <RequestThread events={visibleEvents} /> : null}
 
-        <article className="space-y-5 rounded-2xl bg-mac-parchment p-6 text-[15px] leading-relaxed text-[#1a2744] shadow-md">
+        <article className="space-y-5 rounded-2xl bg-mac-parchment p-8 text-justify text-[15px] leading-7 text-[#1a2744] shadow-md [font-family:Georgia,'Iowan_Old_Style','Palatino_Linotype',Palatino,serif]">
           <header className="text-center">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-[#1a2744]/55 uppercase">
               Mechanical Art Capital
@@ -482,7 +482,7 @@ export default function AgreementDetailPage() {
               Repurchase agreement
             </h2>
             <p className="mt-2 text-[12px] font-medium text-[#1a2744]/70">
-              {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
+              {AGREEMENT_FACE_LABEL}
             </p>
           </header>
           {request ? (
@@ -508,22 +508,22 @@ export default function AgreementDetailPage() {
                 <h3 className="mb-2 text-[12px] font-semibold tracking-[0.12em] text-[#1a2744] uppercase">
                   Monthly repurchase schedule
                 </h3>
-                <table className="w-full text-left text-[13px]">
+                <table className="mx-auto w-full max-w-xl border-collapse text-center text-[13px]">
                   <thead>
                     <tr>
-                      <th className="pb-1">Month</th>
-                      <th className="pb-1">Date</th>
-                      <th className="pb-1">Price</th>
-                      <th className="pb-1">Basis</th>
+                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Month</th>
+                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Date</th>
+                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Price</th>
+                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Basis</th>
                     </tr>
                   </thead>
                   <tbody>
                     {snapshot.value.schedule.rows.map((row) => (
                       <tr key={row.month}>
-                        <td>{row.month}</td>
-                        <td>{row.date}</td>
-                        <td>{moneyExact(row.price || 0)}</td>
-                        <td>{row.note}</td>
+                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.month}</td>
+                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.date}</td>
+                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{moneyExact(row.price || 0)}</td>
+                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.note}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -583,20 +583,20 @@ export default function AgreementDetailPage() {
                   <h3 className="mb-2 text-xs font-semibold tracking-[0.12em] uppercase">
                     Repurchase price by month
                   </h3>
-                  <table className="w-full text-left text-[12px]">
+                  <table className="mx-auto w-full max-w-xl border-collapse text-center text-[12px]">
                     <thead>
                       <tr>
-                        <th className="pb-1">Date</th>
-                        <th className="pb-1">Price</th>
-                        <th className="pb-1">Basis</th>
+                        <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Date</th>
+                        <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Price</th>
+                        <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Basis</th>
                       </tr>
                     </thead>
                     <tbody>
                       {schedule.rows.map((row) => (
                         <tr key={row.month}>
-                          <td>{row.date}</td>
-                          <td>{moneyExact(row.price || 0)}</td>
-                          <td>{row.note}</td>
+                          <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.date}</td>
+                          <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{moneyExact(row.price || 0)}</td>
+                          <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.note}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -639,8 +639,7 @@ export default function AgreementDetailPage() {
               A legal document. You and MAC sign the paper when the timepieces are delivered.
             </p>
             <p className="mt-1 text-[12px] text-mac-muted">
-              {counselLabelForStage(documents.find((row) => row.status === "stored")?.stage
-                ?? documents[0]?.stage)}
+              {AGREEMENT_FACE_LABEL}
             </p>
             <ul className="mt-3 space-y-2">
               {documents.map((row) => (
@@ -708,7 +707,7 @@ export default function AgreementDetailPage() {
               </PillButton>
             </div>
             <p className="text-center text-[11px] text-mac-faint">
-              Temporary preview — not stored. {counselLabelForStage(documentStageForAgreementStatus(agreement.status))}
+              Temporary preview — not stored. {AGREEMENT_FACE_LABEL}
             </p>
           </div>
         ) : null}
