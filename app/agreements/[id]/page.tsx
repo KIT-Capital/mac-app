@@ -511,19 +511,19 @@ export default function AgreementDetailPage() {
                 <table className="mx-auto w-full max-w-xl border-collapse text-center text-[13px]">
                   <thead>
                     <tr>
-                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Month</th>
-                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Date</th>
-                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Price</th>
-                      <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Basis</th>
+                      <th className="border-b border-mac-navy px-2 py-2 font-semibold">Month</th>
+                      <th className="border-b border-mac-navy px-2 py-2 font-semibold">Date</th>
+                      <th className="border-b border-mac-navy px-2 py-2 font-semibold">Price</th>
+                      <th className="border-b border-mac-navy px-2 py-2 font-semibold">Basis</th>
                     </tr>
                   </thead>
                   <tbody>
                     {snapshot.value.schedule.rows.map((row) => (
                       <tr key={row.month}>
-                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.month}</td>
-                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.date}</td>
-                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{moneyExact(row.price || 0)}</td>
-                        <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.note}</td>
+                        <td className="border-b border-mac-navy/15 px-2 py-1.5">{row.month}</td>
+                        <td className="border-b border-mac-navy/15 px-2 py-1.5">{row.date}</td>
+                        <td className="border-b border-mac-navy/15 px-2 py-1.5">{moneyExact(row.price || 0)}</td>
+                        <td className="border-b border-mac-navy/15 px-2 py-1.5">{row.note}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -586,17 +586,17 @@ export default function AgreementDetailPage() {
                   <table className="mx-auto w-full max-w-xl border-collapse text-center text-[12px]">
                     <thead>
                       <tr>
-                        <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Date</th>
-                        <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Price</th>
-                        <th className="border-b border-[#0E2A44] px-2 py-2 font-semibold">Basis</th>
+                        <th className="border-b border-mac-navy px-2 py-2 font-semibold">Date</th>
+                        <th className="border-b border-mac-navy px-2 py-2 font-semibold">Price</th>
+                        <th className="border-b border-mac-navy px-2 py-2 font-semibold">Basis</th>
                       </tr>
                     </thead>
                     <tbody>
                       {schedule.rows.map((row) => (
                         <tr key={row.month}>
-                          <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.date}</td>
-                          <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{moneyExact(row.price || 0)}</td>
-                          <td className="border-b border-[#0E2A44]/15 px-2 py-1.5">{row.note}</td>
+                          <td className="border-b border-mac-navy/15 px-2 py-1.5">{row.date}</td>
+                          <td className="border-b border-mac-navy/15 px-2 py-1.5">{moneyExact(row.price || 0)}</td>
+                          <td className="border-b border-mac-navy/15 px-2 py-1.5">{row.note}</td>
                         </tr>
                       ))}
                     </tbody>
