@@ -30,7 +30,7 @@ This file is the checklist. It does not migrate a database, change a Railway var
 - [x] Journal applied 2026-09-22 with `npm run db:migrate:staging`. Applied count 39, through `0038_special_obadiah_stane`. Endpoint `ep-calm-heart-a5ttpc4d`. Staff: Ricardo Cidale super admin, Dov Tuzman appraiser, Rosario David admin.
 - [x] Railway staging was already on current `main` (`2e5a8e9`) and stayed healthy after the migrate.
 - [ ] Rehearse restore on staging the same way as `docs/runbooks/restore-drill.md`, against a staging preview branch, then delete that preview.
-- [ ] Smoke: staff sign-in, one collector verification, one upload, one stored PDF, one export. Paste counts only.
+- [x] Smoke: staff sign-in, one collector verification, one upload, one stored PDF, one export (2026-09-24). Counts only: requests not on the book 1, executed repos 0, stored agreement PDFs 2 (proposal 1, acceptance 1) plus 1 failed acceptance row, photos stored with a preview 11 and none missing a preview, pieces 2 (1 in a request, 1 free), active collectors 2, dealers 0, suspended customers 0. The desk export for that book is 0 active repos and 1 draft. The practice collector was not suspended.
 
 ## Production prerequisites
 
