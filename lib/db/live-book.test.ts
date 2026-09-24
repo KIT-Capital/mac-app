@@ -2288,8 +2288,10 @@ describe("repo requests", { skip }, () => {
     assert.ok(executedDoc);
     const snapshot = executedDoc.snapshot as { text: string; label: string };
     assert.equal(snapshot.label, ATTESTATION_LABEL);
-    assert.match(snapshot.text, /Collector: /);
-    assert.match(snapshot.text, /MAC: /);
+    assert.match(snapshot.text, /IN WITNESS WHEREOF/);
+    assert.match(snapshot.text, new RegExp(`Name: ${owner.customer.name}`));
+    assert.match(snapshot.text, /Name: Dov Tuzman/);
+    assert.doesNotMatch(snapshot.text, /Document snapshot/);
     const sends = await db.select().from(agreementDocumentSends).where(eq(agreementDocumentSends.documentId, executedDoc.id));
     assert.equal(sends.filter((row) => row.actorKind === "system").length, 2);
     assert.ok(sends.every((row) => row.result === "accepted"));
