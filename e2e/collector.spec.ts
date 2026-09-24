@@ -743,7 +743,7 @@ test.describe("collector app", () => {
     await openCollectorAgreements(page);
     await page.getByRole("link", { name: /MAC-31419/ }).click();
     await expect(page.getByText(/pending legal approval/i).first()).toBeVisible();
-    await expect(page.getByText(/software attestation, not counsel-approved/i).first()).toBeVisible();
+    await expect(page.getByText(/software attestation/i)).toHaveCount(0);
     await expect(page.getByText(/not a loan/i)).toBeVisible();
     await expect(page.getByText(/\bstored document\b/i)).toHaveCount(0);
     await expect(page.getByText(/\bofficial\b/i)).toHaveCount(0);
